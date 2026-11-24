@@ -2,7 +2,7 @@
 
 # BaattleCraft｜十字對衝
 
-[在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [目前狀態與待辦](research/STATUS.md) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)
+[在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [目前狀態與待辦](research/STATUS.md) · [開放議題](https://github.com/xdxd-lab/battle_craft/issues) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)
 
 BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購兵與部隊沿十字路線自動交戰；四人連線和戰爭迷霧尚待開發。
 
