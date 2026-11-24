@@ -1,8 +1,12 @@
+![BaattleCraft 原創科幻十字戰場概念橫幅](assets/branding/baattlecraft-banner.png)
+
 # BaattleCraft｜十字對衝
 
-[在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)
+[在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [目前狀態與待辦](research/STATUS.md) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)
 
 BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購兵與部隊沿十字路線自動交戰；四人連線和戰爭迷霧尚待開發。
+
+橫幅是原創場景概念圖，供儲存庫展示及後續美術方向討論；遊戲內畫面以各版試作為準。
 
 ## 版本紀錄
 
@@ -10,7 +14,7 @@ BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購
 | --- | --- |
 | [v1](v1/battle_craft-v1.html) | 2D 單機，以按鍵購兵，部隊沿中央道路進軍。 |
 | [v2](v2/battle_craft-v2.html) | 信標移到戰區外，站著等到金幣足夠會購買；每次停留只買一次。 |
-| [v3](v3/battle_craft-v3.html) | [3D Garden 裝飾試作](v3/README.md)，含紙板樹、木桶與 2D 回退。歷史版購兵需重新踏入。 |
+| [v3](v3/battle_craft-v3.html) | [3D Garden 裝飾試作](v3/README.md)，含紙板樹、木桶與 2D 回退。此版可站著等金幣買一次；[最初快照](research/archive/battle_craft-v3-original.html)須重新踏入。 |
 | [v4](v4/battle_craft-v4.html) | [傾斜 3D 星際戰場](v4/README.md)，加入寫實燈具與畫質切換。每次停留只買一次。 |
 | [v5](v5/battle_craft-v5.html) | [提高俯角、持續自動購兵、血條與分色事件紀錄](v5/README.md)。建議從此版試玩。 |
 | [v5-2](v5-2/battle_craft-v5-2.html) | 保留歷史 HTML 快照。 |

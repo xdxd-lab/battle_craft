@@ -45,7 +45,7 @@ html = html.replace(
     '<canvas id="field" width="760" height="520" tabindex="0" aria-label="十字戰場。點選場外信標，或用方向鍵移動指揮官。"></canvas>',
     '<div id="arena"><canvas id="field" width="760" height="520" tabindex="0" aria-label="十字戰場。點選場外信標，或用方向鍵移動指揮官。"></canvas></div>\n<small id="garden-state" role="status">3D Garden 場景載入中…</small>',
 )
-html = html.replace('每次進入只買一次，離開再踩可再買。', '每次踏入只判定一次；金幣不足時，離開後再踏入才能購買。')
+html = html.replace('每次進入只買一次，離開再踩可再買。', '金幣不足時站在信標上等待，存夠就自動購買一次；離開再踏入可再次購買。')
 html = html.replace('<button id="reset">重新開始</button>', '<button id="reset">重新開始</button><button id="toggle-garden" aria-pressed="true">隱藏 3D 場景</button>')
 html = html.replace(
     '<details><summary>本版暫定規則</summary>',
