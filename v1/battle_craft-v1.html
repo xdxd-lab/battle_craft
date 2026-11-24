@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-Hant">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BaattleCraft｜十字對衝</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#10191e;color:#edf4ec;font:16px/1.55 system-ui,sans-serif}
+main{max-width:880px;margin:auto;padding:clamp(12px,3vw,32px)}
+header,.tools,.status{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:clamp(28px,5vw,48px);letter-spacing:.08em;margin:0}small{color:#a8c2bc}
+button{font:inherit;color:#e6efeb;background:#26373d;border:1px solid #53696b;padding:8px 14px;border-radius:6px;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}button:focus-visible,canvas:focus-visible{outline:3px solid #ffd66a}
+#buy{background:#f4cd64;color:#172025;font-weight:700;min-width:150px}
+.status{padding:12px 0;font-variant-numeric:tabular-nums}.gold{color:#ffda78}
+canvas{display:block;width:100%;aspect-ratio:760/416;border-radius:8px;background:#19282d;touch-action:none}
+.tools{justify-content:flex-start;margin-top:14px}p{margin:10px 0}#message{color:#ffdd86;min-height:1.6em}
+details{margin-top:18px;color:#bad0cb}summary{cursor:pointer}kbd{font:inherit;color:white}
+</style>
+<main>
+<header><div><small>單機原型 · 玩家對電腦</small><h1>BaattleCraft</h1><small>十字對衝</small></div><button id="save">下載離線版</button></header>
+<div class="status"><b id="wallet" class="gold"></b><span id="health"></span><span id="clock"></span></div>
+<canvas id="field" width="760" height="416" tabindex="0" aria-label="十字戰場。點選踏板，或用方向鍵移動指揮官。"></canvas>
+<div class="tools"><button id="buy">購兵</button><button id="pause">開始對局</button><button id="reset">重新開始</button></div>
+<p id="message" role="status"></p>
+<small>點選地面或用 WASD／方向鍵移動。站上黃色踏板後，按空白鍵或「購兵」。</small>
+<details><summary>本版暫定規則</summary><p>你指揮左方青隊。北側踏板花 5 金出 1 兵，南側踏板花 12 金出 3 兵。雙方同樣以 12 金開局，每秒收入 1 金。士兵從基地自動沿中央道路進軍，遇敵交戰。先攻破對方基地者獲勝。電腦會定期購兵。</p></details>
+</main>
+<script>
+const el=id=>document.getElementById(id);
+const field=el('field'),ctx=field.getContext('2d');
+const pads=[{x:280,y:80,cost:5,count:1},{x:280,y:336,cost:12,count:3}];
+const keys=new Set(),step=1/30;
+let game,acc=0,prev=0;
+function reset(){
+ game={mode:'ready',tick:0,gold:[12,12],hp:[18,18],units:[],serial:0,
+ player:{x:170,y:208},goal:null,fx:[],nextAI:90};
+ keys.clear();acc=0;el('message').textContent='按「開始對局」，再點一個購兵踏板。';hud();draw()
+}
+function onPad(){return pads.find(p=>Math.hypot(p.x-game.player.x,p.y-game.player.y)<=34)}
+function hud(){
+ const p=onPad();el('wallet').textContent='金幣　'+game.gold[0];
+ el('health').textContent='我方基地 '+game.hp[0]+'　／　敵方 '+game.hp[1];
+ el('clock').textContent=Math.floor(game.tick/30)+' 秒';
+ el('buy').textContent=p?'購 '+p.count+' 兵 · '+p.cost+' 金':'購兵（需站上踏板）';
+ el('buy').disabled=game.mode!=='play'||!p||game.gold[0]<p.cost;
+ el('pause').textContent=({ready:'開始對局',play:'暫停',paused:'繼續',end:'對局結束'})[game.mode];
+ el('pause').disabled=game.mode==='end'
+}
+function toggle(){
+ if(game.mode==='end')return;
+ game.mode=game.mode==='play'?'paused':'play';keys.clear();acc=0;
+ el('message').textContent=game.mode==='play'?'前往踏板，選擇立即增援或存錢集結。':'已暫停。';
+ hud();draw()
+}
+function recruit(team,p){
+ if(game.gold[team]<p.cost)return false;
+ game.gold[team]-=p.cost;
+ for(let i=0;i<p.count;i++){
+  const id=++game.serial;
+  game.units.push({id,team,x:team?678+i*5:82-i*5,y:197+(id%3)*11,hp:3,cd:0})
+ }
+ return true
+}
+function buy(){
+ if(game.mode!=='play')return;
+ const p=onPad();if(!p)return;
+ el('message').textContent=recruit(0,p)?'已花 '+p.cost+' 金，'+p.count+' 名士兵從我方基地出發。':'金幣不足。';hud()
+}
+function move(){
+ let dx=Number(keys.has('d')||keys.has('arrowright'))-Number(keys.has('a')||keys.has('arrowleft'));
+ let dy=Number(keys.has('s')||keys.has('arrowdown'))-Number(keys.has('w')||keys.has('arrowup'));
+ if(dx||dy)game.goal=null;
+ else if(game.goal){dx=game.goal.x-game.player.x;dy=game.goal.y-game.player.y}
+ const len=Math.hypot(dx,dy);if(!len)return;
+ const dist=game.goal?Math.min(5,len):5;
+ game.player.x=Math.max(15,Math.min(745,game.player.x+dx/len*dist));
+ game.player.y=Math.max(15,Math.min(401,game.player.y+dy/len*dist))
+}
+function update(){
+ game.tick++;move();
+ if(game.tick%30===0){game.gold[0]++;game.gold[1]++}
+ if(game.tick>=game.nextAI){recruit(1,game.gold[1]>=15?pads[1]:pads[0]);game.nextAI+=180}
+ const damage=new Map(),baseDamage=[0,0],moves=[];
+ for(const u of game.units){
+  u.cd=Math.max(0,u.cd-1);
+  let target=null,nearest=20;
+  for(const other of game.units){
+   const d=Math.abs(u.x-other.x);
+   if(other.team!==u.team&&d<nearest){nearest=d;target=other}
+  }
+  const enemy=1-u.team,baseX=enemy?701:59;
+  if(!target&&Math.abs(u.x-baseX)>23){moves.push(u);continue}
+  if(u.cd)continue;
+  u.cd=25;
+  if(target)damage.set(target.id,(damage.get(target.id)||0)+1);else baseDamage[enemy]++;
+  game.fx.push({x:target?target.x:baseX,y:target?target.y:208,t:6})
+ }
+ for(const u of moves)u.x+=u.team?-1.3:1.3;
+ game.units=game.units.filter(u=>(u.hp-=damage.get(u.id)||0)>0);
+ game.hp=game.hp.map((hp,i)=>Math.max(0,hp-baseDamage[i]));
+ game.fx=game.fx.filter(f=>--f.t>0);
+ if(game.hp.includes(0)){
+  game.mode='end';game.goal=null;keys.clear();
+  el('message').textContent=game.hp.every(h=>h===0)?'平手！雙方基地同時陷落。':game.hp[1]===0?'勝利！你的部隊攻破了敵方基地。':'敗北。敵軍攻破了我方基地。'
+ }
+ hud()
+}
+function circle(x,y,r,color){ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill()}
+function label(s,x,y,color,size=16){ctx.fillStyle=color;ctx.font='bold '+size+'px system-ui';ctx.textAlign='center';ctx.fillText(s,x,y)}
+function draw(){
+ ctx.fillStyle='#19282d';ctx.fillRect(0,0,760,416);
+ for(let y=8;y<416;y+=20)for(let x=8;x<760;x+=20){ctx.fillStyle='#33444a';ctx.fillRect(x,y,2,2)}
+ ctx.fillStyle='#304248';ctx.fillRect(0,174,760,68);ctx.fillRect(253,80,54,256);
+ ctx.strokeStyle='#62767a';ctx.setLineDash([7,12]);ctx.beginPath();ctx.moveTo(0,208);ctx.lineTo(760,208);ctx.stroke();ctx.setLineDash([]);
+ for(const p of pads){
+  circle(p.x,p.y,36,'#c7a954');circle(p.x,p.y,32,onPad()===p?'#635735':'#38403b');
+  label(p.count+' 兵',p.x,p.y-1,'#ffe39a');label(p.cost+' 金',p.x,p.y+18,'#ffe39a',13)
+ }
+ for(let i=0;i<2;i++){
+  const x=i?701:59,c=i?'#ff907a':'#60dfc9';
+  ctx.fillStyle=c;ctx.fillRect(x-18,189,36,38);ctx.fillRect(x-24,184,12,14);ctx.fillRect(x+12,184,12,14);
+  ctx.fillStyle='#1b2d31';ctx.fillRect(x-5,207,10,20);
+  label(i?'敵方基地':'我方基地',x,158,c)
+ }
+ for(const u of game.units){
+  circle(u.x,u.y,6,u.team?'#ff907a':'#60dfc9');
+  ctx.fillStyle='#eff5eb';ctx.fillRect(u.x-5,u.y-10,10*u.hp/3,2)
+ }
+ for(const f of game.fx)circle(f.x,f.y,7-f.t/2,'#ffe9a8');
+ if(game.goal&&Math.hypot(game.goal.x-game.player.x,game.goal.y-game.player.y)>6){
+  ctx.strokeStyle='#ffe09e';ctx.strokeRect(game.goal.x-4,game.goal.y-4,8,8)
+ }
+ const {x,y}=game.player;ctx.fillStyle='#fff0ba';ctx.beginPath();ctx.moveTo(x,y-12);ctx.lineTo(x+9,y+8);ctx.lineTo(x,y+4);ctx.lineTo(x-9,y+8);ctx.closePath();ctx.fill();
+ if(['end','paused'].includes(game.mode)){
+  ctx.fillStyle='#10191ed9';ctx.fillRect(0,168,760,80);
+  label(game.mode==='paused'?'已暫停':el('message').textContent,380,218,'#fff0ba',24)
+ }
+}
+field.onpointerdown=e=>{
+ if(game.mode!=='play')return;
+ const r=field.getBoundingClientRect();game.goal={x:Math.max(15,Math.min(745,(e.clientX-r.left)*760/r.width)),y:Math.max(15,Math.min(401,(e.clientY-r.top)*416/r.height))};field.focus()
+};
+const movement=['a','s','d','w','arrowup','arrowdown','arrowleft','arrowright'];
+window.addEventListener('keydown',e=>{
+ const key=e.key.toLowerCase();if(game.mode!=='play')return;
+ if(movement.includes(key)){e.preventDefault();keys.add(key)}
+ if(key===' '&&e.target.tagName!=='BUTTON'){e.preventDefault();if(!e.repeat)buy()}
+});
+window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));
+window.addEventListener('blur',()=>{keys.clear();if(game.mode==='play')toggle()});
+el('buy').onclick=()=>{buy();field.focus()};
+el('pause').onclick=()=>{toggle();field.focus()};el('reset').onclick=reset;
+el('save').onclick=()=>{
+ const url=URL.createObjectURL(new Blob(['<!doctype html>\n'+document.documentElement.outerHTML],{type:'text/html;charset=utf-8'}));
+ const a=document.createElement('a');a.href=url;a.download='battle_craft-v1.html';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)
+};
+function frame(now){
+ if(game.mode==='play'){
+  acc+=Math.min(.12,(now-prev)/1000);
+  while(acc>=step&&game.mode==='play'){update();acc-=step}
+  draw()
+ }
+ prev=now;requestAnimationFrame(frame)
+}
+reset();requestAnimationFrame(frame)
+</script>
+</html>

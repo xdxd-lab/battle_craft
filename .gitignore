@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+.original-html/
+research/local-source/
+*.generated.js
+*.bundle.js
+DRACOLoader.local.js
+__pycache__/

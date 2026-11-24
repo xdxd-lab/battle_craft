@@ -1,0 +1,41 @@
+map_id,trigger_1_based,selector,location,required_minerals,charged_minerals,spawn_unit,quantity,spawn_location,preserve_trigger
+2tzpVkp9,9,Terran Civilian,Marine,150,150,Jim Raynor (Marine),12,Purchased Units,True
+2tzpVkp9,22,Terran Civilian,Firebat,150,150,Gui Montag (Firebat),12,Purchased Units,True
+2tzpVkp9,23,Terran Civilian,Goliath,300,300,Alan Schezar (Goliath),12,Purchased Units,True
+2tzpVkp9,24,Terran Civilian,Ghost,150,150,Alexei Stukov (Ghost),12,Purchased Units,True
+2tzpVkp9,25,Terran Civilian,Vulture,200,200,Jim Raynor (Vulture),12,Purchased Units,True
+2tzpVkp9,26,Terran Civilian,Wraith,300,300,Tom Kazansky (Wraith),12,Purchased Units,True
+2tzpVkp9,27,Terran Civilian,Zergling,100,100,Devouring One (Zergling),12,Purchased Units,True
+2tzpVkp9,28,Terran Civilian,Hydralisk,175,175,Hunter Killer (Hydralisk),12,Purchased Units,True
+2tzpVkp9,29,Terran Civilian,Ultralisk,200,200,Torrasque (Ultralisk),12,Purchased Units,True
+2tzpVkp9,30,Terran Civilian,Mutalisk,300,300,Kukulza (Mutalisk),12,Purchased Units,True
+2tzpVkp9,31,Terran Civilian,Dragoon,200,200,Fenix (Dragoon),12,Purchased Units,True
+2tzpVkp9,32,Terran Civilian,Archon,250,250,Tassadar/Zeratul (Archon),12,Purchased Units,True
+2tzpVkp9,33,Terran Civilian,Zealot,100,100,Fenix (Zealot),12,Purchased Units,True
+2tzpVkp9,34,Terran Civilian,Scout,300,300,Artanis (Scout),12,Purchased Units,True
+2tzpVkp9,35,Terran Civilian,Reaver,300,300,Warbringer (Reaver),12,Purchased Units,True
+2tzpVkp9,36,Terran Civilian,S-Ghost,500,500,Terran Ghost,12,Purchased Units,True
+2tzpVkp9,37,Terran Civilian,S-Firebat,500,500,Terran Firebat,12,Purchased Units,True
+2tzpVkp9,38,Terran Civilian,S-Hydralisk,500,500,Zerg Hydralisk,12,Purchased Units,True
+2tzpVkp9,39,Terran Civilian,S-Ultralisk,500,500,Zerg Ultralisk,12,Purchased Units,True
+2tzpVkp9,40,Terran Civilian,S-Dragoon,500,500,Protoss Dragoon,12,Purchased Units,True
+2tzpVkp9,41,Terran Civilian,S-Zealot,500,500,Protoss Zealot,12,Purchased Units,True
+2tzpVkp9,54,Terran Civilian,Tank,1000,1000,Zerg Zergling,20,Purchased Units,True
+2tzpVkp9,55,Terran Civilian,Bc,500,500,Hyperion (Battlecruiser),10,Purchased Units,True
+2tzpVkp9,56,Terran Civilian,Devo,500,500,Zerg Devourer,10,Purchased Units,True
+2tzpVkp9,57,Terran Civilian,Guard,1000,1000,Terran Marine,10,Purchased Units,True
+2tzpVkp9,58,Terran Civilian,Infested Terran,750,750,Terran Goliath,10,Purchased Units,True
+2tzpVkp9,77,Protoss Dark Templar,hero sair,750,750,Protoss Corsair,10,Purchased Units,True
+2tzpVkp9,78,Protoss Dark Templar,valk,650,650,Terran Valkyrie,10,Purchased Units,True
+2tzpVkp9,79,Protoss Dark Templar,Ring wraith,1000,1000,Terran Wraith,10,Purchased Units,True
+2tzpVkp9,80,Protoss Dark Templar,hero archo,1000,1000,Protoss Archon,10,Purchased Units,True
+2tzpVkp9,81,Protoss Dark Templar,scv,600,600,Terran SCV,2,Purchased Units,True
+2tzpVkp9,82,Protoss Dark Templar,drone,1000,1000,Infested Terran,15,Purchased Units,True
+2tzpVkp9,83,Protoss Dark Templar,broodling,2000,2000,Protoss Arbiter,6,Purchased Units,True
+2tzpVkp9,84,Protoss Dark Templar,hero scout,1000,1000,Protoss Scout,10,Purchased Units,True
+2tzpVkp9,85,Protoss Dark Templar,poo flinger,750,750,Zerg Mutalisk,10,Purchased Units,True
+2tzpVkp9,86,Protoss Dark Templar,scourage,750,750,Zerg Scourge,35,Purchased Units,True
+2tzpVkp9,87,Protoss Dark Templar,Chick with a gun,1500,1500,Sarah Kerrigan (Ghost),10,Purchased Units,True
+2tzpVkp9,89,Protoss Dark Templar,Magic Worm,1000,1000,Zerg Guardian,10,Purchased Units,True
+2tzpVkp9,90,Protoss Dark Templar,Chick with a whip,1800,1800,Infested Kerrigan (Infested Terran),12,Purchased Units,True
+2tzpVkp9,91,Protoss Dark Templar,Cyclops,1500,1500,Tassadar (Templar),12,Purchased Units,True

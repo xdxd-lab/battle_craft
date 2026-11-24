@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#080f1c">
+<title>BaattleCraft｜十字對衝 v5</title>
+<style>
+:root{color-scheme:dark;--ink:#e7f6ff;--muted:#8da9bf;--cyan:#55e8fa;--red:#ff796e;--gold:#ffe08b;--line:#33516d;--panel:#0b1829;--deep:#060d18}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#050b15;color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+body{background:radial-gradient(ellipse at 50% -28%,#1b4162 0,#0a172a 42%,#050b15 78%)}
+button{font:inherit;cursor:pointer}
+button:focus-visible,canvas:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+main{max-width:1480px;margin:auto;padding:clamp(12px,2vw,28px)}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.identity{display:flex;align-items:center;gap:13px}
+.mark{width:46px;height:46px;display:grid;place-items:center;border:1px solid #4e9db1;background:linear-gradient(145deg,#203f58,#0a1c30);transform:rotate(45deg);box-shadow:0 0 28px #1ec8f333}
+.mark span{transform:rotate(-45deg);font-size:25px;color:#9cefff}
+.eyebrow{font-size:10px;letter-spacing:.26em;text-transform:uppercase;color:#75b7cc;font-weight:750}
+h1{font-size:clamp(25px,3vw,38px);letter-spacing:.14em;margin:-2px 0 0;font-weight:850;line-height:1.1}
+.topmeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.badge{border:1px solid #356076;background:#0b2437;color:#a8dce8;padding:6px 10px;border-radius:2px;font-size:12px;letter-spacing:.08em;font-weight:700}
+.badge.live{color:#7df3d9;border-color:#2a846f;background:#103329}
+.shell{border:1px solid #325272;background:#081522;box-shadow:0 32px 90px #0009,0 0 0 1px #173149 inset;overflow:hidden}
+.hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #2c526d;background:linear-gradient(90deg,#0b2736,#101b2d 50%,#32212d)}
+.side{display:flex;align-items:center;gap:12px;min-width:0}
+.side.enemy{justify-content:flex-end;text-align:right}
+.side .crest{width:35px;height:35px;display:grid;place-items:center;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:#1d6680;color:#c3f9ff;font-size:20px}
+.side.enemy .crest{background:#883d46;color:#ffe0dd}
+.side strong{display:block;font-size:13px;letter-spacing:.12em}
+.side small{color:var(--muted);font-size:11px}
+.hp{font-size:22px;font-weight:850;font-variant-numeric:tabular-nums;line-height:1}
+.side.friendly .hp{color:var(--cyan)}.side.enemy .hp{color:var(--red)}
+.hpbox{min-width:86px}.hpbar{height:6px;margin-top:5px;background:#243447;border:1px solid #557084;overflow:hidden}.hpbar i{display:block;height:100%;width:100%;background:var(--cyan);transition:width .25s linear}.side.enemy .hpbar i{background:var(--red)}
+.centerhud{text-align:center;min-width:125px}.centerhud .clock{display:block;font-size:21px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.12em}.centerhud small{color:#8ca7bb;font-size:10px;letter-spacing:.18em}
+.field-wrap{position:relative;height:min(65dvh,680px);min-height:390px;background:radial-gradient(circle at 50% 47%,#193958,#060d1a 75%)}
+#battlefield{display:block;width:100%;height:100%;touch-action:none}
+.field-top{position:absolute;top:14px;left:14px;right:14px;display:flex;justify-content:space-between;pointer-events:none;gap:10px}
+.callout{padding:8px 11px;border:1px solid #3a5a72;background:#081a2ada;backdrop-filter:blur(8px);color:#b8d5e3;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.callout b{color:var(--gold)}
+.field-bottom{position:absolute;left:14px;bottom:14px;right:14px;display:flex;align-items:end;justify-content:space-between;pointer-events:none;gap:8px}
+.message{background:#081a2ae8;border-left:3px solid var(--gold);padding:8px 12px;color:#f7e4a6;font-weight:650;max-width:min(600px,80%);min-height:38px}
+.message[data-level="warn"]{border-left-color:#ffbd65}.message[data-level="critical"]{border-left-color:#ff796e;color:#ffe2de;background:#2b1726ed}
+.message time{font:700 11px/1.4 ui-monospace,SFMono-Regular,monospace;color:#83c9d6;margin-right:8px}
+.mode{color:#97b8c8;background:#071625cb;padding:7px 10px;font-size:11px;letter-spacing:.1em}
+.controlbar{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:14px 18px;background:#0b1725;border-top:1px solid #2d526b}
+.resources{display:flex;align-items:center;gap:22px;flex-wrap:wrap}.resource{display:flex;align-items:baseline;gap:7px}.resource small{font-size:10px;color:#8baabd;text-transform:uppercase;letter-spacing:.14em;font-weight:800}.resource strong{font-size:22px;font-variant-numeric:tabular-nums}.resource.gold strong{color:var(--gold)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.controls button{border:1px solid #44627b;background:#142b3e;color:#e0f3ff;padding:10px 15px;min-height:42px;letter-spacing:.03em;font-weight:700}
+.controls button.primary{background:#b9e6e9;color:#082031;border-color:#d4ffff}
+.controls button:hover{filter:brightness(1.17)}.controls button:disabled{opacity:.5;cursor:default}
+.lower{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-top:16px}
+.panel{border:1px solid #274560;background:#091725d9;padding:17px 18px;min-width:0}
+.panel h2{font-size:11px;color:#83d4e7;letter-spacing:.21em;text-transform:uppercase;margin:0 0 11px}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:9px}.card{border:1px solid #375875;background:#11273a;padding:10px 12px;display:flex;align-items:center;gap:10px}.num{height:35px;width:35px;border:1px solid #e1b85d;background:#61492144;color:#ffe59a;display:grid;place-items:center;font-size:16px;font-weight:850}.card b{display:block;font-size:14px}.card small{display:block;color:#99b7c8;font-size:11px}
+.panel p{font-size:13px;color:#a8bfce;margin:0}.panel a{color:#85e6f0}
+.shortcuts{margin-top:8px;color:#a3c5d1;font-size:12px}
+kbd{display:inline-block;padding:1px 5px;border:1px solid #48657a;background:#173148;border-radius:3px;color:#e8f8ff;font:inherit;font-size:11px}
+.credit{margin-top:12px;color:#698ca2;font-size:11px}
+.log-panel{margin-top:16px;border:1px solid #274560;background:#091725e8;box-shadow:0 12px 40px #0004}.log-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:12px 17px;border-bottom:1px solid #29465e}.log-head h2{font-size:11px;color:#83d4e7;letter-spacing:.2em;text-transform:uppercase;margin:0}.log-head small{color:#7895aa;font-size:11px}.log-list{max-height:220px;overflow:auto;padding:5px 0;font:12px/1.5 ui-monospace,SFMono-Regular,monospace}.log-row{display:grid;grid-template-columns:60px 66px 54px 1fr;gap:9px;padding:7px 16px;border-bottom:1px solid #1d3449}.log-row:last-child{border-bottom:none}.log-row time{color:#799db2}.log-team{font-weight:800;color:#a9c0cd}.log-row.friendly .log-team{color:var(--cyan)}.log-row.enemy .log-team{color:var(--red)}.log-row.system .log-team{color:var(--gold)}.log-level{font-weight:750;color:#83bfae}.log-row.warn{background:#6c491b1f}.log-row.warn .log-level{color:#ffd27a}.log-row.critical{background:#963b3d28;border-left:3px solid #ff786a;padding-left:13px}.log-row.critical .log-level{color:#ff9b8f}.log-text{color:#d1e4ee}
+@media(max-width:780px){.hud{grid-template-columns:1fr 1fr}.centerhud{grid-column:1/-1;grid-row:1}.side{grid-row:2}.controlbar{grid-template-columns:1fr}.controls{justify-content:stretch}.controls button{flex:1}.lower{grid-template-columns:1fr}.field-wrap{height:min(60dvh,560px);min-height:360px}.callout{font-size:9px}.field-bottom .mode{display:none}}
+@media(max-width:480px){.field-top .callout:last-child{display:none}.cards{grid-template-columns:1fr}.controlbar{padding:12px}.message{font-size:11px;max-width:100%}.field-wrap{height:min(55dvh,450px);min-height:320px}.log-row{grid-template-columns:42px 45px 42px 1fr;gap:5px;padding:7px;font-size:10px}.hpbox{min-width:60px}}
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="identity"><div class="mark" aria-hidden="true"><span>✦</span></div><div><div class="eyebrow">X-Frontier / tactical prototype 05</div><h1>BaattleCraft</h1><small class="subtitle">十字對衝 · v5</small></div></div>
+    <div class="topmeta"><span class="badge live">● 單機戰術試作</span><span class="badge">3D GARDEN × 星際前線</span></div>
+  </header>
+  <section class="shell" aria-label="遊戲場景">
+    <div class="hud">
+      <div class="side friendly"><div class="crest" aria-hidden="true">◆</div><div><strong>聯邦陣線</strong><small>我方基地</small></div><div class="hpbox"><span id="friendly-hp" class="hp">60</span><div class="hpbar" aria-label="我方基地血量"><i id="friendly-hp-bar"></i></div></div></div>
+      <div class="centerhud"><span id="clock" class="clock">00:00</span><small>戰區時間</small></div>
+      <div class="side enemy"><div class="hpbox"><span id="enemy-hp" class="hp">60</span><div class="hpbar" aria-label="敵方基地血量"><i id="enemy-hp-bar"></i></div></div><div><strong>敵軍陣線</strong><small>敵方基地</small></div><div class="crest" aria-hidden="true">✕</div></div>
+    </div>
+    <div class="field-wrap">
+      <canvas id="battlefield" width="1000" height="650" tabindex="0" aria-label="傾斜視角的十字戰場，點選地面移動指揮官，踩上補給信標購兵"></canvas>
+      <div class="field-top"><span class="callout">戰線 / <b>十字交會區</b></span><span class="callout">玩家對電腦 · <b>左右軸啟用</b></span></div>
+      <div class="field-bottom"><span id="message" class="message" role="status"><time id="message-time">00:00</time><span id="message-text">按「開始對局」，前往南側補給平台。</span></span><span id="scene-state" class="mode">3D 場景準備中</span></div>
+    </div>
+    <div class="controlbar">
+      <div class="resources"><span class="resource gold"><small>金幣</small><strong id="gold">12</strong></span><span class="resource"><small>我方單位</small><strong id="unit-count">0</strong></span><span class="resource"><small>敵軍單位</small><strong id="enemy-count">0</strong></span></div>
+      <div class="controls"><button id="start" class="primary">開始對局</button><button id="reset">重新開始</button><button id="quality">畫質：高</button><button id="save">下載離線版</button></div>
+    </div>
+  </section>
+  <section class="log-panel" aria-label="戰況事件紀錄"><div class="log-head"><h2>戰況紀錄 / Event Log</h2><small>原型階段公開顯示 · 正式版預計移至工程師模式</small></div><div id="event-log" class="log-list" role="log" aria-live="off"></div></section>
+  <div class="lower">
+    <section class="panel"><h2>南側補給平台</h2><div class="cards"><div class="card"><span class="num">1</span><div><b>單兵部署</b><small>5 金 · 生成 1 名突擊兵</small></div></div><div class="card"><span class="num">3</span><div><b>編隊部署</b><small>12 金 · 生成 3 名突擊兵</small></div></div></div><div class="shortcuts">點地面移動，或使用 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>／方向鍵。站在信標上時，只要金幣足夠就會自動購買；持續站立會在存夠下一次費用後再買。</div></section>
+    <section class="panel"><h2>戰區說明</h2><p>本版維持單機左右兩軍對戰。十字路口的南北兩臂作為 2v2 地圖雛形，尚未加入四人連線。3D Garden 的寫實燈具用於補給站與基地照明；戰場、角色、部隊與星際環境以金屬 PBR 材質建構。素材只影響視覺，不改變碰撞與戰鬥判定。</p><div class="credit">3D Garden 素材依 <a href="https://www.3dgarden.app/licence">3D Garden Licence</a> 使用。此檔可離線開啟，不需登入。</div></section>
+  </div>
+</main>
+<script>/* BUNDLE */</script>
+</body>
+</html>
