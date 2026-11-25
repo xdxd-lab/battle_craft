@@ -52,7 +52,7 @@ assert.ok(at('plan', () => L.corePos('N'))[1] > 0 && at('plan', () => L.corePos(
 // 7. 關係
 assert.deepEqual(['N', 'W', 'S', 'E'].map(i => L.relation(L.parseView('seat:N'), i)), ['self', 'ally', 'enemy', 'enemy']);
 assert.deepEqual(['N', 'W', 'S', 'E'].map(i => L.relation(L.parseView('team:B'), i)), ['enemy', 'enemy', 'own', 'own']);
-// 8. 四種色覺下的 OKLab 距離：同隊兩席可分辨，且比任一跨隊組合更接近；席號、徽記、敵我標記不依賴顏色
+// 8. 四種色覺下的 OKLab 距離：甲隊兩席一眼可辨（DEV05 試看後提高門檻）、任兩席可分辨；隊伍色系以一般視覺的色相界定。席號、徽記、敵我標記不依賴顏色
 const lin = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
 const lab = ([r, g, b]) => {
   const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b), m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b), s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
@@ -66,11 +66,15 @@ for (const { name, m } of Object.values(L.CVD)) {
   L.SEATS.forEach((a, i) => L.SEATS.slice(i + 1).forEach(b => (a.team === b.team ? same : cross).push(dist(a.primary, b.primary))));
   const mark = dist(L.RELATIONS.ally.color, L.RELATIONS.enemy.color);
   assert.ok(Math.min(...same) > .12, `${name} 同隊兩席太接近 ${same}`);
-  assert.ok(Math.min(...cross) > Math.max(...same), `${name} 跨隊比同隊更接近`);
+  assert.ok(same[0] > (name === L.CVD.none.name ? .28 : .2), `${name} 北、西席太接近 ${same[0]}`);
+  assert.ok(Math.min(...cross) > .16, `${name} 跨隊兩席太接近 ${cross}`);
   assert.ok(mark > .15, `${name} 敵我標記色太接近 ${mark}`);
   for (const s of L.SEATS) assert.ok(dist(s.primary, s.secondary) > .15, `${name} ${s.name}席主輔色太接近`);
   color.push({ 色覺: name, 甲隊內: same[0].toFixed(3), 乙隊內: same[1].toFixed(3), 跨隊最近: Math.min(...cross).toFixed(3), 敵我標記: mark.toFixed(3) });
 }
+// 隊伍色系：冷色色相 150°–280°，暖色 0°–100°（OKLab）
+const hue = h => { const [, a, b] = lab(lin(h)); return (Math.atan2(b, a) * 180 / Math.PI + 360) % 360; };
+for (const s of L.SEATS) { const h = hue(s.primary), [lo, hi] = s.team === 'A' ? [150, 280] : [0, 100]; assert.ok(h >= lo && h <= hi, `${s.name}席偏離${L.TEAMS[s.team].family}系 ${h}`); }
 assert.notEqual(L.TEAMS.A.emblem, L.TEAMS.B.emblem);
 assert.equal(new Set(['self', 'ally', 'enemy'].map(k => L.RELATIONS[k].shape)).size, 3);
 assert.equal(new Set(L.SEATS.map(s => s.name)).size, 4);
