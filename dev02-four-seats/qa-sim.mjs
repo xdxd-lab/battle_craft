@@ -86,14 +86,25 @@ test('同一輸入重跑一致；中途序列化續跑一致；亂數種子不�
     assert.notEqual(S.replay({ ...rec, seed: seed + 1 }).final, a.final);
   }
 });
+test('任意 32 位元種子：四席亂數流與鄰近種子皆不重複', () => {
+  const seen = new Set(); let n = 0;
+  for (const base of [0, 1, 20261126, 2 ** 31 - 3, 2 ** 32 - 60, 3405691582, 4e9]) for (let k = 0; k < 50; k++) { const b = S.createSim({ seed: base + k }).bots; for (const id of S.SEAT_IDS) { seen.add(b[id].rng); n++; } }
+  assert.equal(seen.size, n - 4 * 49, '只有種子 1～49 與 0 起的區段重疊');
+  assert.equal(S.digest(S.createSim({ seed: -1 })), S.digest(S.createSim({ seed: 2 ** 32 - 1 })));
+});
 test('全電腦 60 局：皆有終局；帳目、邊界、部隊數逐步相符；換席不偏袒', () => {
-  const score = { A: 0, B: 0, draw: 0 }; let longest = 0;
+  const score = { A: 0, B: 0, draw: 0 }; let longest = 0, drift = 0;
   for (let seed = 1; seed <= 60; seed++) {
     const st = S.createSim({ seed }), rot = S.createSim({ seed }), k = ['N', 'W', 'S', 'E'];
     k.forEach((id, i) => { rot.bots[id] = JSON.parse(JSON.stringify(S.createSim({ seed }).bots[k[(i + 2) % 4]])); });
     const income = { N: 0, W: 0, S: 0, E: 0 };
     while (st.mode === 'play') {
       const alive = Object.fromEntries(S.SEAT_IDS.map(id => [id, st.seats[id].alive])); S.step(st); S.step(rot);
+      if (st.tick % 30 === 0) for (const id of S.SEAT_IDS) { // 旋轉 180° 的幾何比對：對側席的部隊、核心、金幣逐秒對應
+        const o = L.opposite(id).id, a = st.units.filter(u => u.seat === id), b = rot.units.filter(u => u.seat === o);
+        assert.deepEqual([st.seats[id].hp, st.seats[id].gold, a.map(u => u.hp)], [rot.seats[o].hp, rot.seats[o].gold, b.map(u => u.hp)], `種子 ${seed} tick ${st.tick}`);
+        a.forEach((u, i) => { drift = Math.max(drift, Math.abs(u.x + b[i].x), Math.abs(u.z + b[i].z)); });
+      }
       for (const id of S.SEAT_IDS) { const s = st.seats[id]; if (alive[id] && st.tick % 30 === 0) income[id]++; assert.equal(s.gold + s.spent, 12 + income[id]); assert(s.gold >= 0); if (st.tick % 15 === 0) assert.equal(st.units.filter(u => u.seat === id).length, s.deployed - s.lost); }
       if (st.tick % 15 === 0) for (const u of st.units) { const ok = Math.min(Math.abs(u.x), Math.abs(u.z)) <= 3.6 + 1e-6 || Math.hypot(u.x, u.z) <= 8.2 + 1e-6 || L.SEATS.some(s => { const [x, z] = L.corePos(s.id); return Math.hypot(u.x - x, u.z - z) <= 6.2 + 1e-6; }); assert(ok, `部隊出界 ${u.x},${u.z}`); assert(u.target && st.seats[u.target].alive || st.mode === 'end'); }
       assert(st.tick < 30 * 60 * 13);
@@ -101,7 +112,7 @@ test('全電腦 60 局：皆有終局；帳目、邊界、部隊數逐步相符�
     score[st.winner]++; longest = Math.max(longest, st.tick);
     assert.equal(rot.winner, { A: 'B', B: 'A', draw: 'draw' }[st.winner], `種子 ${seed} 換席後應鏡像`); assert.equal(rot.tick, st.tick);
   }
-  return `甲 ${score.A}／乙 ${score.B}／平 ${score.draw}，最長 ${(longest / 30).toFixed(0)} 秒`;
+  return `甲 ${score.A}／乙 ${score.B}／平 ${score.draw}，最長 ${(longest / 30).toFixed(0)} 秒，鏡像偏差 ${drift.toExponential(1)}`;
 });
 test('玩家全程不動也會終局', () => {
   const t = []; for (const id of S.SEAT_IDS) { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); while (st.mode === 'play') S.step(st); assert.equal(st.seats[id].buys, 0); t.push((st.tick / 30).toFixed(0)); } return `終局 ${t.join('、')} 秒`;
@@ -110,7 +121,7 @@ test('驗收案例：固定種子 20261126，玩家持南席腳本', () => {
   const pads = [0, 1].map(i => S.padWorld('S', i)), commands = [];
   for (let t = 30; t < 18000; t += 900) { const [x, z] = pads[Math.floor(t / 900) % 2]; commands.push({ tick: t, seat: 'S', type: 'goal', x, z }); }
   const r = S.replay({ seed: 20261126, bots: ['N', 'W', 'E'], commands }); assert.equal(r.state.mode, 'end');
-  const expected = process.env.UPDATE ? null : 'd657d338 13dd6894';
+  const expected = process.env.UPDATE ? null : '55681272 053eeabc';
   if (expected) assert.equal(`${r.final} ${r.events}`, expected, '模擬規則改變時需有意識地更新');
   return `${r.state.winner} ${(r.state.tick / 30).toFixed(0)} 秒 ${r.final} ${r.events}`;
 });

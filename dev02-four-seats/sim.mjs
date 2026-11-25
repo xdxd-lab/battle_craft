@@ -34,6 +34,9 @@ const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (
 
 const nextRandom = v => { v ^= v << 13; v ^= v >>> 17; v ^= v << 5; return v >>> 0; };
 
+// 32 位元整數雜湊：種子與席位的每個位元都影響結果，不會超出浮點精度
+function mix(seed, i) { let h = Math.imul(seed ^ Math.imul(i + 1, 0x9e3779b9), 0x85ebca6b); h = Math.imul(h ^ h >>> 15, 0xc2b2ae35); return (h ^ h >>> 16) >>> 0 || 1; }
+
 // bots：由電腦控制的席位；其餘席位只聽 commands
 export function createSim({ seed = 1, bots = SEAT_IDS } = {}) {
   const state = { version: 1, seed: seed >>> 0, tick: 0, mode: 'play', winner: null, serial: 0, units: [], seats: {}, bots: {} };
@@ -41,7 +44,7 @@ export function createSim({ seed = 1, bots = SEAT_IDS } = {}) {
     const [x, z] = toWorld(s.id, HOME.x, HOME.z);
     state.seats[s.id] = { id: s.id, team: s.team, alive: true, gold: RULES.startGold, hp: RULES.coreHp, commander: { x, z, dx: 0, dz: 0 }, goal: null, dir: null, pad: -1, nextBuy: 0, waiting: false, buys: 0, spent: 0, deployed: 0, lost: 0, kills: 0 };
   }
-  SEAT_IDS.forEach((id, i) => { if (bots.includes(id)) state.bots[id] = { rng: nextRandom(((seed + 1) * 2654435761 + i * 40503 + 1) >>> 0 || 1), pad: -1, until: 0, left: 0, seen: 0 }; });
+  SEAT_IDS.forEach((id, i) => { if (bots.includes(id)) state.bots[id] = { rng: mix(state.seed, i), pad: -1, until: 0, left: 0, seen: 0 }; });
   return state;
 }
 
