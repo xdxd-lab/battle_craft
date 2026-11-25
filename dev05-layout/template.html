@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BaattleCraft｜DEV05 四席版面預覽</title>
+<style>
+:root{color-scheme:dark;--ink:#e9edf0;--muted:#9eabb4;--panel:#10161be6;--line:#3a464e;--hot:#ffe9a8}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#0a0f14;color:var(--ink);font:14px/1.5 "PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block}
+.bar{position:fixed;left:max(12px,env(safe-area-inset-left));top:12px;display:grid;gap:8px;width:190px}
+h1{font-size:16px;margin:0;line-height:1.25}h1 small{display:block;color:var(--hot);font-size:12px;font-weight:500}
+fieldset{border:1px solid var(--line);background:var(--panel);margin:0;padding:6px 8px 8px;display:flex;gap:6px;flex-wrap:wrap;min-width:0}legend{font-size:12px;color:var(--muted);padding:0 4px}
+button{font:inherit;color:inherit;background:#222c33;border:1px solid #4c5a63;min-height:36px;padding:4px 10px;flex:1 1 auto;cursor:pointer;white-space:nowrap}
+button[aria-pressed=true]{background:#e9edf0;color:#0a0f14;font-weight:700}button:focus-visible,summary:focus-visible{outline:3px solid var(--hot);outline-offset:2px}
+i{display:inline-block;width:12px;height:12px;border:2px solid #0000;margin-right:5px;vertical-align:-1px}
+#seats{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%}#status{position:fixed;left:50%;bottom:8px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:3px 12px;font-size:13px;text-align:center;max-width:calc(100% - 24px);pointer-events:none}
+.compass{position:fixed;left:max(16px,env(safe-area-inset-left));bottom:14px;width:64px;height:64px;border:1px solid var(--line);border-radius:50%;background:var(--panel);display:grid;place-items:center}
+#needle{width:48px;height:48px}
+#panel{position:fixed;right:max(12px,env(safe-area-inset-right));top:12px;width:280px;max-height:calc(100% - 60px);overflow:auto;background:var(--panel);border:1px solid var(--line)}
+#panel:not([open]){width:auto}summary{padding:7px 12px;cursor:pointer;font-weight:700}
+#panel>div{padding:0 12px 12px}h2{font-size:12px;color:var(--hot);margin:10px 0 4px}table{border-collapse:collapse;width:100%;font-size:12px}th{text-align:left;font-weight:600;white-space:nowrap}td,th{padding:2px 4px 2px 0;border-top:1px solid #2a343b}td code{display:block;color:var(--muted);font-size:10px}
+#panel p{margin:4px 0;font-size:12px;color:#c5ced4}.rel{display:grid;grid-template-columns:22px 1fr;font-size:12px;gap:2px 4px;align-items:center}.rel b{text-align:center;font-size:15px}
+svg#plan{display:block;width:150px;margin:6px auto 0}#plan text{fill:#fff;font-size:8px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#0a0f14;stroke-width:1.4px}#plan text.sm{font-size:4.6px}
+#fallback{display:none}.no3d #stage{display:none}.no3d #fallback{display:block;color:var(--hot)}.no3d svg#plan{width:240px}
+@media(max-height:560px){.bar{top:6px;gap:4px;width:150px}h1{font-size:13px}h1 small{font-size:10px}fieldset{padding:0 6px 4px}legend{font-size:10px}button{min-height:30px;padding:0 7px;font-size:12px}.compass{width:44px;height:44px;bottom:6px}#needle{width:34px;height:34px}#status{font-size:11px;bottom:3px;max-width:52%}#panel{top:6px;width:250px;max-height:calc(100% - 12px)}}
+@media(orientation:portrait) and (max-width:700px){.bar{width:calc(100% - 24px);grid-template-columns:1fr 1fr}.bar h1{grid-column:1/-1}#panel{top:auto;bottom:88px;max-height:45%}#status{bottom:88px;display:none}}
+</style>
+</head>
+<body>
+<canvas id="stage" aria-label="四席十字戰場 3D 版面預覽，世界北向固定"></canvas>
+<div class="bar" id="bar">
+  <h1>BaattleCraft DEV05<small>四席版面預覽 · 尺寸與配色皆暫定</small></h1>
+  <fieldset><legend>隊伍基準（選隊）</legend><span id="teams" style="display:contents"></span></fieldset>
+  <fieldset><legend>個人基準（選席）</legend><span id="seats"></span></fieldset>
+  <fieldset><legend>校對</legend><button data-view="plan">北向俯視</button><button id="dims" aria-pressed="false">尺寸</button><button id="still" aria-pressed="false">靜止</button></fieldset>
+</div>
+<details id="panel" open><summary>圖例與暫定值</summary><div>
+  <p id="fallback">此裝置無法啟用 3D，改以同一份資料的俯視圖呈現。</p>
+  <svg id="plan" viewBox="-42 -42 84 84" role="img" aria-label="北向俯視圖"></svg>
+  <p>席序逆時鐘：北→西→南→東→北。各席購買區在該席逆時鐘側，位於道路外。</p>
+  <h2>席位主輔色</h2><table id="colors"></table>
+  <p>識別桿數：北 1、西 2、南 3、東 4。</p>
+  <h2>隊伍</h2><p>甲隊（北＋西）雙橫條；乙隊（南＋東）雙箭頭。隊友間為聯管橋架，敵方間為警示防爆牆。</p>
+  <h2>敵我標記（依檢視者）</h2>
+  <div class="rel"><b style="color:#fff">★</b>自己：粗實線框<b style="color:#8ff5ff">⛨</b>隊友／我隊：實線框<b style="color:#ff4b4b">✕</b>敵方：虛線框</div>
+  <h2>暫定尺寸（場景單位，約當 1 公尺）</h2><table id="sizes"></table>
+  <p>部隊、指揮官與信標為比例示意，無購兵、戰鬥或連線。購兵行為見 v5。</p>
+</div></details>
+<div class="compass" title="世界北向"><svg id="needle" viewBox="-24 -24 48 48" aria-hidden="true"><path d="M0-12 6 10 0 5-6 10z" fill="#e9edf0"/><text y="-13" text-anchor="middle" fill="#ffe9a8" font-size="11" font-weight="700">北</text></svg></div>
+<div id="status" role="status"></div>
+<script>/* BUNDLE */</script>
+</body>
+</html>
