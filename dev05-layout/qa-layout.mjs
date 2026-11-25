@@ -52,25 +52,28 @@ assert.ok(at('plan', () => L.corePos('N'))[1] > 0 && at('plan', () => L.corePos(
 // 7. 關係
 assert.deepEqual(['N', 'W', 'S', 'E'].map(i => L.relation(L.parseView('seat:N'), i)), ['self', 'ally', 'enemy', 'enemy']);
 assert.deepEqual(['N', 'W', 'S', 'E'].map(i => L.relation(L.parseView('team:B'), i)), ['enemy', 'enemy', 'own', 'own']);
-// 8. 主色在一般、紅色弱、綠色弱視覺（Machado 2009, severity 1）下的 OKLab 距離
+// 8. 四種色覺下的 OKLab 距離：同隊兩席可分辨，且比任一跨隊組合更接近；席號、徽記、敵我標記不依賴顏色
 const lin = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4);
-const CVD = {
-  一般: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
-  紅色弱: [[.152286, 1.052583, -.204868], [.114503, .786281, .099216], [-.003882, -.048116, 1.051998]],
-  綠色弱: [[.367322, .860646, -.227968], [.280085, .672501, .047413], [-.01182, .04294, .968881]],
-};
 const lab = ([r, g, b]) => {
   const l = Math.cbrt(.4122214708 * r + .5363325363 * g + .0514459929 * b), m = Math.cbrt(.2119034982 * r + .6806995451 * g + .1073969566 * b), s = Math.cbrt(.0883024619 * r + .2817188376 * g + .6299787005 * b);
   return [.2104542553 * l + .793617785 * m - .0040720468 * s, 1.9779984951 * l - 2.428592205 * m + .4505937099 * s, .0259040371 * l + .7827717662 * m - .808675766 * s];
 };
-const color = {};
-for (const [name, M] of Object.entries(CVD)) {
-  const labs = L.SEATS.map(s => { const c = lin(s.primary); return lab(M.map(r => Math.max(0, r[0] * c[0] + r[1] * c[1] + r[2] * c[2]))); });
-  let min = Infinity, pair;
-  for (let i = 0; i < 4; i++) for (let j = i + 1; j < 4; j++) { const d = Math.hypot(...labs[i].map((v, k) => v - labs[j][k])); if (d < min) { min = d; pair = L.SEATS[i].name + L.SEATS[j].name; } }
-  color[name] = `${min.toFixed(3)}（${pair}）`;
-  assert.ok(min > .08, `${name} 主色最近距離 ${min} ${pair}`);
+const color = [];
+for (const { name, m } of Object.values(L.CVD)) {
+  const see = h => { const c = lin(h); return lab(m.map(r => Math.min(1, Math.max(0, r[0] * c[0] + r[1] * c[1] + r[2] * c[2])))); };
+  const dist = (a, b) => { const x = see(a), y = see(b); return Math.hypot(...x.map((v, k) => v - y[k])); };
+  let same = [], cross = [];
+  L.SEATS.forEach((a, i) => L.SEATS.slice(i + 1).forEach(b => (a.team === b.team ? same : cross).push(dist(a.primary, b.primary))));
+  const mark = dist(L.RELATIONS.ally.color, L.RELATIONS.enemy.color);
+  assert.ok(Math.min(...same) > .12, `${name} 同隊兩席太接近 ${same}`);
+  assert.ok(Math.min(...cross) > Math.max(...same), `${name} 跨隊比同隊更接近`);
+  assert.ok(mark > .15, `${name} 敵我標記色太接近 ${mark}`);
+  for (const s of L.SEATS) assert.ok(dist(s.primary, s.secondary) > .15, `${name} ${s.name}席主輔色太接近`);
+  color.push({ 色覺: name, 甲隊內: same[0].toFixed(3), 乙隊內: same[1].toFixed(3), 跨隊最近: Math.min(...cross).toFixed(3), 敵我標記: mark.toFixed(3) });
 }
+assert.notEqual(L.TEAMS.A.emblem, L.TEAMS.B.emblem);
+assert.equal(new Set(['self', 'ally', 'enemy'].map(k => L.RELATIONS[k].shape)).size, 3);
+assert.equal(new Set(L.SEATS.map(s => s.name)).size, 4);
 console.table(rows);
-console.log('主色最近 OKLab 距離', color);
+console.table(color);
 console.log('DEV05 layout QA: OK');

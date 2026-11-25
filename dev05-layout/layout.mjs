@@ -20,22 +20,30 @@ export const DIM = {
 
 // 逆時鐘：北 → 西 → 南 → 東 → 北
 export const SEATS = [
-  { id: 'N', name: '北', dir: [0, -1], team: 'A', primary: '#2560d8', secondary: '#8fd2ff', primaryName: '鈷藍', secondaryName: '冰白' },
-  { id: 'W', name: '西', dir: [-1, 0], team: 'A', primary: '#157f55', secondary: '#d4f56a', primaryName: '銅綠', secondaryName: '萊姆' },
-  { id: 'S', name: '南', dir: [0, 1], team: 'B', primary: '#eda02c', secondary: '#ffe38f', primaryName: '琥珀', secondaryName: '乳白' },
-  { id: 'E', name: '東', dir: [1, 0], team: 'B', primary: '#c27be8', secondary: '#ffb0ef', primaryName: '紫', secondaryName: '粉紫' },
+  { id: 'N', name: '北', dir: [0, -1], team: 'A', primary: '#2d73cb', secondary: '#a9ccff', primaryName: '鈷藍', secondaryName: '冰藍' },
+  { id: 'W', name: '西', dir: [-1, 0], team: 'A', primary: '#2cacd0', secondary: '#a8f3ea', primaryName: '藍綠', secondaryName: '薄荷' },
+  { id: 'S', name: '南', dir: [0, 1], team: 'B', primary: '#d48c22', secondary: '#ffe38f', primaryName: '琥珀', secondaryName: '乳黃' },
+  { id: 'E', name: '東', dir: [1, 0], team: 'B', primary: '#c03f30', secondary: '#ffc3ad', primaryName: '珊瑚紅', secondaryName: '蜜桃' },
 ];
-// 隊伍以圖形與名稱區分，不另佔一組色相。
+// 同隊共用色系（甲冷、乙暖），另以徽記圖形與名稱區分，不只靠顏色。
 export const TEAMS = {
-  A: { id: 'A', name: '甲隊', emblem: 'bars', emblemName: '雙橫條' },
-  B: { id: 'B', name: '乙隊', emblem: 'chevrons', emblemName: '雙箭頭' },
+  A: { id: 'A', name: '甲隊', family: '冷色', emblem: 'bars', emblemName: '雙橫條' },
+  B: { id: 'B', name: '乙隊', family: '暖色', emblem: 'chevrons', emblemName: '雙箭頭' },
 };
-// 敵我標記獨立於席位色，形狀＋文字＋顏色三重編碼。
+// 敵我標記獨立於席位色，形狀＋文字＋顏色三重編碼；色相避開兩隊的冷、暖色系。
 export const RELATIONS = {
   self: { name: '自己', shape: 'star', color: '#ffffff' },
-  ally: { name: '隊友', shape: 'shield', color: '#8ff5ff' },
-  own: { name: '我隊', shape: 'shield', color: '#8ff5ff' },
-  enemy: { name: '敵方', shape: 'cross', color: '#ff4b4b' },
+  ally: { name: '隊友', shape: 'shield', color: '#c4f06a' },
+  own: { name: '我隊', shape: 'shield', color: '#c4f06a' },
+  enemy: { name: '敵方', shape: 'cross', color: '#ff6bf0' },
+};
+
+// 色覺模擬矩陣（Machado 2009，severity 1，linear RGB）；預覽濾鏡與測試共用。
+export const CVD = {
+  none: { name: '一般', m: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] },
+  protan: { name: '紅色弱', m: [[.152286, 1.052583, -.204868], [.114503, .786281, .099216], [-.003882, -.048116, 1.051998]] },
+  deutan: { name: '綠色弱', m: [[.367322, .860646, -.227968], [.280085, .672501, .047413], [-.01182, .04294, .968881]] },
+  tritan: { name: '藍色弱', m: [[1.255528, -.076749, -.178779], [-.078411, .930809, .147602], [.004733, .691367, .3039]] },
 };
 
 export const seatIndex = id => SEATS.findIndex(s => s.id === id);

@@ -324,7 +324,7 @@ function buildDims() {
 }
 
 // ---------- 啟動 ----------
-let renderer, camera, env, view = L.parseView('team:A'), from = null, angles = L.viewAngles(view), anim = 1, dims = false, still = matchMedia('(prefers-reduced-motion: reduce)').matches, time = 2, prev = 0, dirty = true;
+let renderer, camera, env, view = L.parseView('team:A'), from = null, angles = L.viewAngles(view), anim = 1, dims = false, cvd = 'none', still = matchMedia('(prefers-reduced-motion: reduce)').matches, time = 2, prev = 0, dirty = true;
 function buildEnvironment() { // 自製攝影棚環境光，供金屬反射
   const e = new THREE.Scene(); e.background = new THREE.Color(0x1c252d);
   const add = (color, k, w, h, x, y, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), side: THREE.DoubleSide })); m.position.set(x, y, z); m.lookAt(0, 0, 0); e.add(m); };
@@ -399,29 +399,35 @@ function setView(v, jump) {
   view = v; dirty = true; if (renderer) buildMarkers(v); plan2d();
   for (const b of document.querySelectorAll('[data-view]')) b.setAttribute('aria-pressed', b.dataset.view === L.viewKey(v));
   const names = { team: () => `隊伍基準：${L.TEAMS[v.id].name}（${L.seatsOf(v.id).map(s => s.name).join('＋')}）在畫面下方`, seat: () => { const ally = L.seatsOf(L.seatById(v.id).team).find(s => s.id !== v.id); return `個人基準：${L.seatById(v.id).name}席固定在下方中央，購買區在右下，隊友${ally.name}席在${L.nextCcw(v.id).id === ally.id ? '右' : '左'}側`; }, plan: () => '北向俯視：北在上、東在右，校對座標用，不分敵我' };
-  $('status').textContent = names[v.kind]();
+  $('status').textContent = document.body.classList.contains('no3d') ? '此裝置無法啟用 3D，以北向俯視圖呈現' : names[v.kind]();
 }
-function writeHash() { const s = `#view=${L.viewKey(view)}${dims ? '&dims=1' : ''}${still ? '&still=1' : ''}`; try { history.replaceState(null, '', s); } catch { /* file:// 限制時略過 */ } }
+function writeHash() { const s = `#view=${L.viewKey(view)}${dims ? '&dims=1' : ''}${still ? '&still=1' : ''}${cvd !== 'none' ? `&cvd=${cvd}` : ''}`; try { history.replaceState(null, '', s); } catch { /* file:// 限制時略過 */ } }
 function readHash(jump) {
   const h = new URLSearchParams(location.hash.slice(1)); dims = h.get('dims') === '1'; if (h.get('still') === '1') still = true;
   $('dims').setAttribute('aria-pressed', dims); $('still').setAttribute('aria-pressed', still);
+  setCvd(h.get('cvd'));
   if (h.get('panel') === '0') $('panel').removeAttribute('open'); setView(L.parseView(h.get('view')) || view, jump);
 }
 $('teams').innerHTML = Object.values(L.TEAMS).map(t => `<button data-view="team:${t.id}">${t.name}</button>`).join('');
 $('seats').innerHTML = L.SEATS.map(s => `<button data-view="seat:${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i>${s.name}</button>`).join('');
-$('colors').innerHTML = L.SEATS.map(s => `<tr><th>${s.name}</th><td><i style="background:${s.primary}"></i>${s.primaryName}<code>${s.primary}</code></td><td><i style="background:${s.secondary}"></i>${s.secondaryName}<code>${s.secondary}</code></td><td>${L.TEAMS[s.team].name}</td></tr>`).join('');
+$('colors').innerHTML = L.SEATS.map(s => `<tr><th>${s.name}</th><td><i style="background:${s.primary}"></i>${s.primaryName}<code>${s.primary}</code></td><td><i style="background:${s.secondary}"></i>${s.secondaryName}<code>${s.secondary}</code></td><td>${L.TEAMS[s.team].name}<code>${L.TEAMS[s.team].family}</code></td></tr>`).join('');
 $('sizes').innerHTML = [['戰場中心→核心', D.coreDistance], ['路寬', D.laneWidth], ['交會區直徑', D.junctionRadius * 2], ['核心平台直徑', D.corePlatformRadius * 2], ['購買區', `${D.shopWidth} × ${D.shopDepth}`], ['購買區離路淨距', L.shopClearance()], ['每席信標（示意）', D.padCount]].map(([a, b]) => `<tr><th>${a}</th><td>${b}</td></tr>`).join('');
 document.addEventListener('click', e => { const b = e.target.closest('[data-view]'); if (b) { setView(L.parseView(b.dataset.view), still); writeHash(); } });
 $('dims').onclick = () => { dims = !dims; $('dims').setAttribute('aria-pressed', dims); dirty = true; writeHash(); };
+// 色覺模擬：只影響預覽顯示
+$('cvd').innerHTML = Object.entries(L.CVD).map(([k, c]) => `<option value="${k}">色覺：${c.name}</option>`).join('');
+$('filters').innerHTML = Object.entries(L.CVD).map(([k, c]) => `<filter id="cvd-${k}" color-interpolation-filters="linearRGB"><feColorMatrix values="${c.m.map(r => [...r, 0, 0].join(' ')).join(' ')} 0 0 0 1 0"/></filter>`).join('');
+function setCvd(k) { cvd = L.CVD[k] ? k : 'none'; $('cvd').value = cvd; for (const o of [canvas, $('plan'), $('bar'), $('panel')]) o.style.filter = cvd === 'none' ? '' : `url(#cvd-${cvd})`; }
+$('cvd').onchange = e => { setCvd(e.target.value); writeHash(); };
 $('still').onclick = () => { still = !still; $('still').setAttribute('aria-pressed', still); dirty = true; writeHash(); };
 addEventListener('hashchange', () => readHash(still));
 if (innerHeight < 560 || innerWidth < 900) $('panel').removeAttribute('open');
-try { start3d(); } catch (err) { console.error(err); renderer = camera = null; document.body.classList.add('no3d'); $('panel').setAttribute('open', ''); }
+try { start3d(); } catch (err) { console.error(err); renderer = camera = null; document.body.classList.add('no3d'); document.body.prepend($('plan')); }
 readHash(true);
 // 供自動核對：實際鏡頭下所有取景點的 NDC 極值與繪製統計
 window.__dev05 = { info: () => ({ view: L.viewKey(view), calls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles }), safeBox: () => { // 取景點在實際鏡頭下的像素範圍，對照安全區
     applyPose(); camera.updateMatrixWorld(); const W = canvas.clientWidth, H = canvas.clientHeight, b = [1e9, 1e9, -1e9, -1e9];
     for (const p of L.framePoints(view)) { const v = new THREE.Vector3(...p).project(camera), x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H; b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); }
-    return { inside: b[0] >= safe.l && b[1] >= safe.t && b[2] <= safe.l + safe.w && b[3] <= safe.t + safe.h, box: b.map(Math.round), safe: [safe.l, safe.t, safe.l + safe.w, safe.t + safe.h].map(Math.round), size: [W, H] };
+    return { inside: b[0] >= safe.l && b[1] >= safe.t && b[2] <= safe.l + safe.w && b[3] <= safe.t + safe.h, box: b.map(Math.round), safe: [safe.l, safe.t, safe.l + safe.w, safe.t + safe.h].map(Math.round), size: [W, H], roof: Object.fromEntries(L.SEATS.map(s => { const [x, z] = L.corePos(s.id), v = new THREE.Vector3(x, 7.2, z).project(camera); return [s.id, [Math.round((v.x + 1) / 2 * W), Math.round((1 - v.y) / 2 * H)]]; })) };
   } };
 if (/[#&]qa=1/.test(location.hash)) setTimeout(() => console.log('DEV05QA ' + JSON.stringify({ ...window.__dev05.info(), ...window.__dev05.safeBox() })), 1500);
