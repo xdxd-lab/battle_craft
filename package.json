@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "build": "python3 v3/build.py && python3 v4/build.py && python3 v5/build.py && python3 dev05-layout/build.py",
-    "test": "node v5/qa-exact-functions.cjs && node dev05-layout/qa-layout.mjs"
+    "test": "node v5/qa-exact-functions.cjs && node dev05-layout/qa-layout.mjs",
+    "test:browser": "node v5/qa-browser.mjs"
   },
   "devDependencies": {
     "esbuild": "0.24.0"
