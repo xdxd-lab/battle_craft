@@ -21,7 +21,7 @@ export const DIM = {
 // 逆時鐘：北 → 西 → 南 → 東 → 北
 export const SEATS = [
   { id: 'N', name: '北', dir: [0, -1], team: 'A', primary: '#2d73cb', secondary: '#a9ccff', primaryName: '鈷藍', secondaryName: '冰藍' },
-  { id: 'W', name: '西', dir: [-1, 0], team: 'A', primary: '#60d6c0', secondary: '#f0fff6', primaryName: '薄荷綠', secondaryName: '霜白' },
+  { id: 'W', name: '西', dir: [-1, 0], team: 'A', primary: '#c6b0fd', secondary: '#faf6ff', primaryName: '冷紫', secondaryName: '霜紫' },
   { id: 'S', name: '南', dir: [0, 1], team: 'B', primary: '#d48c22', secondary: '#ffe38f', primaryName: '琥珀', secondaryName: '乳黃' },
   { id: 'E', name: '東', dir: [1, 0], team: 'B', primary: '#c03f30', secondary: '#ffc3ad', primaryName: '珊瑚紅', secondaryName: '蜜桃' },
 ];

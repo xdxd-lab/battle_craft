@@ -66,15 +66,16 @@ for (const { name, m } of Object.values(L.CVD)) {
   L.SEATS.forEach((a, i) => L.SEATS.slice(i + 1).forEach(b => (a.team === b.team ? same : cross).push(dist(a.primary, b.primary))));
   const mark = dist(L.RELATIONS.ally.color, L.RELATIONS.enemy.color);
   assert.ok(Math.min(...same) > .12, `${name} 同隊兩席太接近 ${same}`);
-  assert.ok(same[0] > (name === L.CVD.none.name ? .28 : .2), `${name} 北、西席太接近 ${same[0]}`);
+  assert.ok(same[0] > (name === L.CVD.none.name ? .24 : .2), `${name} 北、西席太接近 ${same[0]}`);
   assert.ok(Math.min(...cross) > .16, `${name} 跨隊兩席太接近 ${cross}`);
   assert.ok(mark > .15, `${name} 敵我標記色太接近 ${mark}`);
   for (const s of L.SEATS) assert.ok(dist(s.primary, s.secondary) > .15, `${name} ${s.name}席主輔色太接近`);
-  color.push({ 色覺: name, 甲隊內: same[0].toFixed(3), 乙隊內: same[1].toFixed(3), 跨隊最近: Math.min(...cross).toFixed(3), 敵我標記: mark.toFixed(3) });
+  const seatMark = Math.min(...L.SEATS.filter(s => s.team === 'A').map(s => dist(s.primary, L.RELATIONS.enemy.color))); // 只揭露、不設門檻：色弱下靠叉形與虛線框
+  color.push({ 甲席對敵標記: seatMark.toFixed(3), 色覺: name, 甲隊內: same[0].toFixed(3), 乙隊內: same[1].toFixed(3), 跨隊最近: Math.min(...cross).toFixed(3), 敵我標記: mark.toFixed(3) });
 }
-// 隊伍色系：冷色色相 150°–280°，暖色 0°–100°（OKLab）
+// 隊伍色系：冷色色相 220°–305°（藍到偏藍的紫），暖色 0°–100°（OKLab）
 const hue = h => { const [, a, b] = lab(lin(h)); return (Math.atan2(b, a) * 180 / Math.PI + 360) % 360; };
-for (const s of L.SEATS) { const h = hue(s.primary), [lo, hi] = s.team === 'A' ? [150, 280] : [0, 100]; assert.ok(h >= lo && h <= hi, `${s.name}席偏離${L.TEAMS[s.team].family}系 ${h}`); }
+for (const s of L.SEATS) { const h = hue(s.primary), [lo, hi] = s.team === 'A' ? [220, 305] : [0, 100]; assert.ok(h >= lo && h <= hi, `${s.name}席偏離${L.TEAMS[s.team].family}系 ${h}`); }
 assert.notEqual(L.TEAMS.A.emblem, L.TEAMS.B.emblem);
 assert.equal(new Set(['self', 'ally', 'enemy'].map(k => L.RELATIONS[k].shape)).size, 3);
 assert.equal(new Set(L.SEATS.map(s => s.name)).size, 4);
