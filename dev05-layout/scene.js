@@ -416,7 +416,7 @@ $('dims').onclick = () => { dims = !dims; $('dims').setAttribute('aria-pressed',
 $('still').onclick = () => { still = !still; $('still').setAttribute('aria-pressed', still); dirty = true; writeHash(); };
 addEventListener('hashchange', () => readHash(still));
 if (innerHeight < 560 || innerWidth < 900) $('panel').removeAttribute('open');
-try { start3d(); } catch (err) { console.error(err); renderer = camera = null; document.body.classList.add('no3d'); }
+try { start3d(); } catch (err) { console.error(err); renderer = camera = null; document.body.classList.add('no3d'); $('panel').setAttribute('open', ''); }
 readHash(true);
 // 供自動核對：實際鏡頭下所有取景點的 NDC 極值與繪製統計
 window.__dev05 = { info: () => ({ view: L.viewKey(view), calls: renderer?.info.render.calls, triangles: renderer?.info.render.triangles }), safeBox: () => { // 取景點在實際鏡頭下的像素範圍，對照安全區
