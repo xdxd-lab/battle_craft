@@ -4,6 +4,7 @@
 
 export const DIM = {
   coreDistance: 30,      // 核心中心到戰場中心
+  spawnRadial: 22,      // 出兵門到戰場中心
   laneWidth: 8,          // 道路可通行寬
   junctionRadius: 9,     // 交會區外接半徑
   corePlatformRadius: 7, // 核心平台半徑
@@ -11,6 +12,8 @@ export const DIM = {
   shopWidth: 14,         // 購買區沿切線方向
   shopDepth: 10,         // 購買區沿臂方向
   shopTangent: 17,       // 購買區中心離道路中線
+  shopSupplyRadial: 3.2, // 購買區設備相對中心的沿臂偏移
+  shopPadPositions: [[4.2, 2.4], [-2.4, 2.4], [4.2, -2.4], [-2.4, -2.4]],
   shopRadial: 25,        // 購買區中心離戰場中心（沿臂）
   padCount: 4,           // 每席信標數
   padRadius: 1.5,
@@ -56,29 +59,29 @@ export const ccw = ([x, z]) => [z || 0, -x || 0];
 // 席位本地座標（以北席建模）轉世界座標的 Y 軸旋轉角
 export const seatYaw = id => seatIndex(id) * Math.PI / 2;
 
-export function corePos(id) {
+export function corePos(id, dim = DIM) {
   const [x, z] = seatById(id).dir;
-  return [x * DIM.coreDistance, z * DIM.coreDistance];
+  return [x * dim.coreDistance, z * dim.coreDistance];
 }
-export function shopPos(id) {
+export function shopPos(id, dim = DIM) {
   const d = seatById(id).dir, t = ccw(d);
-  return [d[0] * DIM.shopRadial + t[0] * DIM.shopTangent, d[1] * DIM.shopRadial + t[1] * DIM.shopTangent];
+  return [d[0] * dim.shopRadial + t[0] * dim.shopTangent, d[1] * dim.shopRadial + t[1] * dim.shopTangent];
 }
-export function markerPos(id) {
-  const c = corePos(id), t = ccw(seatById(id).dir);
-  return [c[0] - t[0] * DIM.markerOffset, DIM.markerHeight, c[1] - t[1] * DIM.markerOffset];
+export function markerPos(id, dim = DIM) {
+  const c = corePos(id, dim), t = ccw(seatById(id).dir);
+  return [c[0] - t[0] * dim.markerOffset, dim.markerHeight, c[1] - t[1] * dim.markerOffset];
 }
-export function shopCorners(id) {
-  const d = seatById(id).dir, t = ccw(d), c = shopPos(id);
+export function shopCorners(id, dim = DIM) {
+  const d = seatById(id).dir, t = ccw(d), c = shopPos(id, dim);
   const out = [];
   for (const a of [-1, 1]) for (const b of [-1, 1]) {
-    const h = a * DIM.shopWidth / 2, v = b * DIM.shopDepth / 2;
+    const h = a * dim.shopWidth / 2, v = b * dim.shopDepth / 2;
     out.push([c[0] + t[0] * h + d[0] * v, c[1] + t[1] * h + d[1] * v]);
   }
   return out;
 }
 // 購買區邊緣與道路邊緣的淨距
-export const shopClearance = () => DIM.shopTangent - DIM.shopWidth / 2 - DIM.laneWidth / 2;
+export const shopClearance = (dim = DIM) => dim.shopTangent - dim.shopWidth / 2 - dim.laneWidth / 2;
 
 // viewer: 'seat:N' | 'team:A' | 'plan'
 export function parseView(text) {
@@ -110,21 +113,22 @@ export function viewFrom(view) {
 }
 
 // 完整戰場必須入鏡的點：道路端、核心（含高度）、敵我標記、購買區。
-export function boundsPoints() {
+export function boundsPoints(dim = DIM) {
   const pts = [];
   for (const s of SEATS) {
-    const [x, z] = corePos(s.id);
+    const [x, z] = corePos(s.id, dim);
     for (let i = 0; i < 8; i++) {
-      const a = i * Math.PI / 4, r = DIM.corePlatformRadius;
+      const a = i * Math.PI / 4, r = dim.corePlatformRadius;
       pts.push([x + Math.cos(a) * r, 0, z + Math.sin(a) * r]);
     }
-    pts.push([x, DIM.coreHeight, z]);
-    for (const [cx, cz] of shopCorners(s.id)) pts.push([cx, 0, cz], [cx, 4, cz]);
+    pts.push([x, dim.coreHeight, z]);
+    for (const [cx, cz] of shopCorners(s.id, dim)) pts.push([cx, 0, cz], [cx, 4, cz]);
   }
   return pts;
 }
 // 標記是朝向鏡頭的方形貼圖，取景時以四角納入。
 export const MARKER_SIZE = { w: 8.4, h: 4.8 };
+export const SHOP_LABEL = { w: 7.2, h: 1.83, y: 5.6, fontSize: 40 };
 
 const sub = (a, b) => a.map((v, i) => v - b[i]);
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -144,37 +148,48 @@ export function basisOf({ az, el }) {
   return { forward, up, right };
 }
 export const viewBasis = view => basisOf(viewAngles(view));
-export const framePoints = view => frameOf(viewAngles(view));
-export function frameOf(angles) {
+export const framePoints = (view, dim) => frameOf(viewAngles(view), dim);
+export function frameOf(angles, dim = DIM) {
   const { up, right } = basisOf(angles);
-  const pts = boundsPoints();
+  const pts = boundsPoints(dim);
   for (const s of SEATS) {
-    const m = markerPos(s.id);
+    const m = markerPos(s.id, dim);
     for (const a of [-1, 1]) for (const b of [-1, 1]) {
       const w = a * MARKER_SIZE.w / 2, h = b * MARKER_SIZE.h / 2;
       pts.push([0, 1, 2].map(i => m[i] + right[i] * w + up[i] * h));
+    }
+  }
+  if (dim.shopLabel) {
+    const label = dim.shopLabel;
+    // 購買區名稱牌為朝向鏡頭的貼圖，超出地板輪廓的部分亦須入鏡。
+    for (const seat of SEATS) {
+      const [x, z] = shopPos(seat.id, dim);
+      for (const a of [-1, 1]) for (const b of [-1, 1]) {
+        const w = a * label.w / 2, h = b * label.h / 2;
+        pts.push([x + right[0] * w + up[0] * h, label.y + up[1] * h, z + right[2] * w + up[2] * h]);
+      }
     }
   }
   return pts;
 }
 // 封閉解：鏡頭左右置中（自己的核心永遠在中線），取能容納全部點的最近距離。
 export const fitCamera = (view, aspect, margin) => fitAngles(viewAngles(view), aspect, margin);
-export function fitAngles(angles, aspect, margin = 0.95) {
+export function fitAngles(angles, aspect, margin = 0.95, dim = DIM, minDistance = 0) {
   const { forward, up, right } = basisOf(angles);
   const tv = Math.tan(FOV * Math.PI / 360) * margin, th = tv * aspect;
   let depthH = Infinity, hi = -Infinity, lo = Infinity;
-  for (const p of frameOf(angles)) {
+  for (const p of frameOf(angles, dim)) {
     const a = dot(p, right), b = dot(p, up), c = dot(p, forward);
     depthH = Math.min(depthH, c - Math.abs(a) / th);
     hi = Math.max(hi, b - tv * c);
     lo = Math.min(lo, b + tv * c);
   }
   const depthV = (lo - hi) / (2 * tv);
-  const depth = Math.min(depthH, depthV);
+  const depth = Math.min(depthH, depthV, -minDistance);
   // 垂直方向置中：上下邊界對 b 的允許區間取中點
   const lift = ((hi + tv * depth) + (lo - tv * depth)) / 2;
   const position = [0, 1, 2].map(i => up[i] * lift + forward[i] * depth);
-  return { position, forward, up, right };
+  return { position, forward, up, right, distance: -depth };
 }
 export function project(cam, aspect, p) {
   const t = Math.tan(FOV * Math.PI / 360), d = sub(p, cam.position), c = dot(d, cam.forward);

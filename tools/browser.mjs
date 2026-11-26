@@ -15,10 +15,10 @@ export const STEPPED = `(() => { let q = [], id = 0, t = 1000; const dead = new 
   window.cancelAnimationFrame = i => dead.add(i);
   window.__step = (n = 1, dt = 33.34) => { for (let k = 0; k < n; k++) { t += dt; const run = q; q = []; for (const [i, f] of run) if (!dead.delete(i)) f(t); } return t; }; })();`;
 
-export async function launch({ width = 1280, height = 800 } = {}) {
+export async function launch({ width = 1280, height = 800, args = [] } = {}) {
   if (!CHROME) throw new Error('找不到 Chrome，請以 CHROME 指定執行檔');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bc-qa-'));
-  const proc = spawn(CHROME, ['--headless=new', `--use-angle=${ANGLE}`, '--enable-unsafe-swiftshader', '--hide-scrollbars', '--no-first-run', '--disable-extensions', '--remote-debugging-port=0', `--user-data-dir=${dir}`, `--window-size=${width},${height}`, 'about:blank'], { stdio: 'ignore' });
+  const proc = spawn(CHROME, ['--headless=new', `--use-angle=${ANGLE}`, '--enable-unsafe-swiftshader', '--hide-scrollbars', ...args, '--no-first-run', '--disable-extensions', '--remote-debugging-port=0', `--user-data-dir=${dir}`, `--window-size=${width},${height}`, 'about:blank'], { stdio: 'ignore' });
   const portFile = path.join(dir, 'DevToolsActivePort');
   for (let i = 0; i < 200 && !fs.existsSync(portFile); i++) await sleep(50);
   await sleep(100);
@@ -29,7 +29,7 @@ export async function launch({ width = 1280, height = 800 } = {}) {
   ws.onmessage = e => { const m = JSON.parse(e.data); if (m.id) { const w = waiting.get(m.id); waiting.delete(m.id); m.error ? w.no(new Error(JSON.stringify(m.error))) : w.ok(m.result); } else listeners.forEach(f => f(m)); };
   const send = (method, params = {}, sessionId) => new Promise((ok, no) => { const id = ++serial; waiting.set(id, { ok, no }); ws.send(JSON.stringify({ id, method, params, sessionId })); });
 
-  async function open(url, { stepped = false, w = width, h = height } = {}) {
+  async function open(url, { stepped = false, w = width, h = height, prelude = '' } = {}) {
     const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await send('Target.attachToTarget', { targetId, flatten: true });
     const s = (m, p) => send(m, p, sessionId), errors = [];
@@ -42,11 +42,13 @@ export async function launch({ width = 1280, height = 800 } = {}) {
     await s('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
     await s('Emulation.setFocusEmulationEnabled', { enabled: true });
     if (stepped) await s('Page.addScriptToEvaluateOnNewDocument', { source: STEPPED });
+    if (prelude) await s('Page.addScriptToEvaluateOnNewDocument', { source: prelude });
     const loaded = new Promise(ok => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && ok()));
     await s('Page.navigate', { url }); await loaded;
     const page = {
       errors, send: s,
       eval: async expr => { const r = await s('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true }); if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text); return r.result.value; },
+      reload: async () => { const done = new Promise(ok => listeners.push(m => m.sessionId === sessionId && m.method === 'Page.loadEventFired' && ok())); await s('Page.reload', {}); await done; },
       click: async (x, y, n = 1) => { for (let i = 0; i < n; i++) { await s('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 }); await s('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 }); } },
       clickOn: async sel => { const [x, y] = await page.eval(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); e.scrollIntoView({ block: 'center' }); const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`); await page.click(x, y); },
       down: (key, autoRepeat = false) => s('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code: 'Key' + key.toUpperCase(), windowsVirtualKeyCode: key.toUpperCase().charCodeAt(0), autoRepeat }),

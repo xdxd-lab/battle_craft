@@ -110,7 +110,7 @@ class Batch {
 const batch = new Batch();
 
 // ---------- 一席（以北席本地座標建模：核心在 -z，逆時鐘側為 -x） ----------
-function buildSeat(s, { commander = true } = {}) {
+function buildSeat(s, { commander = true, dim: D = L.DIM } = {}) {
   const M = seatMats[s.id], R = D.coreDistance, W = D.laneWidth, J = D.junctionRadius;
   batch.base.makeRotationY(L.seatYaw(s.id));
   const b = batch;
@@ -127,12 +127,13 @@ function buildSeat(s, { commander = true } = {}) {
     }
   }
   for (let z = z0 + 1.5; z < z1; z += 2.6) b.box(MAT.steel, W, .5, .35, 0, -2.9, z);
-  for (const z of [-14, -20]) { b.box(MAT.dark, 3.4, 13, 2.2, 0, -8.5, z); b.box(MAT.rust, 5.6, .8, 3, 0, -3.4, z); b.box(MAT.steel, 4.4, .5, 2.9, 0, -8, z); }
+  for (const z of [-14, 2 - D.spawnRadial]) { b.box(MAT.dark, 3.4, 13, 2.2, 0, -8.5, z); b.box(MAT.rust, 5.6, .8, 3, 0, -3.4, z); b.box(MAT.steel, 4.4, .5, 2.9, 0, -8, z); }
   for (let z = z0 + 2.2; z < z1 - 1; z += 3.2) for (const q of [-1, 1]) b.box(M.trim, 1.5, .03, .3, q * .48, .02, z, q * .72); // 指向中央
   for (const q of [-1, 1]) b.box(M.trim, .16, .03, len - 1, q * (W / 2 - .7), .02, zc);
   // 出兵門
-  for (const q of [-1, 1]) { b.box(MAT.dark, 1.5, 3.6, 1.8, q * (W / 2 + .8), 1.6, -22); b.box(M.paint, 1.62, .9, 1.9, q * (W / 2 + .8), 2.7, -22); }
-  b.box(MAT.steel, W + 3, .5, .9, 0, 3.6, -22); b.box(M.glow, W - .6, .16, .16, 0, 3.3, -21.5);
+  const gate = -D.spawnRadial;
+  for (const q of [-1, 1]) { b.box(MAT.dark, 1.5, 3.6, 1.8, q * (W / 2 + .8), 1.6, gate); b.box(M.paint, 1.62, .9, 1.9, q * (W / 2 + .8), 2.7, gate); }
+  b.box(MAT.steel, W + 3, .5, .9, 0, 3.6, gate); b.box(M.glow, W - .6, .16, .16, 0, 3.3, gate + .5);
 
   // 核心：反應爐塔（原創造型）
   const cr = D.corePlatformRadius;
@@ -160,16 +161,17 @@ function buildSeat(s, { commander = true } = {}) {
   b.box(MAT.dark, 2.6, 13, 2.6, sx, -9, sz); b.box(MAT.rust, 6, .7, 4, sx, -3.4, sz);
   for (const q of [-1, 1]) {
     b.box(M.paint, w + .3, .5, .4, sx, .3, sz + q * d / 2); b.box(M.paint, .4, .5, d + .3, sx + q * w / 2, .3, sz);
-    for (let i = -3; i <= 3; i++) b.box(MAT.steel, .12, .9, .12, sx + i * 2.2, .9, sz + q * (d / 2 - .1));
+    for (let i = -3; i <= 3; i++) b.box(MAT.steel, .12, .9, .12, sx + i * (w - .8) / 6, .9, sz + q * (d / 2 - .1));
     b.box(MAT.steel, w - .4, .1, .1, sx, 1.35, sz + q * (d / 2 - .1));
   }
-  for (const i of [-1, 1]) for (const k of [-1, 1]) {
-    const x = sx + i * 3.3 + .9, z = sz + k * 2.4;
+  for (const [px, pz] of D.shopPadPositions) {
+    const x = sx + px, z = sz + pz;
     b.cyl(MAT.dark, D.padRadius + .25, D.padRadius + .4, .24, x, .22, z, 6); b.cyl(MAT.steel, D.padRadius - .25, D.padRadius - .25, .1, x, .38, z, 6);
     b.ring(M.glow, D.padRadius, .11, x, .38, z, 6); b.cyl(M.glow, .3, .3, .3, x, .5, z, 12);
   }
-  for (const k of [-1, 1]) { b.cyl(MAT.steel, .95, .95, 2.4, sx - 5.6, 1.3, sz + k * 3.2, 18); b.cyl(M.paint, 1, 1, .5, sx - 5.6, 1.6, sz + k * 3.2, 18); b.cyl(MAT.dark, .5, .95, .4, sx - 5.6, 2.7, sz + k * 3.2, 18); }
-  b.box(M.paint, 1.7, 1.5, 2.8, sx - 5.6, .85, sz); b.box(MAT.dark, 1.8, .2, 2.9, sx - 5.6, 1.6, sz);
+  const supplyX = sx - w / 2 + 1.4, supplyZ = D.shopSupplyRadial;
+  for (const k of [-1, 1]) { b.cyl(MAT.steel, .95, .95, 2.4, supplyX, 1.3, sz + k * supplyZ, 18); b.cyl(M.paint, 1, 1, .5, supplyX, 1.6, sz + k * supplyZ, 18); b.cyl(MAT.dark, .5, .95, .4, supplyX, 2.7, sz + k * supplyZ, 18); }
+  b.box(M.paint, 1.7, 1.5, 2.8, supplyX, .85, sz); b.box(MAT.dark, 1.8, .2, 2.9, supplyX, 1.6, sz);
   b.box(MAT.dark, .6, 4, .6, sx + w / 2 - .7, 2, sz - d / 2 + .8); b.box(M.glow, .9, .5, .9, sx + w / 2 - .7, 4, sz - d / 2 + .8);
   // 歸屬管線：購買區 → 自己的核心平台（不可通行）
   for (const k of [-.5, .5]) b.pipe(k < 0 ? M.paint : MAT.steel, .28, [sx + w / 2 - .5, -.5, sz - 2.6 + k], [-cr + .8, -.5, -R + 2 + k]);
@@ -205,16 +207,17 @@ function buildJunction() {
   }
 }
 
+export const GROUND = { material: null, dots: [] }; // 場外背景地面與其星點，供材質對照替換時保留
 function buildSurroundings() {
   const tex = canvasTexture(1024, (g, s) => {
     g.fillStyle = '#0c1116'; g.fillRect(0, 0, s, s);
     for (let i = 0; i < 240; i++) { const v = 14 + rnd() * 20; g.fillStyle = `rgb(${v},${v + 4},${v + 8})`; g.fillRect(rnd() * s, rnd() * s, 10 + rnd() * 90, 10 + rnd() * 70); }
     g.strokeStyle = '#262d33'; g.lineWidth = 5; for (let i = 0; i < 12; i++) { const p = rnd() * s; g.beginPath(); rnd() < .5 ? (g.moveTo(p, 0), g.lineTo(p, s)) : (g.moveTo(0, p), g.lineTo(s, p)); g.stroke(); }
-    for (let i = 0; i < 420; i++) { g.fillStyle = rnd() < .8 ? 'rgba(255,190,120,.55)' : 'rgba(170,210,255,.5)'; g.fillRect(rnd() * s, rnd() * s, 2, 2); }
+    for (let i = 0; i < 420; i++) { const color = rnd() < .8 ? 'rgba(255,190,120,.55)' : 'rgba(170,210,255,.5)', x = rnd() * s, y = rnd() * s; g.fillStyle = color; g.fillRect(x, y, 2, 2); GROUND.dots.push({ color, x: x / s, y: y / s }); } // 取亂數順序與原本相同
   });
   tex.repeat.set(3, 3);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: .32, roughness: 1 }));
-  floor.rotation.x = -Math.PI / 2; floor.position.y = -15; floor.receiveShadow = true; scene.add(floor);
+  floor.rotation.x = -Math.PI / 2; floor.position.y = -15; floor.receiveShadow = true; scene.add(floor); GROUND.material = floor.material;
   const haze = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), new THREE.MeshBasicMaterial({ color: 0x1b2a35, transparent: true, opacity: .5, depthWrite: false }));
   haze.rotation.x = -Math.PI / 2; haze.position.y = -7.6; scene.add(haze);
   // 低於戰場的廠區，只作背景層次
@@ -253,7 +256,7 @@ export function relationShape(g, kind, x, y, r) {
   g.closePath(); g.fill();
 }
 export function clear(group) { for (const o of [...group.children]) { o.material.map?.dispose(); o.material.dispose(); if (!o.isSprite) o.geometry?.dispose(); group.remove(o); } }
-export function buildMarkers(markerGroup, view, hideShop = null) {
+export function buildMarkers(markerGroup, view, hideShop = null, dim = L.DIM) {
   clear(markerGroup);
   for (const s of L.SEATS) {
     const rel = L.relation(view, s.id), R = rel && L.RELATIONS[rel], team = L.TEAMS[s.team];
@@ -270,14 +273,15 @@ export function buildMarkers(markerGroup, view, hideShop = null) {
       if (R) { relationShape(g, R.shape, 292, 78, 48); g.font = `800 58px ${FONT}`; g.fillText(R.name, 292, 176); }
       else { g.font = `800 46px ${FONT}`; g.fillText('核心', 292, 120); }
     });
-    m.position.set(...L.markerPos(s.id)); m.scale.set(L.MARKER_SIZE.w, L.MARKER_SIZE.h, 1); markerGroup.add(m);
+    m.position.set(...L.markerPos(s.id, dim)); m.scale.set(L.MARKER_SIZE.w, L.MARKER_SIZE.h, 1); markerGroup.add(m);
     if (s.id === hideShop) continue;
+    const tag = dim.shopLabel ?? L.SHOP_LABEL;
     const p = label(330, 84, (g, w, h) => {
       g.fillStyle = 'rgba(7,11,15,.82)'; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 14); g.fill(); g.lineWidth = 5; g.strokeStyle = s.secondary; g.stroke();
       g.fillStyle = R ? R.color : '#c8d2da'; if (R) relationShape(g, R.shape, 46, 42, 24);
-      g.fillStyle = '#fff'; g.font = `700 40px ${FONT}`; g.fillText(`${s.name}席購買區`, R ? 190 : 165, 43);
+      g.fillStyle = '#fff'; g.font = `700 ${tag.fontSize}px ${FONT}`; g.fillText(`${s.name}席購買區`, R ? 190 : 165, 43);
     });
-    const [u, v] = L.shopPos(s.id); p.position.set(u, 5.6, v); p.scale.set(7.2, 1.83, 1); markerGroup.add(p);
+    const [u, v] = L.shopPos(s.id, dim); p.position.set(u, tag.y, v); p.scale.set(tag.w, tag.h, 1); markerGroup.add(p);
   }
 }
 // ---------- 繪製器、燈光、靜態場景 ----------
@@ -302,8 +306,8 @@ export function createWorld(canvas, options) {
 }
 
 // ---------- 鏡頭：版面與取景由 layout.mjs 計算 ----------
-export function poseCamera(camera, angles, safe) {
-  const c = L.fitAngles(angles, safe.w / safe.h);
+export function poseCamera(camera, angles, safe, fit = L.fitAngles) {
+  const c = fit(angles, safe.w / safe.h);
   const b = new THREE.Matrix4().makeBasis(new THREE.Vector3(...c.right), new THREE.Vector3(...c.up), new THREE.Vector3(...c.forward).negate());
   camera.position.set(...c.position); camera.quaternion.setFromRotationMatrix(b);
 }
