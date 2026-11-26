@@ -250,6 +250,7 @@ await test('主城：血量數字與損壞階段隨本體血量、血條開關�
       for (const id of S.SEAT_IDS) { assert.equal(ui[id].stage, want(st[id].hp), `${id} ${st[id].hp}`); assert.equal(ui[id].layers, ui[id].stage); assert.equal(ui[id].label, st[id].alive ? String(Math.ceil(st[id].hp)) : null); if (!seen.has(ui[id].stage)) { seen.add(ui[id].stage); if (SHOTS) { await page.eval('__step(6)'); await page.shot(path.join(SHOTS, `core-stage${ui[id].stage}-${id}-${w}.png`)); } } }
     }
     assert.deepEqual([...seen].sort(), [0, 1, 2, 3]); await same(page);
+    const reach = await page.eval('__dev02.coreReach()'); assert(reach > 3 && reach <= S.RULES.coreRadius, `地面損壞物件伸到 ${reach}`);
     await page.eval('__step(2)'); if (SHOTS) await page.shot(path.join(SHOTS, `core-end-${w}.png`)); await page.done();
   }
   const page = await open('W'); await page.eval('__step(30)'); assert.equal((await page.eval('__dev02.cores()')).N.label, String(max)); await page.clickOn('#opt-bars'); await page.eval('__step(2)'); assert((await page.eval('Object.values(__dev02.cores())')).every(c => c.label === null)); await page.clickOn('#opt-bars'); await page.eval('__step(2)'); assert.equal((await page.eval('__dev02.cores()')).W.label, String(max)); await page.done();

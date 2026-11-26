@@ -1,6 +1,6 @@
 # Poly Haven 材質（CC0）
 
-DEV02 地板與場外背景的離線 A/B 對照用。2026-11-26 由 `api.polyhaven.com/files/<id>` 列出的 dl.polyhaven.org 網址下載，下載後 md5 與該 API 回傳值相符。CC0（公共領域貢獻），可商用、可於公開儲存庫再散布，不需署名；作者為 Rob Tuytel。
+DEV02 地板與場外背景用：標準地表內嵌 512 地板與 1K 背景，精緻地表內嵌 `hi/`。1K 地板現僅作 512 的縮製來源，2K 背景已不內嵌，兩者保留備查。2026-11-26 由 `api.polyhaven.com/files/<id>` 列出的 dl.polyhaven.org 網址下載，下載後 md5 與該 API 回傳值相符。CC0（公共領域貢獻），可商用、可於公開儲存庫再散布，不需署名；作者為 Rob Tuytel。
 
 | 檔案 | 來源 | 實際尺寸 | 解析度 | 位元組 | md5 |
 | --- | --- | --- | --- | --- | --- |

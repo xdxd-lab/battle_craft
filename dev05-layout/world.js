@@ -117,6 +117,9 @@ function buildSeat(s, { commander = true, dim: D = L.DIM } = {}) {
   // 道路
   const z0 = -(R - D.corePlatformRadius + 1), z1 = -(J - 1), len = z1 - z0, zc = (z0 + z1) / 2;
   b.box(MAT.deck, W, 1.2, len, 0, -.6, zc);
+  if (W > L.DIM.laneWidth) { // 加寬後路面兩角超出八角交會台的斜邊，補到斜邊交點；略低避免重疊面閃爍
+    const fill = -z1 - (J * Math.cos(Math.PI / 8) * Math.SQRT2 - W / 2); if (fill > 0) b.box(MAT.deck, W, 1.19, fill, 0, -.605, z1 + fill / 2);
+  }
   for (const q of [-1, 1]) {
     b.box(MAT.dark, .9, 1.1, len, q * (W / 2 + .45), -.2, zc);
     for (let z = z0 + 1.2; z < z1 - .4; z += 2.4) b.box(M.paint, 1, .32, 1.5, q * (W / 2 + .45), .42, z);
