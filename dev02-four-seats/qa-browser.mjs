@@ -54,6 +54,24 @@ await test('暫停、視角、觀戰', async () => {
   await page.clickOn('#view'); assert.equal(await page.eval('__dev02.view()'), 'team:B'); await page.clickOn('#view'); assert.equal(await page.eval('__dev02.view()'), 'seat:E'); await page.done();
   const w = await open('none', { seed: 3 }); for (let i = 0; i < 300 && await w.eval('__dev02.mode()') === 'play'; i++) await w.eval('__step(300)'); assert.equal(await w.eval('__dev02.mode()'), 'end'); await same(w); await w.done();
 });
+await test('方向鍵按下後、下一 tick 前暫停，暫停中放開：恢復後不移動、不扣款', async () => {
+  for (const [via, key] of [['button', 'd'], ['space', 'w'], ['blur', 'a']]) for (const id of S.SEAT_IDS) {
+    const page = await open(id); await page.eval('__step(10)');
+    const before = await page.snap();
+    await page.down(key); // 尚未推進 tick
+    if (via === 'button') await page.clickOn('#pause'); else if (via === 'space') { await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 }); } else await page.eval(`dispatchEvent(new Event('blur'))`);
+    assert.equal(await page.eval('__dev02.mode()'), 'paused'); await page.eval('__step(30)'); await page.up(key); await page.eval('__step(30)');
+    if (via === 'space') { await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', windowsVirtualKeyCode: 32, text: ' ' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 }); } else await page.clickOn('#pause');
+    assert.equal(await page.eval('__dev02.mode()'), 'play'); await page.eval('__step(240)');
+    const after = await page.snap(), a = before.seats[id], b = after.seats[id];
+    assert.deepEqual([b.commander.x, b.commander.z, b.spent, b.buys, b.pad], [a.commander.x, a.commander.z, 0, 0, -1], `${via} ${id} 暫停後自行移動或扣款`);
+    assert.equal(b.gold, 12 + Math.floor(after.tick / 30)); await same(page);
+    // 正常行為仍在：恢復後再按方向鍵會移動
+    await page.down(key); await page.eval('__step(10)'); await page.up(key); await page.eval('__step(2)'); const c = (await page.snap()).seats[id].commander;
+    assert(Math.hypot(c.x - b.commander.x, c.z - b.commander.z) > 1, `${via} ${id} 恢復後按鍵應移動`); await page.done();
+  }
+  return '按鈕、空白鍵、失焦 × 四席';
+});
 await test('取景：桌面與橫式手機四席與隊伍視角皆在安全區內', async () => {
   for (const [w, h] of [[1600, 900], [1280, 720], [844, 390]]) for (const id of S.SEAT_IDS) {
     const page = await open(id, { w, h }); assert(await page.eval('__dev02.inside()'), `${w}x${h} ${id}`); if (SHOTS && w === 844 && id === 'W') { await page.eval('__step(500)'); await page.shot(path.join(SHOTS, 'phone-W.png')); }

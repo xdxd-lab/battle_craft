@@ -144,7 +144,11 @@ function start(id, seed = (Date.now() ^ (Math.random() * 2 ** 32)) >>> 0) {
   $('log').replaceChildren(); W.clear(fallGroup); shots.live = []; puffs.live = []; prevPos = new Map();
   buildPads(); setView(L.parseView(seat ? `seat:${seat}` : 'team:A'), true); shopUi(); $('cover').hidden = true; canvas.focus(); hud();
 }
-function pause() { if (mode === 'play') { mode = 'paused'; keys.clear(); if (seat && state.seats[seat].dir) { queue = [{ seat, type: 'dir', x: 0, z: 0 }]; } say('已暫停。', 'info'); } else if (mode === 'paused') { mode = 'play'; say('繼續。', 'info'); } accumulator = 0; hud(); }
+function pause() { if (mode === 'play') {
+  // 暫停時放掉所有按鍵：尚未送進模擬的方向指令作廢，已生效的方向歸零；點擊目標保留
+  mode = 'paused'; keys.clear(); queue = queue.filter(c => c.type !== 'dir');
+  if (seat && state.seats[seat].alive) queue.push({ seat, type: 'dir', x: 0, z: 0 }); // 方向歸零不取消點擊目標
+  say('已暫停。', 'info'); } else if (mode === 'paused') { mode = 'play'; say('繼續。', 'info'); } accumulator = 0; hud(); }
 let prevPos = new Map();
 function tick() {
   const now = queue; queue = [];
