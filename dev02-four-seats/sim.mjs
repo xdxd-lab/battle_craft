@@ -6,7 +6,7 @@ import { KINDS, KIND_IDS, CORE, unitStats } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
 
 export const HZ = 30;
-export const VERSION = 3; // 1、2：單一突擊機（舊紀錄與回歸用）；3：BC01 三兵種
+export const VERSION = 4; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
   startGold: 12, incomeEvery: 30, purchaseGap: 15, // v5：12 金起始、每秒 1 金、兩次購買至少 0.5 秒
@@ -40,6 +40,7 @@ const GEOMETRY = {
   ] },
 };
 GEOMETRY[3] = GEOMETRY[2];
+GEOMETRY[4] = { ...GEOMETRY[2], dim: { ...ARENA, laneHalf: RULES.laneHalf * 1.1 } };
 export const SEAT_IDS = L.SEATS.map(s => s.id);
 
 // 北席本地座標 ⇄ 世界座標（90° 旋轉，浮點無誤差）
@@ -153,22 +154,22 @@ function moveCommander(s, geometry) {
 
 // ---------- 部隊 ----------
 function clampWalk(x, z, dim) { // 道路、交會區、核心平台之內；核心本體不可穿越
-  const R = RULES, C = dim.coreDistance;
+  const R = RULES, C = dim.coreDistance, half = dim.laneHalf ?? R.laneHalf;
   for (const s of L.SEATS) {
     const cx = s.dir[0] * C, cz = s.dir[1] * C, d = dist(x, z, cx, cz);
     if (d < R.platform) { if (d >= R.coreRadius || !d) return [x, z]; return [cx + (x - cx) / d * R.coreRadius, cz + (z - cz) / d * R.coreRadius]; }
   }
   const r = dist(x, z, 0, 0), ax = Math.abs(x), az = Math.abs(z);
-  if (r <= R.junction || (ax <= R.laneHalf && az <= C) || (az <= R.laneHalf && ax <= C)) return [x, z];
+  if (r <= R.junction || (ax <= half && az <= C) || (az <= half && ax <= C)) return [x, z];
   // 出界時取位移最小的合法位置
-  const lane = ax < az ? [clamp(x, -R.laneHalf, R.laneHalf), clamp(z, -C, C)] : [clamp(x, -C, C), clamp(z, -R.laneHalf, R.laneHalf)];
+  const lane = ax < az ? [clamp(x, -half, half), clamp(z, -C, C)] : [clamp(x, -C, C), clamp(z, -half, half)];
   const hub = [x / r * R.junction, z / r * R.junction];
   return dist(x, z, ...hub) < dist(x, z, ...lane) ? hub : lane;
 }
 function waypoint(u, dim) { // 已在目標核心的軸線走廊就直行，否則先經中央折向
   const [tx, tz] = L.corePos(u.target, dim), [ox, oz] = L.ccw(L.seatById(u.target).dir);
   const off = u.x * ox + u.z * oz;
-  if (Math.abs(off) > RULES.laneHalf + .3) return [0, 0];
+  if (Math.abs(off) > (dim.laneHalf ?? RULES.laneHalf) + .3) return [0, 0];
   return [tx + ox * u.lat, tz + oz * u.lat];
 }
 function stepUnits(state, emit, dim) {

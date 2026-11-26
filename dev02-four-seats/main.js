@@ -10,6 +10,7 @@ import { detailCommander, detailMaterials, triangles } from './detail-models.js'
 import { unitModels, FLY_HEIGHT } from './unit-models.js';
 import { KINDS, KIND_IDS, ATTACKS, CORE } from './roster.mjs';
 import * as HS from './high-scene.js';
+import { createCoreStatus } from './core-status.js';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
@@ -20,7 +21,7 @@ let renderer, camera, dossier, view = L.parseView('team:A'), angles = L.viewAngl
 // ---------- 場景物件 ----------
 const MAX = 128, CORE_MAX = S.coreMax(S.VERSION), dummy = new THREE.Object3D(), markerGroup = new THREE.Group(), padGroup = new THREE.Group(), fallGroup = new THREE.Group();
 scene.add(markerGroup, padGroup, fallGroup);
-let squads, commanders, barBack, barFill, shots, puffs, orbs, glaives, shadows;
+let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, glaives, shadows;
 const inst = (geo, mat, n = MAX) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; m.count = 0; scene.add(m); return m; };
 let bodyTriangles;
 const looks = {};
@@ -348,16 +349,14 @@ function hud() {
 
 // ---------- 顯示設定：只影響呈現，不進模擬與紀錄；保存失敗時照常遊玩 ----------
 const DISPLAY_KEY = 'battle_craft.dev02.display';
-const display = { bars: true, log: true, surface: 'max', engineering: false, quality: 'high' };
-try { const kept = JSON.parse(localStorage.getItem(DISPLAY_KEY) || '{}'); if (!kept.quality) delete kept.surface; Object.assign(display, kept); } catch { /* 無法讀取時用預設值 */ } // 舊版保存的地表不覆蓋高細節預設
+const display = { bars: true, log: true, engineering: false, quality: 'high' };
+try { Object.assign(display, JSON.parse(localStorage.getItem(DISPLAY_KEY) || '{}')); } catch { /* 無法讀取時用預設值 */ }
+delete display.surface; // 舊版另存的地表忽略：地表一律由畫質決定
 if (display.quality !== 'std') display.quality = 'high';
 let savedQuality = display.quality;
-if (['std', 'high'].includes(hash.get('quality'))) { display.quality = hash.get('quality'); if (display.surface === (display.quality === 'high' ? 'orig' : 'max')) display.surface = display.quality === 'high' ? 'max' : 'orig'; } // 只換掉另一畫質的預設地表，自選的標準／高解析保留
+if (['std', 'high'].includes(hash.get('quality'))) display.quality = hash.get('quality'); // 網址參數只在本次生效
 for (const k of ['bars', 'log']) display[k] = display[k] !== false;
 display.engineering = display.engineering === true;
-if (!SF.TIERS[display.surface]) display.surface = display.quality === 'high' ? 'max' : 'orig';
-let savedSurface = display.surface; // 網址 #surface= 只在本次生效，不改寫保存的偏好
-if (SF.TIERS[hash.get('surface')]) display.surface = hash.get('surface');
 function applyDisplay(save) {
   document.body.classList.toggle('no-bars', !display.bars); document.body.classList.toggle('no-log', !display.log);
   $('opt-engineering').setAttribute('aria-pressed', display.engineering);
@@ -370,21 +369,19 @@ function applyDisplay(save) {
   $('dossier').hidden = display.engineering;
   dossier?.hover(null);
   if (barBack) barBack.visible = barFill.visible = display.bars;
-  $('opt-surface').textContent = `地表：${SF.TIERS[display.surface].name}${surfaceBusy ? '…' : ''}`;
-  if (save) try { localStorage.setItem(DISPLAY_KEY, JSON.stringify({ ...display, surface: savedSurface, quality: savedQuality })); } catch { /* 無法保存時只在本次生效 */ }
+  if (save) try { localStorage.setItem(DISPLAY_KEY, JSON.stringify({ ...display, quality: savedQuality })); } catch { /* 無法保存時只在本次生效 */ }
 }
 // 滑鼠點擊後把焦點還給戰場；鍵盤啟動（detail 為 0）時焦點留在按鈕，可連按切換或 Tab 到下一個
 $('opt-bars').onclick = e => { display.bars = !display.bars; applyDisplay(true); if (e.detail) canvas.focus(); };
 $('opt-log').onclick = e => { display.log = !display.log; applyDisplay(true); if (e.detail) canvas.focus(); };
 $('opt-engineering').onclick = e => { display.engineering = !display.engineering; applyDisplay(true); if (e.detail) canvas.focus(); };
 let surfaceBusy = false, surfaceCall = 0;
-async function applySurface(save) { // 失敗時回原始材質並提示，不影響對局；連按時只由最後一次收尾
-  const my = ++surfaceCall; surfaceBusy = true; applyDisplay(false);
-  try { await SF.setSurface(display.surface); } catch { if (my === surfaceCall) { display.surface = 'orig'; say('地表材質載入失敗，已回原始材質。', 'warn'); } }
-  if (my !== surfaceCall) return;
-  surfaceBusy = false; applyDisplay(save);
+const surfaceTier = () => display.quality === 'high' ? 'max' : 'std';
+async function applySurface() { // 失敗時回程序材質並提示，不影響對局；連按時只由最後一次收尾
+  const my = ++surfaceCall; surfaceBusy = true;
+  try { await SF.setSurface(surfaceTier()); } catch { if (my === surfaceCall) say('地表材質載入失敗，已改用內建材質。', 'warn'); }
+  if (my === surfaceCall) surfaceBusy = false;
 }
-$('opt-surface').onclick = e => { const k = Object.keys(SF.TIERS); display.surface = savedSurface = k[(k.indexOf(display.surface) + 1) % k.length]; applySurface(true); if (e.detail) canvas.focus(); };
 applyDisplay(false);
 
 // ---------- 畫質：模型、場景層、解析度一起切換；只換呈現 ----------
@@ -406,8 +403,8 @@ function applyQuality() {
 // 高細節在低密度螢幕以 1.5 倍超取樣，上限 2
 const pixelRatio = () => Math.min(display.quality === 'high' ? Math.max(devicePixelRatio || 1, 1.5) : devicePixelRatio || 1, 2);
 $('opt-quality').onclick = e => {
-  display.quality = display.quality === 'high' ? 'std' : 'high'; savedQuality = display.quality; display.surface = savedSurface = display.quality === 'high' ? 'max' : 'orig';
-  applyQuality(); resize(); applySurface(true); if (e.detail) canvas.focus();
+  display.quality = display.quality === 'high' ? 'std' : 'high'; savedQuality = display.quality;
+  applyQuality(); applyDisplay(true); resize(); applySurface(); if (e.detail) canvas.focus();
 };
 
 // ---------- 繪製 ----------
@@ -436,6 +433,7 @@ function draw(dt, k) {
     const c = commanders[s.id], [x, z] = corePos(s.id); c.visible = v.alive; c.position.set(v.commander.x, .1, v.commander.z); if (v.commander.dx || v.commander.dz) c.rotation.y = Math.atan2(v.commander.dx, v.commander.dz);
     bar(x, 10.2, z, 6, .55, v.hp / CORE_MAX, relColor(s.id));
   }
+  coreStatus.update(state, (state?.tick ?? 0) + k, camera, display.bars, compactPadLabels, relColor);
   shadows.count = shade; shadows.instanceMatrix.needsUpdate = true;
   const flying = { dragoon: 0, mutalisk: 0 };
   for (const s of mode === 'end' ? [] : state?.shots ?? []) { // 終局後模擬停止，飛行中的投射物不再畫出
@@ -485,16 +483,16 @@ $('view').onclick = () => { nextView(); canvas.focus(); };
 $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(); };
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
-$('rules').innerHTML = ['每秒 1 金、購買間隔 0.5 秒沿用 v5；價格、數量、核心、光球速度與彈跳半徑為暫定。', `核心 ${CORE_MAX}，視為重裝甲。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對輕／中／重本體 50／75／100%，單體；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
+$('rules').innerHTML = ['每秒 1 金、購買間隔 0.5 秒沿用 v5；價格、數量、核心、光球速度與彈跳半徑為暫定。', `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對輕／中／重本體 50／75／100%，單體；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
 try {
-  ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: ARENA })); buildActors();
+  ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: ARENA })); buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;
   dossier = createDossier(renderer, $('dossier'), $('panel'), () => display.quality);
   applyDisplay(false); applyQuality();
-  if (display.surface !== 'orig') applySurface(false);
+  applySurface();
   const watch = new ResizeObserver(resize); [canvas, $('panel'), $('bar')].forEach(o => watch.observe(o)); $('panel').addEventListener('toggle', resize);
   shopUi(); setView(view, true); resize(); menu(); hud(); requestAnimationFrame(frame);
 } catch (err) { console.error(err); $('card').innerHTML = '<h3>無法啟動 3D</h3><p>此裝置或瀏覽器無法使用 WebGL，這一版沒有 2D 備援。</p>'; }
 // 供自動核對：唯讀快照
-window.__dev02 = { snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ projectiles: { dragoon: orbs.count, mutalisk: glaives.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
+window.__dev02 = { cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
   screen: (x, z, y = .1) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * canvas.clientWidth, (1 - v.y) / 2 * canvas.clientHeight]; }, pad: i => S.padWorld(seat, i), inside: () => { pose(); const b = [1e9, 1e9, -1e9, -1e9]; for (const p of L.framePoints(view, ARENA)) { const [x, y] = window.__dev02.screen(p[0], p[2], p[1]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b[0] >= safe.l - 1 && b[1] >= safe.t - 1 && b[2] <= safe.l + safe.w + 1 && b[3] <= safe.t + safe.h + 1; } };

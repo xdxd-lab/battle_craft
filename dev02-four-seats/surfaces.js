@@ -1,13 +1,11 @@
-// 地板與場外背景的材質對照（原始程序貼圖／標準／高解析）。只改呈現，不碰模擬。
-// 圖檔為 Poly Haven CC0，建置時以 base64 內嵌；任何一張載入失敗就整組回到原始材質。
+// 地板與場外背景的材質：標準／精緻兩級，由畫質決定。只改呈現，不碰模擬。
+// 圖檔為 Poly Haven CC0，建置時以 base64 內嵌；任何一張載入失敗就整組回到程序材質（'orig'，僅作回退，不供選擇）。
 import * as THREE from 'three';
 import * as W from '../dev05-layout/world.js';
 import DATA from './surface-data.generated.js';
 
 export const TIERS = {
-  orig: { name: '原始' },
   std: { name: '標準', floor: '512', ground: '1k', canvas: 2048 },
-  hi: { name: '高解析', floor: '1k', ground: '2k', canvas: 4096 },
   max: { name: '精緻', floor: '2k', ground: '4k', panel: 2048 },
 };
 // 真實尺寸：地板 4 m、背景 30 m；場景 1 單位約 1 公尺
