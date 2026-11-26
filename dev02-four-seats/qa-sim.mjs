@@ -4,10 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import * as L from '../dev05-layout/layout.mjs';
 import * as S from './sim.mjs';
+import { ARENA, corePos } from './arena.mjs';
 
 const R = S.RULES, rows = [];
 const test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
-const none = () => S.createSim({ bots: [] });
+const none = () => S.createSim({ version: 2, bots: [] }); // 本檔是版本 1／2 單一兵種規則的回歸；版本 3 見 qa-roster.mjs
 const onPad = (st, id, i) => { const [x, z] = S.padWorld(id, i); Object.assign(st.seats[id].commander, { x, z }); };
 const run = (st, n, cmds = {}) => { const log = []; for (let i = 0; i < n && st.mode === 'play'; i++) log.push(...S.step(st, cmds[st.tick + 1] || [])); return log; };
 const unit = (st, seat, x, z, more = {}) => { const u = { id: ++st.serial, seat, team: L.seatById(seat).team, x, z, hp: R.unitHp, cd: 0, lat: 0, target: S.targetOf(st, seat), foe: 0, dx: 0, dz: 0, ...more }; st.units.push(u); st.seats[seat].deployed++; return u; };
@@ -38,8 +39,44 @@ test('連續與重複移動指令不增加成交；非法指令無效；指揮�
   const buys = l => l.filter(e => e.type === 'buy').map(e => [e.tick, e.gold, e.units]); assert.deepEqual(buys(a), buys(b)); assert(buys(a).length >= 4);
   const st = none(), d = S.digest(st.seats);
   S.step(st, [null, {}, { seat: 'Q', type: 'goal', x: 0, z: 0 }, { seat: 'N', type: 'goal', x: NaN, z: 1 }, { seat: 'N', type: 'buy', x: 1, z: 1 }, { seat: 'N', type: 'dir', x: Infinity, z: 0 }]); assert.equal(S.digest(st.seats), d);
-  for (const id of S.SEAT_IDS) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = none(); run(q, 120, { 1: [{ seat: id, type: 'dir', x: dx, z: dz }] }); const [lx, lz] = S.toLocal(id, q.seats[id].commander.x, q.seats[id].commander.z); assert(Math.abs(lx) <= 5.8 + 1e-9 && Math.abs(lz) <= 4.2 + 1e-9); }
+  for (const id of S.SEAT_IDS) for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const q = none(); run(q, 120, { 1: [{ seat: id, type: 'dir', x: dx, z: dz }] }); const [lx, lz] = S.toLocal(id, q.seats[id].commander.x, q.seats[id].commander.z); assert(Math.abs(lx) <= ARENA.shopWidth / 2 - .6 + 1e-9 && Math.abs(lz) <= ARENA.shopDepth / 2 - .6 + 1e-9); }
   const far = none(); run(far, 200, { 1: [{ seat: 'N', type: 'goal', x: 0, z: 0 }] }); assert(far.seats.N.commander.x < -L.DIM.laneWidth / 2);
+});
+test('四臂有效長度、獨立長形購買區與出兵後攻擊對側核心', () => {
+  const R = S.RULES, boxes = [];
+  for (const id of S.SEAT_IDS) {
+    const dir = L.seatById(id).dir, tangent = L.ccw(dir);
+    const [cx, cz] = corePos(id), newReach = Math.hypot(cx, cz) + R.platform;
+    const oldReach = Math.hypot(...L.corePos(id)) + R.platform;
+    assert(Math.abs(newReach / oldReach - 1.2) < 1e-12);
+    const corners = L.shopCorners(id, ARENA);
+    const extent = ([x, z]) => { const a = corners.map(p => p[0] * x + p[1] * z); return Math.max(...a) - Math.min(...a); };
+    assert.deepEqual([extent(dir), extent(tangent)], [15, 9]);
+    assert(L.shopClearance(ARENA) > 0);
+    const [xs, zs] = [0, 1].map(i => corners.map(p => p[i]));
+    boxes.push([Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]);
+    for (const [x, z] of ARENA.shopPadPositions) {
+      assert(Math.abs(x) + R.padRadius < ARENA.shopWidth / 2);
+      assert(Math.abs(z) + R.padRadius < ARENA.shopDepth / 2);
+    }
+
+    const st = none(), target = L.opposite(id).id;
+    const [x, z] = S.padWorld(id, 0);
+    S.step(st, [{ seat: id, type: 'goal', x, z }]);
+    while (!st.units.length) { assert(st.tick < 90); S.step(st); }
+    const u = st.units[0];
+    const radial = u.x * dir[0] + u.z * dir[1];
+    assert(Math.abs(radial - (ARENA.spawnRadial - R.unitSpeed)) < 1e-12); // 出兵當步已向中央移動
+    assert.equal(u.target, target);
+    const log = run(st, 1400);
+    assert(log.some(e => e.type === 'shot' && e.core === target && e.seat === id), id);
+    assert(st.seats[target].hp < R.coreHp && st.seats[id].buys > 1);
+  }
+  for (let i = 0; i < boxes.length; i++) for (const [x0, x1, z0, z1] of boxes.slice(i + 1)) {
+    const [a, b, c, d] = boxes[i];
+    assert(b < x0 || x1 < a || d < z0 || z1 < c);
+  }
+  return '四臂 36.2 → 43.44，四區 15 × 9';
 });
 test('同步傷害：互殺同 tick 同亡，與陣列順序無關', () => {
   for (const flip of [0, 1]) {
@@ -55,7 +92,7 @@ test('兩軸部隊依平面距離接敵', () => {
 });
 test('最後核心同一步失守為平手；同步失守先全部生效', () => {
   const st = none(); st.seats.S.alive = st.seats.W.alive = false; st.seats.N.hp = st.seats.E.hp = 1;
-  const core = (id, off) => { const [x, z] = L.corePos(id), d = L.seatById(id).dir; return [x - d[0] * off, z - d[1] * off]; };
+  const core = (id, off) => { const [x, z] = corePos(id), d = L.seatById(id).dir; return [x - d[0] * off, z - d[1] * off]; };
   unit(st, 'S', ...core('N', 5.5), { target: 'N' }); unit(st, 'W', ...core('E', 5.5), { target: 'E' });
   const log = run(st, 1); assert.deepEqual([st.mode, st.winner], ['end', 'draw']); assert.equal(log.filter(e => e.type === 'fall').length, 2); assert.equal(log.at(-1).type, 'end');
   const st2 = none(); st2.seats.S.hp = st2.seats.E.hp = 1; unit(st2, 'N', ...core('S', 5.5)); unit(st2, 'W', ...core('E', 5.5)); run(st2, 1); assert.equal(st2.winner, 'A');
@@ -64,7 +101,7 @@ test('最後核心同一步失守為平手；同步失守先全部生效', () =>
 test('對側失守：經中央改派、路線可重現、失守席停購、存活部隊續戰', () => {
   const go = () => {
     const st = none(); st.seats.S.hp = 1; onPad(st, 'S', 0); st.seats.S.gold = 0;
-    const [x, z] = L.corePos('S'); const u = unit(st, 'N', 0, z - 5.5, { hp: 99 }); const s = unit(st, 'S', 3, -15, { hp: 99 }); // 南席存活部隊已在北路
+    const [x, z] = corePos('S'); const u = unit(st, 'N', 0, z - 5.5, { hp: 99 }); const s = unit(st, 'S', 3, -15, { hp: 99 }); // 南席存活部隊已在北路
     const log = run(st, 1), path = []; let near = 99;
     assert(log.some(e => e.type === 'fall' && e.seat === 'S') && log.some(e => e.type === 'reroute' && e.seat === 'N' && e.to === 'E'));
     assert.deepEqual([u.target, s.target], ['E', 'N']); const gold = st.seats.S.gold;
@@ -79,7 +116,7 @@ test('同一輸入重跑一致；中途序列化續跑一致；亂數種子不�
   for (const seed of [3, 17]) {
     const commands = []; let r = seed * 7919; const next = n => (r = (Math.imul(r, 1103515245) + 12345) >>> 0, r % n);
     for (let t = 1; t < 5000; t += 1 + next(90)) commands.push(next(4) ? { tick: t, seat: 'W', type: 'goal', x: -40 + next(30), z: 5 + next(25) } : { tick: t, seat: 'W', type: 'dir', x: next(3) - 1, z: next(3) - 1 });
-    const rec = { seed, bots: ['N', 'S', 'E'], commands }, a = S.replay(rec), b = S.replay(JSON.parse(JSON.stringify(rec)));
+    const rec = { version: 2, seed, bots: ['N', 'S', 'E'], commands }, a = S.replay(rec), b = S.replay(JSON.parse(JSON.stringify(rec)));
     assert.deepEqual(a.marks, b.marks); assert.equal(a.events, b.events); assert.equal(a.state.mode, 'end');
     let st = S.createSim(rec), i = 0; while (st.mode === 'play') { const now = []; while (commands[i]?.tick === st.tick + 1) now.push(commands[i++]); S.step(st, now); if (st.tick % 777 === 0) st = JSON.parse(JSON.stringify(st)); }
     assert.equal(S.digest(st), a.final);
@@ -95,8 +132,8 @@ test('任意 32 位元種子：四席亂數流與鄰近種子皆不重複', () =
 test('全電腦 60 局：皆有終局；帳目、邊界、部隊數逐步相符；換席不偏袒', () => {
   const score = { A: 0, B: 0, draw: 0 }; let longest = 0, drift = 0;
   for (let seed = 1; seed <= 60; seed++) {
-    const st = S.createSim({ seed }), rot = S.createSim({ seed }), k = ['N', 'W', 'S', 'E'];
-    k.forEach((id, i) => { rot.bots[id] = JSON.parse(JSON.stringify(S.createSim({ seed }).bots[k[(i + 2) % 4]])); });
+    const st = S.createSim({ version: 2, seed }), rot = S.createSim({ version: 2, seed }), k = ['N', 'W', 'S', 'E'];
+    k.forEach((id, i) => { rot.bots[id] = JSON.parse(JSON.stringify(S.createSim({ version: 2, seed }).bots[k[(i + 2) % 4]])); });
     const income = { N: 0, W: 0, S: 0, E: 0 };
     while (st.mode === 'play') {
       const alive = Object.fromEntries(S.SEAT_IDS.map(id => [id, st.seats[id].alive])); S.step(st); S.step(rot);
@@ -106,7 +143,7 @@ test('全電腦 60 局：皆有終局；帳目、邊界、部隊數逐步相符�
         a.forEach((u, i) => { drift = Math.max(drift, Math.abs(u.x + b[i].x), Math.abs(u.z + b[i].z)); });
       }
       for (const id of S.SEAT_IDS) { const s = st.seats[id]; if (alive[id] && st.tick % 30 === 0) income[id]++; assert.equal(s.gold + s.spent, 12 + income[id]); assert(s.gold >= 0); if (st.tick % 15 === 0) assert.equal(st.units.filter(u => u.seat === id).length, s.deployed - s.lost); }
-      if (st.tick % 15 === 0) for (const u of st.units) { const ok = Math.min(Math.abs(u.x), Math.abs(u.z)) <= 3.6 + 1e-6 || Math.hypot(u.x, u.z) <= 8.2 + 1e-6 || L.SEATS.some(s => { const [x, z] = L.corePos(s.id); return Math.hypot(u.x - x, u.z - z) <= 6.2 + 1e-6; }); assert(ok, `部隊出界 ${u.x},${u.z}`); assert(u.target && st.seats[u.target].alive || st.mode === 'end'); }
+      if (st.tick % 15 === 0) for (const u of st.units) { const ok = Math.min(Math.abs(u.x), Math.abs(u.z)) <= 3.6 + 1e-6 || Math.hypot(u.x, u.z) <= 8.2 + 1e-6 || L.SEATS.some(s => { const [x, z] = corePos(s.id); return Math.hypot(u.x - x, u.z - z) <= 6.2 + 1e-6; }); assert(ok, `部隊出界 ${u.x},${u.z}`); assert(u.target && st.seats[u.target].alive || st.mode === 'end'); }
       assert(st.tick < 30 * 60 * 13);
     }
     score[st.winner]++; longest = Math.max(longest, st.tick);
@@ -115,14 +152,21 @@ test('全電腦 60 局：皆有終局；帳目、邊界、部隊數逐步相符�
   return `甲 ${score.A}／乙 ${score.B}／平 ${score.draw}，最長 ${(longest / 30).toFixed(0)} 秒，鏡像偏差 ${drift.toExponential(1)}`;
 });
 test('玩家全程不動也會終局', () => {
-  const t = []; for (const id of S.SEAT_IDS) { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); while (st.mode === 'play') S.step(st); assert.equal(st.seats[id].buys, 0); t.push((st.tick / 30).toFixed(0)); } return `終局 ${t.join('、')} 秒`;
+  const t = []; for (const id of S.SEAT_IDS) { const st = S.createSim({ version: 2, seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); while (st.mode === 'play') S.step(st); assert.equal(st.seats[id].buys, 0); t.push((st.tick / 30).toFixed(0)); } return `終局 ${t.join('、')} 秒`;
 });
-test('驗收案例：固定種子 20261126，玩家持南席腳本', () => {
-  const pads = [0, 1].map(i => S.padWorld('S', i)), commands = [];
-  for (let t = 30; t < 18000; t += 900) { const [x, z] = pads[Math.floor(t / 900) % 2]; commands.push({ tick: t, seat: 'S', type: 'goal', x, z }); }
-  const r = S.replay({ seed: 20261126, bots: ['N', 'W', 'E'], commands }); assert.equal(r.state.mode, 'end');
-  const expected = process.env.UPDATE ? null : '55681272 053eeabc';
-  if (expected) assert.equal(`${r.final} ${r.events}`, expected, '模擬規則改變時需有意識地更新');
-  return `${r.state.winner} ${(r.state.tick / 30).toFixed(0)} 秒 ${r.final} ${r.events}`;
+test('驗收案例：固定種子 20261126，南席在兩版幾何重跑', () => {
+  const results = [];
+  for (const [version, dim, expected] of [[1, L.DIM, '55681272 053eeabc'], [2, ARENA, 'cff9297f 85a19c65']]) {
+    const pads = [0, 1].map(i => S.padWorld('S', i, dim)), commands = [];
+    for (let t = 30; t < 18000; t += 900) {
+      const [x, z] = pads[Math.floor(t / 900) % 2];
+      commands.push({ tick: t, seat: 'S', type: 'goal', x, z });
+    }
+    const r = S.replay({ version, seed: 20261126, bots: ['N', 'W', 'E'], commands });
+    assert.equal(r.state.mode, 'end');
+    if (!process.env.UPDATE) assert.equal(`${r.final} ${r.events}`, expected, `模擬版本 ${version} 摘要`);
+    results.push(`v${version} ${r.state.winner} ${(r.state.tick / 30).toFixed(0)} 秒 ${r.final} ${r.events}`);
+  }
+  return results.join('；');
 });
 console.table(rows); console.log('DEV02 sim QA: OK');

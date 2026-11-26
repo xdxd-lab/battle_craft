@@ -18,6 +18,7 @@ BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購
 | [v4](v4/battle_craft-v4.html) | [傾斜 3D 星際戰場](v4/README.md)，加入寫實燈具與畫質切換。每次停留只買一次。 |
 | [v5](v5/battle_craft-v5.html) | [提高俯角、持續自動購兵、血條與分色事件紀錄](v5/README.md)。建議從此版試玩。 |
 | [v5-2](v5-2/battle_craft-v5-2.html) | 保留歷史 HTML 快照。 |
+| [四席 2v2](dev02-four-seats/battle_craft-dev02.html) | [單人加三電腦，陸戰隊、重騎兵、飛螳](dev02-four-seats/README.md)；[傷害規則與暫定值](research/BC01-ROSTER-DAMAGE.md)。 |
 
 各版 HTML 可下載後雙擊離線遊玩。3D 版本需要支援 WebGL 的瀏覽器。
 
@@ -37,5 +38,5 @@ npm test
 
 - [SC1 SPEED／FastBlack 與 SC2 歷史版本、外部資源與現況](research/battle_craft-research.md)
 - [跨 AI 研究交接快照](research/battle_craft-source-master-handoff.md) · [3D Garden 開發指南快照](research/battle_craft-source-3dgarden-handoff.md)
-- [4 件模型及個別來源](assets/3dgarden/README.md) · [3D Garden 授權](https://www.3dgarden.app/licence)
+- [3D Garden 模型及個別來源](assets/3dgarden/README.md) · [3D Garden 授權](https://www.3dgarden.app/licence)
 - [Three.js MIT 授權](vendor/THREE-LICENSE.txt) · [Draco Apache 2.0 授權](vendor/addons/draco/LICENSE.txt)
