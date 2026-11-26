@@ -19,7 +19,7 @@
 
 其他 SPEED 鏡像包括 [8sGp67zf](https://scmscx.com/map/8sGp67zf)、[d37t25T3](https://scmscx.com/map/d37t25T3)、[zRDTRs23](https://scmscx.com/map/zRDTRs23)（三者文字匯出一致，有 P1 的一次性資源規則），[fqzfY9cz](https://scmscx.com/map/fqzfY9cz)、[96c594jR](https://scmscx.com/map/96c594jR)（另含大額資源觸發），[5ykDqVDV](https://scmscx.com/map/5ykDqVDV)（另有砲台數量控制核心無敵），以及 [yrDYVGj7](https://scmscx.com/map/yrDYVGj7)（+75 改 +350，移除基準版第 94 條）。這些分歧會改變經濟或勝負，選版本時須比對 Trigger。
 
-[樣本雜湊](battle_craft-scx-checksums.csv) · [購買生成項目表](battle_craft-speed-purchases.csv)。完整 Trigger 匯出保存在本機研究副本；可依上表鏡像、樣本雜湊與 scmJS 版本重做。
+[樣本雜湊](battle_craft-scx-checksums.csv) · [購買生成項目表](battle_craft-speed-purchases.csv) · [15 組地空兵種、護甲與顯示名稱比對](BATTLECRAFT-UNIT-REFERENCE.md)。完整 Trigger 匯出保存在本機研究副本。可依上表鏡像、樣本雜湊與 scmJS 版本重做。
 
 | 玩法 | SPEED 基準版的實證 |
 | --- | --- |
@@ -32,6 +32,13 @@
 SCX 證據讓經濟假說比原交接稿更具體，但無法證明哪個同名樣本是 2009 年 RAR 內的那一份，或給出牆鐘每秒速率。要判定「比某版本快多少」，需要選定同系對照版並在相同遊戲速度下量測。
 
 ## SC2 重製版改版紀錄
+
+### 歷史畫面與介面
+
+- SC1 SPEED 基準鏡像與 FastBlack v2.91f 的 CHK 都使用 96×96 Space Platform。SPEED 的 `COLR` 前四席索引依序為 `0,1,2,3`，v2.91f 為 `0,1,8,4`。這是兩份地圖內的索引紀錄，對局實際配色也取決於遊戲版本與顯示設定。原論壇 RAR 直連本輪重試仍回 502，Wayback Availability API 亦未回傳該短網址的存檔。[SPEED 鏡像](https://scmscx.com/map/2tzpVkp9) · [FastBlack v2.91f](https://scmscx.com/map/7zGY2kzG) · [論壇附件](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar)
+- 重製作者的圖庫保留一張標為 `sc1bw_bca0.1` 的地圖鳥瞰圖，可看到深色底、淺色平台輪廓、深色行軍帶與成組的信標。該圖的版本標籤不同，畫面也只有地圖，無法據此核對 SPEED 的對局 HUD。[作者圖庫](https://www.curseforge.com/sc2/maps/battlecraft) · [SC1 BCA 鳥瞰](https://media.forgecdn.net/attachments/154/780/bca.jpg)
+- SC2 作者實機圖可見深色金屬網板戰場、左下小地圖、右上計分或投票版面、下方單位與指令資訊。v2.3.5 畫面保留 Score、Income 與按玩家著色的列，購買提示同時顯示價格、用途和攻擊目標。較早的圖可讀到 Life Crystal、Buy Zerg Units 和 Leaderboard；作者說明另列礦物、瓦斯及購兵快捷鍵。這些是 SC2 重製版的介面證據。[SC2 v2.3.5 實機圖](https://media.forgecdn.net/attachments/154/782/bc_2.3.5_igp.jpg) · [較早期 SC2 實機圖](https://media.forgecdn.net/attachments/154/768/bc012.jpg)
+- BaattleCraft 可借用其資訊優先順序。戰場上優先辨認戰線、隊伍、席位與場外購買區，購兵資訊凸顯兵種職責、價格、每批數量及對地／對空能力。套用本專案的半寫實材質與原創介面。四個購買區的逆時鐘位置及雙鏡頭基準屬本輪 Web 設計。
 
 [重製者專頁](https://www.curseforge.com/sc2/maps/battlecraft)將來源指向 SC1，署名原作者 Spikes10012。SPEED 鏡像內另列 Blacklabel 及修改者 Milbauer、Lights-Out，兩份署名描述的是不同版本的來源。SC2 專頁描述 1v1／2v2、成隊購買、自動向敵方生命水晶進攻，以及自動收入和擊殺對經濟的影響。
 
