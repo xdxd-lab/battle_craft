@@ -35,7 +35,7 @@ export function createCoreStatus(max) {
     for (const [px, pz, q] of [[-.7, .35, .75], [.55, -.6, .6], [.5, .75, .45]]) { const o = mesh(1, geo.scar, scorch, px, 7.49, pz); o.scale.setScalar(q); o.rotation.y = q * 9; } // 塔頂焦痕
     for (const a of [.6, 2.7, 4.8]) smoke(1, a, 2.6, 7.2, 1.2, 0x5d666d, 5); // 輕損：三道灰煙
     for (const a of [.2, 2.3, 4.4]) { fire(2, a, 3.2, 2.1, 1.5); smoke(2, a, 3.2, 4, 1.2, 0x565d63, 4); } // 重損：三方向起火
-    for (const a of [1.25, 3.35, 5.45]) { fire(3, a, 3.3, 2.1, 2.5); fire(3, a + .35, 3.8, 1.05, 1.5); }
+    for (const a of [1.25, 3.35, 5.45]) { fire(3, a, 3.3, 2.1, 2.5); fire(3, a + .35, 3.8, 1.05, 1.4); }
     fire(3, 0, 0, 8.4, 2.8); smoke(3, 1.5, .6, 9.5, 2.3, 0x1d2125, 9); // 危急：塔頂大火與濃煙
     for (let i = 0; i < 8; i++) { const [px, pz] = around(i * .785, 4.3), o = mesh(3, geo.spark, ember, px, 1.2, pz); o.scale.setScalar(1.3); }
     for (const layer of layers) for (const material of [scorch, metal, ember]) { // 靜態件按層與材質合批
