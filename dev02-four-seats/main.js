@@ -7,7 +7,8 @@ import { ARENA, corePos, fitArenaCamera, fitNearCamera } from './arena.mjs';
 import * as SF from './surfaces.js';
 import { createDossier } from './dossier.js';
 import { detailCommander, detailMaterials, triangles } from './detail-models.js';
-import { unitModels, FLY_HEIGHT } from './unit-models.js';
+import { unitModels, FLY_HEIGHT, WING_HINGE } from './unit-models.js';
+import { createAudio, LEVEL_NAMES } from './audio.js';
 import { KINDS, KIND_IDS, ATTACKS, CORE } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
@@ -36,7 +37,10 @@ function buildActors() {
   squads = {}; commanders = {};
   for (const s of L.SEATS) {
     const M = W.seatMats[s.id];
-    squads[s.id] = Object.fromEntries(KIND_IDS.map(k => [k, [['hull', M.paint], ['dark', W.MAT.black], ['lamp', M.glow]].map(([part, m]) => { const x = inst(looks.std[k][part], m); x.castShadow = true; return x; })]));
+    squads[s.id] = Object.fromEntries(KIND_IDS.map(k => [k, Object.keys(looks.std[k]).map(part => { // 第一個部件必須是本體（點選與高度以它為準）
+      const [material, tag] = part.split(':'), x = inst(looks.std[k][part], { hull: M.paint, dark: W.MAT.black, lamp: M.glow }[material]);
+      x.castShadow = true; Object.assign(x.userData, { part, material, side: tag === 'L' ? -1 : tag === 'R' ? 1 : 0 }); return x;
+    })]));
     const c = new THREE.Group(), add = (g, m, y, z = 0) => { const x = new THREE.Mesh(g, m); x.position.set(0, y, z); x.castShadow = true; c.add(x); return x; };
     add(commander.hull, M.paint, 0); add(commander.dark, W.MAT.steel, 0); add(commander.lamp, M.glow, 0);
     const ring = add(new THREE.TorusGeometry(1, .1, 6, 24), M.glow, .16); ring.rotation.x = Math.PI / 2; ring.castShadow = false;
@@ -164,7 +168,7 @@ function sendKeys() { // 螢幕方向依目前鏡頭換成世界方向
   command({ type: 'dir', x: dx, z: dz });
 }
 const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.1), hit = new THREE.Vector3();
-const pointer = new THREE.Vector2(), probe = new THREE.Mesh(), instance = new THREE.Matrix4(), bounds = new THREE.Sphere(), picks = [];
+const pointer = new THREE.Vector2(), probe = new THREE.Mesh(), instance = new THREE.Matrix4(), partMatrix = new THREE.Matrix4(), bounds = new THREE.Sphere(), picks = [];
 let mouse = null, hoverAt = 0;
 function pointRay(e) {
   const b = canvas.getBoundingClientRect();
@@ -190,8 +194,8 @@ function unitAt(e) {
       const meshes = squads[id][k];
       for (let i = 0; i < meshes[0].count; i++) {
         meshes[0].getMatrixAt(i, instance);
-        bounds.center.setFromMatrixPosition(instance).y += k === 'dragoon' ? .9 : .58; bounds.radius = k === 'marine' ? 1.3 : 1.8;
-        if (ray.ray.intersectsSphere(bounds)) for (const mesh of meshes) check(mesh, instance, k);
+        bounds.center.setFromMatrixPosition(instance).y += k === 'mutalisk' ? .58 : .9; bounds.radius = k === 'marine' ? 1.3 : 1.8;
+        if (ray.ray.intersectsSphere(bounds)) for (const mesh of meshes) { mesh.getMatrixAt(i, partMatrix); check(mesh, partMatrix, k); }
       }
     }
   }
@@ -245,6 +249,7 @@ function stopBackgroundClock() {
   backgroundTimer = undefined;
 }
 document.addEventListener('visibilitychange', () => {
+  audio.sync();
   if (!document.hidden) {
     stopBackgroundClock();
     previous = 0;
@@ -309,7 +314,8 @@ function tick() {
   prevShots = new Map(state.shots.map(s => [s.id, [s.x, s.z]]));
   const before = new Map(state.units.map(u => [u.id, u]));
   for (const e of S.step(state, now)) {
-    if (e.type === 'shot') { const u = before.get(e.from); if (u) { shots.live.push({ a: [u.x, heightOf(u), u.z], b: [e.x, e.core ? 2.5 : heightOf(before.get(e.to)), e.z], life: .12, color: L.seatById(e.seat).secondary }); } continue; }
+    if (e.type === 'launch') audio.play(e.kind);
+    if (e.type === 'shot') { const u = before.get(e.from); if (u) { audio.play(u.kind); shots.live.push({ a: [u.x, heightOf(u), u.z], b: [e.x, e.core ? 2.5 : heightOf(before.get(e.to)), e.z], life: .12, color: L.seatById(e.seat).secondary }); } continue; }
     if (e.type === 'impact') { puffs.live.push({ x: e.x, z: e.z, y: e.kind === 'mutalisk' ? 1.8 : 1.1, size: e.kind === 'dragoon' ? .55 : .3, life: .25, color: L.seatById(e.seat).secondary }); continue; }
     if (e.transient) continue;
     if (e.type === 'death') puffs.live.push({ x: e.x, z: e.z, y: .9, size: 1, life: .4, color: L.seatById(e.seat).primary });
@@ -326,7 +332,7 @@ function finish() {
   $('restart').onclick = menu; $('look').onclick = () => { $('cover').hidden = true; }; $('cover').hidden = false;
 }
 function menu() {
-  mode = 'menu'; $('cover').hidden = false;
+  mode = 'menu'; audio.setPaused(false); $('cover').hidden = false;
   $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。三座信標分別購買陸戰隊、重騎兵、飛螳。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按 1／2／3 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
@@ -338,6 +344,7 @@ function shopUi() {
 }
 function hud() {
   if (!state) return;
+  audio.setPaused(mode === 'paused');
   $('clock').textContent = time(state.tick); $('gold').textContent = seat ? state.seats[seat].gold : '—';
   for (const s of L.SEATS) { const v = state.seats[s.id], e = $('core-' + s.id); e.classList.toggle('down', !v.alive); e.querySelector('i').style.width = `${v.hp / CORE_MAX * 100}%`; e.querySelector('span').textContent = `${relName(s.id)} ${Math.ceil(v.hp)}`; }
   for (const b of $('shop').querySelectorAll('button')) { b.classList.toggle('on', state.seats[seat].pad === +b.dataset.pad); b.disabled = !state.seats[seat].alive || mode === 'end'; }
@@ -349,7 +356,7 @@ function hud() {
 
 // ---------- 顯示設定：只影響呈現，不進模擬與紀錄；保存失敗時照常遊玩 ----------
 const DISPLAY_KEY = 'battle_craft.dev02.display';
-const display = { bars: true, log: true, engineering: false, quality: 'high' };
+const display = { bars: true, log: true, engineering: false, quality: 'high', music: 2, sfx: 2 };
 try { Object.assign(display, JSON.parse(localStorage.getItem(DISPLAY_KEY) || '{}')); } catch { /* 無法讀取時用預設值 */ }
 delete display.surface; // 舊版另存的地表忽略：地表一律由畫質決定
 if (display.quality !== 'std') display.quality = 'high';
@@ -357,6 +364,10 @@ let savedQuality = display.quality;
 if (['std', 'high'].includes(hash.get('quality'))) display.quality = hash.get('quality'); // 網址參數只在本次生效
 for (const k of ['bars', 'log']) display[k] = display[k] !== false;
 display.engineering = display.engineering === true;
+for (const k of ['music', 'sfx']) if (![0, 1, 2, 3].includes(display[k])) display[k] = 2;
+// 聲音：瀏覽器要求互動後才能出聲，第一次點擊或按鍵才建立 AudioContext
+const audio = createAudio(display);
+for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, () => audio.unlock(), true);
 function applyDisplay(save) {
   document.body.classList.toggle('no-bars', !display.bars); document.body.classList.toggle('no-log', !display.log);
   $('opt-engineering').setAttribute('aria-pressed', display.engineering);
@@ -369,12 +380,15 @@ function applyDisplay(save) {
   $('dossier').hidden = display.engineering;
   dossier?.hover(null);
   if (barBack) barBack.visible = barFill.visible = display.bars;
+  for (const [k, name] of [['music', '音樂'], ['sfx', '音效']]) { $(`opt-${k}`).textContent = `${name}：${LEVEL_NAMES[display[k]]}`; $(`opt-${k}`).setAttribute('aria-pressed', display[k] > 0); }
+  audio.sync();
   if (save) try { localStorage.setItem(DISPLAY_KEY, JSON.stringify({ ...display, quality: savedQuality })); } catch { /* 無法保存時只在本次生效 */ }
 }
 // 滑鼠點擊後把焦點還給戰場；鍵盤啟動（detail 為 0）時焦點留在按鈕，可連按切換或 Tab 到下一個
 $('opt-bars').onclick = e => { display.bars = !display.bars; applyDisplay(true); if (e.detail) canvas.focus(); };
 $('opt-log').onclick = e => { display.log = !display.log; applyDisplay(true); if (e.detail) canvas.focus(); };
 $('opt-engineering').onclick = e => { display.engineering = !display.engineering; applyDisplay(true); if (e.detail) canvas.focus(); };
+for (const k of ['music', 'sfx']) $(`opt-${k}`).onclick = e => { display[k] = (display[k] + 1) % LEVEL_NAMES.length; audio.unlock(); applyDisplay(true); if (e.detail) canvas.focus(); };
 let surfaceBusy = false, surfaceCall = 0;
 const surfaceTier = () => display.quality === 'high' ? 'max' : 'std';
 async function applySurface() { // 失敗時回程序材質並提示，不影響對局；連按時只由最後一次收尾
@@ -394,7 +408,7 @@ function applyQuality() {
     const M = W.seatMats[s.id];
     const pick = (paint, dark) => high ? (heroMats[s.id + dark.uuid] ??= detailMaterials(paint, dark)) : [paint, dark];
     const [dh, dd] = pick(M.paint, W.MAT.black), [ch, cd] = pick(M.paint, W.MAT.steel);
-    for (const k of KIND_IDS) for (const [i, part, mat] of [[0, 'hull', dh], [1, 'dark', dd], [2, 'lamp', M.glow]]) { squads[s.id][k][i].geometry = look[k][part]; squads[s.id][k][i].material = mat; }
+    for (const k of KIND_IDS) for (const mesh of squads[s.id][k]) { mesh.geometry = look[k][mesh.userData.part]; mesh.material = { hull: dh, dark: dd, lamp: M.glow }[mesh.userData.material]; }
     for (const [i, part, mat] of [[0, 'hull', ch], [1, 'dark', cd], [2, 'lamp', M.glow]]) { const m = commanders[s.id].children[i]; m.geometry = look.commander[part]; m.material = mat; }
   }
   HS.setHighScene(high); dossier?.refresh();
@@ -408,7 +422,15 @@ $('opt-quality').onclick = e => {
 };
 
 // ---------- 繪製 ----------
-const color = new THREE.Color();
+const color = new THREE.Color(), wingMatrix = new THREE.Matrix4(), hingeMatrix = new THREE.Matrix4(), root = new THREE.Vector3(), moved = new THREE.Vector3();
+function hinge(side, angle) { // 繞翅根旋轉：T(h)·Rz·T(-h)
+  hingeMatrix.makeRotationZ(side * angle); root.set(side * WING_HINGE[0], WING_HINGE[1], 0); moved.copy(root).applyMatrix4(hingeMatrix);
+  return hingeMatrix.setPosition(root.sub(moved));
+}
+function wingTilts() { // 供核對：每隻飛螳右翅相對本體的角度
+  const body = new THREE.Matrix4(), right = new THREE.Matrix4();
+  return S.SEAT_IDS.flatMap(id => { const meshes = squads[id].mutalisk, r = meshes.find(m => m.userData.part === 'hull:R'); return Array.from({ length: r.count }, (_, i) => { meshes[0].getMatrixAt(i, body); r.getMatrixAt(i, right); const e = body.invert().multiply(right).elements; return Math.round(Math.atan2(e[1], e[0]) * 1000) / 1000; }); });
+}
 function draw(dt, k) {
   let bars = 0, shade = 0; const counts = Object.fromEntries(S.SEAT_IDS.map(id => [id, Object.fromEntries(KIND_IDS.map(k => [k, 0]))]));
   const bar = (x, y, z, w, h, f, c) => {
@@ -423,8 +445,10 @@ function draw(dt, k) {
     const home = L.seatById(u.seat).dir, dx = u.dx || u.dz ? u.dx : -home[0], dz = u.dx || u.dz ? u.dz : -home[1];
     if (spec.air && shade < 256) { dummy.position.set(x, .12, z); dummy.quaternion.identity(); dummy.scale.setScalar(1); dummy.updateMatrix(); shadows.setMatrixAt(shade++, dummy.matrix); }
     dummy.position.set(x, .04 + lift, z); dummy.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.atan2(dx, dz)); dummy.scale.setScalar(1); dummy.updateMatrix();
-    squads[u.seat][u.kind].forEach(m => m.setMatrixAt(i, dummy.matrix));
-    const top = (u.kind === 'dragoon' ? 2.25 : 1.75) + lift; bar(x, top, z, 1.1, .16, u.hp / spec.hp, relColor(u.seat));
+    // 拍翅取模擬 tick（暫停即停），以單位編號錯開相位
+    const flap = Math.sin(((state.tick + k) * .5 + u.id * 1.7)) * .5;
+    for (const m of squads[u.seat][u.kind]) m.setMatrixAt(i, m.userData.side ? wingMatrix.multiplyMatrices(dummy.matrix, hinge(m.userData.side, flap)) : dummy.matrix);
+    const top = (u.kind === 'dragoon' ? 2.25 : u.kind === 'marine' ? 2.15 : 1.75) + lift; bar(x, top, z, 1.1, .16, u.hp / spec.hp, relColor(u.seat));
     if (spec.shield) bar(x, top + .36, z, 1.1, .13, u.sh / spec.shield, '#6fe8ff');
   }
   for (const s of L.SEATS) {
@@ -483,7 +507,7 @@ $('view').onclick = () => { nextView(); canvas.focus(); };
 $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(); };
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
-$('rules').innerHTML = ['每秒 1 金、購買間隔 0.5 秒沿用 v5；價格、數量、核心、光球速度與彈跳半徑為暫定。', `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對輕／中／重本體 50／75／100%，單體；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
+$('rules').innerHTML = [`起始 ${S.ECONOMY.startGold} 金、每 ${S.ECONOMY.incomeEvery / S.HZ} 秒 1 金、陸戰隊 ${S.ECONOMY.costs.marine} 金（版本 5：原 12 金／每秒 1 金／5 金）；購買間隔 0.5 秒沿用 v5。價格、數量、核心、光球速度與彈跳半徑為暫定。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對輕／中／重本體 50／75／100%，單體；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: ARENA })); buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;
@@ -494,5 +518,5 @@ try {
   shopUi(); setView(view, true); resize(); menu(); hud(); requestAnimationFrame(frame);
 } catch (err) { console.error(err); $('card').innerHTML = '<h3>無法啟動 3D</h3><p>此裝置或瀏覽器無法使用 WebGL，這一版沒有 2D 備援。</p>'; }
 // 供自動核對：唯讀快照
-window.__dev02 = { cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
+window.__dev02 = { audio: () => audio.info(), wings: wingTilts, cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
   screen: (x, z, y = .1) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * canvas.clientWidth, (1 - v.y) / 2 * canvas.clientHeight]; }, pad: i => S.padWorld(seat, i), inside: () => { pose(); const b = [1e9, 1e9, -1e9, -1e9]; for (const p of L.framePoints(view, ARENA)) { const [x, y] = window.__dev02.screen(p[0], p[2], p[1]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b[0] >= safe.l - 1 && b[1] >= safe.t - 1 && b[2] <= safe.l + safe.w + 1 && b[3] <= safe.t + safe.h + 1; } };

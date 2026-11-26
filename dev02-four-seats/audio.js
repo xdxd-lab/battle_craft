@@ -1,0 +1,48 @@
+// 瀏覽器端播放：互動後才建立 AudioContext；音樂、音效分開調整；限制同時聲部與觸發間隔。只讀事件，不影響模擬。
+import { RATE, SOUNDS, renderSound, renderMusic } from './audio-synth.mjs';
+
+export const LEVEL_NAMES = ['關', '小', '中', '大'];
+const GAIN = [0, .3, .6, 1];
+const MIX = { music: .4, sfx: .5 };
+export const LIMIT = { total: 6, perKind: 3, gap: .07 }; // 同時聲部、單一兵種聲部、同兵種最短間隔（實際秒數，不隨遊戲倍速）
+
+export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼叫端持有與保存
+  const Context = window.AudioContext || window.webkitAudioContext;
+  const active = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, 0])), played = { ...active }, last = {};
+  let context = null, gains = null, buffers = null, paused = false, failed = !Context, peak = 0, dropped = 0, musicStarted = false;
+  const voices = () => Object.values(active).reduce((a, b) => a + b, 0);
+  const buffer = data => { const b = context.createBuffer(1, data.length, RATE); b.getChannelData(0).set(data); return b; };
+  function sync() {
+    if (!context) return;
+    for (const k of ['music', 'sfx']) gains[k].gain.value = GAIN[levels[k]] * MIX[k];
+    const wanted = !paused && !document.hidden && (levels.music > 0 || levels.sfx > 0);
+    if (wanted !== (context.state === 'running')) (wanted ? context.resume() : context.suspend()).catch(() => {});
+    if (levels.music && !musicStarted) {
+      musicStarted = true;
+      const source = context.createBufferSource(); source.buffer = buffer(renderMusic()); source.loop = true; source.connect(gains.music); source.start();
+    }
+  }
+  return {
+    sync,
+    unlock() {
+      if (failed || (!levels.music && !levels.sfx)) return;
+      if (!context) try {
+        context = new Context();
+        gains = Object.fromEntries(['music', 'sfx'].map(k => { const g = context.createGain(); g.connect(context.destination); return [k, g]; }));
+        buffers = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, buffer(renderSound(k))]));
+      } catch (error) { console.warn('聲音無法啟動', error); failed = true; context = null; return; }
+      sync();
+    },
+    setPaused(value) { if (value !== paused) { paused = value; sync(); } },
+    play(kind) {
+      if (!context || context.state !== 'running' || !levels.sfx || !buffers[kind]) return;
+      const now = performance.now() / 1000;
+      if (voices() >= LIMIT.total || active[kind] >= LIMIT.perKind || now - (last[kind] ?? -9) < LIMIT.gap) { dropped++; return; }
+      const source = context.createBufferSource(), gain = context.createGain();
+      source.buffer = buffers[kind]; source.playbackRate.value = .94 + (played[kind] % 5) * .03; gain.gain.value = SOUNDS[kind].gain;
+      source.connect(gain).connect(gains.sfx); source.onended = () => { active[kind]--; gain.disconnect(); };
+      last[kind] = now; active[kind]++; played[kind]++; peak = Math.max(peak, voices()); source.start();
+    },
+    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, voices: voices(), peak, dropped, played: { ...played } }),
+  };
+}

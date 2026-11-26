@@ -25,13 +25,13 @@ button[aria-pressed=true],button.go{background:#e9edf0;color:#0a0f14;font-weight
 #panel{position:fixed;right:max(12px,env(safe-area-inset-right));top:12px;width:280px;max-height:calc(100% - 100px);overflow:auto;background:var(--panel);border:1px solid var(--line)}#panel:not([open]){width:auto}summary{padding:7px 12px;cursor:pointer;font-weight:700}
 #panel>div{padding:0 12px 12px}#log{max-height:min(46vh,420px);overflow:auto;font-size:12px;display:grid;gap:2px}.log{display:grid;grid-template-columns:38px 46px 1fr;gap:5px;border-top:1px solid #2a343b;padding:2px 0}.log time{color:var(--muted)}.log.warn{background:#3a30121f}.log.critical{font-weight:700;background:#4a123f3d}
 body.no-bars .core .hp{visibility:hidden}body.no-log #log{display:none}
-#opt-bars,#opt-log,#opt-engineering,#opt-quality{font-size:12px}button[id^=opt-][aria-pressed=false]{color:#d5dde2;background:#161d22;border:1px dashed #8a979f}
+#opt-bars,#opt-log,#opt-engineering,#opt-quality,#opt-music,#opt-sfx{font-size:12px}button[id^=opt-][aria-pressed=false]{color:#d5dde2;background:#161d22;border:1px dashed #8a979f}
 .box .row>button{padding-inline:3px;min-width:0}
 #engineering-panel button{width:100%;margin-top:8px}
 #panel>#dossier{border-top:1px solid var(--line);padding:10px 12px 12px}
-#dossier nav{display:grid;grid-template-columns:1fr 1fr}#dossier nav button{min-height:34px}
+#dossier nav{display:grid;grid-template-columns:1fr 1fr}#dossier nav button{min-height:40px;line-height:1.15;min-width:0;padding-inline:2px}#dossier nav small{display:block;font-size:10px;font-weight:500;opacity:.75}
 #dossier img{display:block;width:100%;height:auto;aspect-ratio:2;margin-top:10px;border:1px solid var(--line);background:#19252e}
-#dossier h2{margin:2px 0 4px;color:var(--ink);font-size:20px;line-height:1.15}
+#dossier h2{margin:2px 0 4px;color:var(--ink);font-size:18px;line-height:1.2}
 .profile-role{display:block;margin-top:10px;color:var(--hot);font-size:11px}
 #dossier dl{display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin:9px 0 0;padding-top:7px;border-top:1px solid var(--line);font-size:12px}
 #dossier dt{color:var(--muted)}#dossier dd{margin:0;text-align:right}
@@ -48,9 +48,9 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
 @media(orientation:landscape) and (max-height:560px){
   #panel[open]{width:150px;max-height:calc(100% - 104px)}
   #panel>#dossier{padding-top:7px}
-  #dossier nav{gap:4px}#dossier nav button{min-height:26px;padding-inline:2px}
+  #dossier nav{gap:4px}#dossier nav button{min-height:28px;font-size:11px;line-height:1.1}#dossier nav small{font-size:9px}
   #dossier img{margin-top:6px}
-  #dossier h2{font-size:17px}
+  #dossier h2{font-size:13px}
   .profile-role,#dossier dl{margin-top:5px}
   #dossier p,#dossier dl{line-height:1.35}
   .log{grid-template-columns:auto 1fr}.log span{grid-column:1 / -1}
@@ -62,10 +62,10 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
 <canvas id="stage" tabindex="0" aria-label="四席十字戰場。點購買區地面或用方向鍵移動指揮官，站上信標自動購兵"></canvas>
 <div id="bar">
   <h1>BaattleCraft DEV02<small>2v2 三兵種 · 數值暫定</small></h1>
-  <div class="box"><div class="row"><div><small>時間</small><span id="clock">00:00</span></div><div><small id="gold-label">金幣</small><span id="gold">12</span></div></div></div>
+  <div class="box"><div class="row"><div><small>時間</small><span id="clock">00:00</span></div><div><small id="gold-label">金幣</small><span id="gold">48</span></div></div></div>
   <div class="box" id="cores" aria-label="四席核心血量"></div>
   <div class="box"><div class="row"><button id="pause">暫停</button><button id="speed" aria-label="遊戲速度 1×，切換速度">1×</button></div><div class="row"><button id="framing" title="在近景與四席全景間切換">切全景</button><button id="opt-bars" aria-pressed="true">血條</button></div><div class="row"><button id="view">隊伍視角</button><button id="again">重新選席</button></div></div>
-  <div class="box" role="group" aria-label="顯示設定"><div class="row"><button id="opt-quality" aria-pressed="true" title="高與標準：模型、地表、遠景、配件、解析度">畫質：高</button><button id="opt-engineering" aria-pressed="false" aria-controls="panel" title="開啟後切換視窗或分頁會暫停">工程模式</button></div></div>
+  <div class="box" role="group" aria-label="顯示與聲音設定"><div class="row"><button id="opt-quality" aria-pressed="true" title="高與標準：模型、地表、遠景、配件、解析度">畫質：高</button><button id="opt-engineering" aria-pressed="false" aria-controls="panel" title="開啟後切換視窗或分頁會暫停">工程模式</button></div><div class="row"><button id="opt-music" aria-pressed="true" title="背景音樂音量：關／小／中／大">音樂：中</button><button id="opt-sfx" aria-pressed="true" title="攻擊音效音量：關／小／中／大">音效：中</button></div></div>
 </div>
 <details id="panel" open><summary id="panel-title">單位介紹</summary>
 <div id="dossier" aria-labelledby="profile-name">

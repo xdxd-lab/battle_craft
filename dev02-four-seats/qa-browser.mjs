@@ -6,8 +6,9 @@ import { launch, sleep } from '../tools/browser.mjs';
 import * as S from './sim.mjs';
 import * as L from '../dev05-layout/layout.mjs';
 
-// 三兵種本體三角面（陸戰隊沿用原突擊機 92／380）
-const stdTri = { dragoon: 148, mutalisk: 112 }, highTri = { dragoon: 756, mutalisk: 436 };
+// 三兵種本體三角面
+const stdTri = { marine: 192, dragoon: 148, mutalisk: 160 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436 };
+const gold = tick => S.ECONOMY.startGold + Math.floor(tick / S.ECONOMY.incomeEvery);
 const here = path.dirname(fileURLToPath(import.meta.url)), SHOTS = process.env.SHOTS;
 const url = pathToFileURL(path.join(here, 'battle_craft-dev02.html')).href;
 const browser = await launch({ width: 1600, height: 900 }), rows = [];
@@ -33,7 +34,7 @@ await test('四席：點信標購兵、HUD 與帳目相符、WASD 依鏡頭方�
     let s = await page.snap(); const h = s.seats[id].commander;
     await page.clickWorld(x, z, 12); let first = 0;
     for (let i = 0; i < 90; i++) { await page.eval('__step(1)'); s = await page.snap(); if (!first && s.seats[id].buys) first = s.tick; if (Math.hypot(s.seats[id].commander.x - x, s.seats[id].commander.z - z) > S.RULES.padRadius) assert.equal(s.seats[id].spent, 0); }
-    assert(first > 0); assert.equal(s.seats[id].gold + s.seats[id].spent, 12 + Math.floor(s.tick / 30)); assert.equal(+(await page.eval(`document.getElementById('gold').textContent`)), s.seats[id].gold);
+    assert(first > 0); assert.equal(s.seats[id].gold + s.seats[id].spent, gold(s.tick)); assert.equal(+(await page.eval(`document.getElementById('gold').textContent`)), s.seats[id].gold);
     assert(Math.hypot(s.seats[id].commander.x - h.x, s.seats[id].commander.z - h.z) > 2);
     await page.clickWorld(...S.toWorld(id, .9, 0)); await page.eval('__step(60)');
     const at = async () => { const c = (await page.snap()).seats[id].commander; return page.eval(`__dev02.screen(${c.x}, ${c.z})`); };
@@ -69,7 +70,7 @@ await test('方向鍵按下後、下一 tick 前暫停，暫停中放開：恢�
     assert.equal(await page.eval('__dev02.mode()'), 'play'); await page.eval('__step(240)');
     const after = await page.snap(), a = before.seats[id], b = after.seats[id];
     assert.deepEqual([b.commander.x, b.commander.z, b.spent, b.buys, b.pad], [a.commander.x, a.commander.z, 0, 0, -1], `${via} ${id} 暫停後自行移動或扣款`);
-    assert.equal(b.gold, 12 + Math.floor(after.tick / 30)); await same(page);
+    assert.equal(b.gold, gold(after.tick)); await same(page);
     // 正常行為仍在：恢復後再按方向鍵會移動
     await page.down(key); await page.eval('__step(10)'); await page.up(key); await page.eval('__step(2)'); const c = (await page.snap()).seats[id].commander;
     assert(Math.hypot(c.x - b.commander.x, c.z - b.commander.z) > 1, `${via} ${id} 恢復後按鍵應移動`); await page.done();
@@ -164,7 +165,7 @@ await test('鍵盤操作設定：Space／Enter 連續切換、Tab 換開關，�
   await enter(); await page.eval('__step(1)'); assert.deepEqual(await state(), ['opt-bars', 'play', true, true]);
   await tab(); assert.deepEqual(await state(), ['view', 'play', true, true]); await tab(); await tab(); assert.deepEqual(await state(), ['opt-quality', 'play', true, true]);
   await tab(); assert.deepEqual(await state(), ['opt-engineering', 'play', true, true]); await space();
-  await tab(); assert.deepEqual(await state(), ['panel-title', 'play', true, true]);
+  await tab(); assert.deepEqual(await state(), ['opt-music', 'play', true, true]); await tab(); await tab(); assert.deepEqual(await state(), ['panel-title', 'play', true, true]);
   await tab(); assert.deepEqual(await state(), ['opt-log', 'play', true, true]); await space(); await enter(); await space(); await page.eval('__step(1)'); assert.deepEqual(await state(), ['opt-log', 'play', true, false]);
   await page.clickOn('#opt-engineering');
   const t = (await page.snap()).tick; await page.eval('__step(30)'); assert.equal((await page.snap()).tick, t + 30, '對局不應暫停');
@@ -184,7 +185,7 @@ await test('地表跟隨畫質：僅標準／精緻、無地表按鈕、舊保�
     assert.equal(await page.eval('__dev02.quality().active'), quality, JSON.stringify(saved));
   }
   await page.eval(`localStorage.setItem('battle_craft.dev02.display', '{"bars":false,"surface":"hi","quality":"std"}')`); await page.reload(); await settled(page, 'std'); await page.eval('__step(2)'); await page.clickOn('[data-seat="N"]'); await page.clickOn('#opt-engineering');
-  assert.deepEqual(JSON.parse(await page.eval(`localStorage.getItem('battle_craft.dev02.display')`)), { bars: false, log: true, engineering: true, quality: 'std' }, '重存時移除舊地表欄位');
+  assert.deepEqual(JSON.parse(await page.eval(`localStorage.getItem('battle_craft.dev02.display')`)), { bars: false, log: true, engineering: true, quality: 'std', music: 2, sfx: 2 }, '重存時移除舊地表欄位');
   await page.eval(`localStorage.setItem('battle_craft.dev02.display', '{壞掉'); location.hash = 'seed=7&surface=hi&quality=std'`); await page.reload(); await settled(page, 'std'); assert.deepEqual(page.errors, []); await page.close();
   const broken = await browser.open(`${url}#seed=7`, { stepped: true, prelude: `localStorage.clear(); ${BAD_IMAGES}` });
   await broken.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await broken.eval('__step(2)'); await broken.until(`!__dev02.surface().busy`);
@@ -198,10 +199,10 @@ await test('畫質：高細節預設、模型與場景層切換、解析度、�
   const page = await browser.open(`${url}#seed=7`, { stepped: true }); const ready = p => p.until(`!!window.__dev02 && !__dev02.surface().busy && __dev02.quality().props.status !== 'loading'`, 60000);
   await ready(page); await page.eval('localStorage.clear()'); await page.reload(); await ready(page); await page.eval('__step(2)'); await page.clickOn('[data-seat="W"]'); await page.eval("document.getElementById('speed').click(); document.getElementById('speed').click(); __step(2)"); await page.eval('__step(600)');
   const q = () => page.eval('__dev02.quality()'), tri = () => page.eval('__dev02.info().bodyTriangles'), sf = () => page.eval('__dev02.surface().active');
-  let v = await q(); assert.deepEqual([v.active, v.sceneVisible, v.props.status, v.props.count, v.pixelRatio, await sf()], ['high', true, 'ready', 12, 1.5, 'max']); assert.deepEqual(await tri(), { marine: 380, ...highTri, commander: 372 });
+  let v = await q(); assert.deepEqual([v.active, v.sceneVisible, v.props.status, v.props.count, v.pixelRatio, await sf()], ['high', true, 'ready', 12, 1.5, 'max']); assert.deepEqual(await tri(), { ...highTri, commander: 372 });
   const ref = await open('W'); await ref.eval('__step(600)');
   for (let i = 0; i < 3; i++) { await page.clickOn('#opt-quality'); await ready(page); await page.eval('__step(60)'); await ref.eval('__step(60)'); }
-  v = await q(); assert.deepEqual([v.active, v.sceneVisible, v.pixelRatio, await sf()], ['std', false, 1, 'std']); assert.deepEqual(await tri(), { marine: 92, ...stdTri, commander: 92 });
+  v = await q(); assert.deepEqual([v.active, v.sceneVisible, v.pixelRatio, await sf()], ['std', false, 1, 'std']); assert.deepEqual(await tri(), { ...stdTri, commander: 92 });
   while ((await ref.snap()).tick < (await page.eval('__dev02.snapshot().tick'))) await ref.eval('__step(1)');
   if ((await ref.snap()).tick === (await page.eval('__dev02.snapshot().tick'))) assert.equal(await page.eval('__dev02.digest()'), await ref.eval('__dev02.digest()'), '畫質切換不應影響模擬'); else assert.fail('tick 未對齊');
   await ref.done(); await page.reload(); await ready(page); assert.equal((await q()).active, 'std', '重載保留');
@@ -226,7 +227,7 @@ await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、�
   for (const [w, h] of [[844, 390], [1280, 720], [1600, 900]]) for (const quality of ['std', 'high']) {
     const page = await open('S', { w, h, quality });
     const rows = await page.eval(`[...document.querySelectorAll('#bar button')].map(b => { const r = b.getBoundingClientRect(); return { id: b.id, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), over: b.scrollWidth > b.clientWidth, bottom: r.bottom }; })`);
-    assert.deepEqual(rows.map(r => r.id), ['pause', 'speed', 'framing', 'opt-bars', 'view', 'again', 'opt-quality', 'opt-engineering']);
+    assert.deepEqual(rows.map(r => r.id), ['pause', 'speed', 'framing', 'opt-bars', 'view', 'again', 'opt-quality', 'opt-engineering', 'opt-music', 'opt-sfx']);
     for (let i = 0; i < rows.length; i += 2) assert.equal(rows[i].y, rows[i + 1].y, `${w} 第 ${i / 2 + 1} 列`);
     assert(Math.max(...rows.map(r => r.w)) - Math.min(...rows.map(r => r.w)) <= 12 && new Set(rows.map(r => r.x)).size <= 4, `${w} ${JSON.stringify(rows)}`);
     assert(rows.every(r => !r.over && r.bottom <= h), `${w}x${h} ${JSON.stringify(rows)}`);
@@ -299,15 +300,58 @@ await test('BC01：四席各買三兵種；模型、盾條、飛行中光球與�
   const left = await open('none', { seed: 1 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0 }); await left.done();
   for (const quality of ['std', 'high']) {
     const card = await open('N', { quality });
-    for (const [kind, name, attack] of [['marine', '陸戰隊', '普通'], ['dragoon', '重騎兵', '指向性爆炸'], ['mutalisk', '飛螳', '彈跳']]) {
+    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳']]) {
       await card.clickOn(`[data-profile="${kind}"]`); const text = await card.eval(`document.getElementById('dossier').innerText`); assert(text.includes(name) && text.includes(attack), text);
       if (SHOTS) await card.shot(path.join(SHOTS, `dossier-${quality}-${kind}.png`));
     }
+    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '指揮官 Commander']);
     await card.done();
   }
   for (const [w, h] of [[844, 390], [1600, 900]]) { const p = await open('S', { w, h, quality: 'high', seed: 11 }); await p.eval('__step(30)'); for (let i = 0; i < 22; i++) { await p.down('123'[i % 3]); await p.up('123'[i % 3]); await p.eval('__step(60)'); } if (SHOTS) await p.shot(path.join(SHOTS, `battle-${w}.png`));
     assert(await p.eval(`(() => { const r = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#shop button, #dossier nav button')].filter(b => r(b).width).every(b => r(b).left >= 0 && r(b).right <= innerWidth && r(b).bottom <= innerHeight); })()`), `${w} 按鈕在視窗內`); await p.done(); }
   return '12 組席位×兵種；投射物數與狀態一致';
+});
+await test('半金：價格、扣款與 HUD 顯示 7.5 金', async () => {
+  const page = await open('S'); assert.match(await page.eval(`document.querySelector('#shop button').textContent`), /7\.5 金/); assert.equal(await page.eval(`document.getElementById('gold').textContent`), String(gold((await page.snap()).tick)));
+  await page.down('1'); await page.up('1'); for (let i = 0; i < 200 && (await page.snap()).seats.S.buys !== 1; i++) await page.eval('__step(1)');
+  const s = await page.snap(); assert.equal(s.seats.S.spent, 7.5); assert.equal(await page.eval(`document.getElementById('gold').textContent`), String(gold(s.tick) - 7.5)); assert.match(await page.eval(`document.getElementById('msg').textContent`), /花 7\.5 金/); if (SHOTS) await page.shot(path.join(SHOTS, 'half-gold.png')); await page.done();
+});
+await test('飛螳拍翅：隨模擬 tick 擺動、各隻錯相、暫停凍結', async () => {
+  const page = await open('none', { seed: 11, quality: 'high' }); let tilts = [];
+  for (let i = 0; i < 400 && tilts.length < 2; i++) { await page.eval('__step(10)'); tilts = await page.eval('__dev02.wings()'); }
+  assert(tilts.length >= 2); const seen = [];
+  for (let i = 0; i < 14; i++) { await page.eval('__step(1)'); seen.push((await page.eval('__dev02.wings()'))[0]); }
+  assert(Math.max(...seen) > .3 && Math.min(...seen) < -.3 && seen.every(v => Math.abs(v) <= .501), String(seen)); assert(new Set(await page.eval('__dev02.wings()')).size > 1);
+  if (SHOTS) { await page.clickOn('#view'); await page.eval('__step(40)'); }
+  await page.clickOn('#pause'); await page.eval('__step(2)'); const a = await page.eval('__dev02.wings()'); await page.eval('__step(20)'); assert.deepEqual(await page.eval('__dev02.wings()'), a); await page.done();
+  return `角度 ${Math.min(...seen)}～${Math.max(...seen)} rad`;
+});
+await test('聲音：互動後啟動、分開調整與關閉、保存、限制同時發聲、暫停靜止、不改模擬', async () => {
+  const A = p => p.eval('__dev02.audio()'), running = p => p.until(`__dev02.audio().state === 'running'`), stopped = p => p.until(`__dev02.audio().state === 'suspended'`);
+  const page = await browser.open(`${url}#seed=11`, { stepped: true, prelude: `if (!sessionStorage.k) { localStorage.clear(); sessionStorage.k = 1 }` });
+  await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)');
+  assert.deepEqual([(await A(page)).state, (await A(page)).musicStarted], ['locked', false], '互動前不建立 AudioContext');
+  await page.clickOn('[data-seat="none"]'); await running(page); let a = await A(page); assert(a.musicStarted && a.music > 0 && a.sfx > 0);
+  for (let i = 0; i < 600 && !(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped) && await page.eval('__dev02.mode()') === 'play'; i++) { await page.eval('__step(6)'); await sleep(8); a = await A(page); assert(a.voices <= 6, `聲部 ${a.voices}`); }
+  assert(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped > 0 && a.peak >= 2 && a.peak <= 6, JSON.stringify(a));
+  await sleep(700); assert.equal((await A(page)).voices, 0, '播完釋放聲部'); const total = v => Object.values(v.played).reduce((x, y) => x + y, 0), first = total(await A(page));
+  for (let i = 0; i < 100 && total(await A(page)) < first + 3; i++) { await page.eval('__step(6)'); await sleep(90); } assert(total(await A(page)) >= first + 3, '釋放後可再播放'); a = await A(page);
+  await page.clickOn('#pause'); await stopped(page); const before = (await A(page)).played; await page.eval('__step(30)'); assert.deepEqual((await A(page)).played, before); await page.clickOn('#pause'); await running(page);
+  const label = id => page.eval(`document.getElementById('${id}').textContent`);
+  const levels = []; for (let i = 0; i < 4; i++) { await page.clickOn('#opt-sfx'); levels.push([await label('opt-sfx'), (await A(page)).sfx]); }
+  assert.deepEqual(levels.map(v => v[0]), ['音效：大', '音效：關', '音效：小', '音效：中']); assert(levels[1][1] === 0 && levels[0][1] > levels[3][1] && levels[3][1] > levels[2][1]);
+  await page.clickOn('#opt-sfx'); await page.clickOn('#opt-sfx'); const mute = (await A(page)).played; await page.eval('__step(200)'); assert.deepEqual((await A(page)).played, mute, '音效關閉不播放'); assert((await A(page)).music > 0, '音樂獨立'); await running(page);
+  await page.clickOn('#opt-music'); await page.clickOn('#opt-music'); assert.equal(await label('opt-music'), '音樂：關'); await stopped(page); assert.equal((await A(page)).music, 0);
+  await page.reload(); await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)'); assert.deepEqual([await label('opt-music'), await label('opt-sfx')], ['音樂：關', '音效：關']);
+  await page.clickOn('[data-seat="N"]'); assert.equal((await A(page)).state, 'locked', '全關時不建立'); await page.clickOn('#opt-music'); await running(page); assert.deepEqual([await label('opt-music'), (await A(page)).musicStarted], ['音樂：小', true]);
+  await page.eval(`localStorage.setItem('battle_craft.dev02.display', '{"music":9,"sfx":"x"}')`); await page.reload(); await page.until(`!!window.__dev02`); assert.deepEqual([await label('opt-music'), await label('opt-sfx')], ['音樂：中', '音效：中']); assert.deepEqual(page.errors, []); await page.close();
+  const mutedRun = await open('N', { seed: 21 }), loudRun = await open('N', { seed: 21 });
+  for (const id of ['#opt-music', '#opt-music', '#opt-sfx', '#opt-sfx']) await mutedRun.clickOn(id);
+  for (const p of [mutedRun, loudRun]) { while ((await p.snap()).tick < 900) await p.eval('__step(1)'); }
+  assert.equal(await mutedRun.eval('__dev02.digest()'), await loudRun.eval('__dev02.digest()'), '聲音不影響模擬'); await mutedRun.done(); await loudRun.done();
+  const none = await browser.open(`${url}#seed=7`, { stepped: true, prelude: `window.AudioContext = window.webkitAudioContext = undefined;` });
+  await none.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await none.eval('__step(2)'); await none.clickOn('[data-seat="N"]'); await none.clickOn('#opt-sfx'); await none.eval('__step(300)'); assert.equal((await A(none)).state, 'unavailable'); assert((await none.eval('__dev02.snapshot().tick')) >= 300); assert.deepEqual(none.errors, []); await none.close();
+  return `播放 ${JSON.stringify(a.played)}、略過 ${a.dropped}、同時峰值 ${a.peak}`;
 });
 await sleep(50); await browser.close();
 console.table(rows); console.log(`DEV02 browser QA: OK (${browser.angle})`);

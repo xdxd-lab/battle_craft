@@ -6,14 +6,14 @@ import { HZ, RULES } from './sim.mjs';
 import { KINDS, ATTACKS, ARMORS, FRAME_MS } from './roster.mjs';
 
 const describe = {
-  marine: ['地面步兵', '低價前線單位，即時射擊地面與空中目標。', [3.1, 2.4, -3.7], .54, 20],
+  marine: ['地面步兵', '低價前線單位，即時射擊地面與空中目標。', [1.9, 1.9, 4.3], .92, 25],
   dragoon: ['地面重型', '發射慢速光球，延後命中單一目標；護盾持續緩慢回復。', [4.2, 3.2, 4.6], .85, 22],
   mutalisk: ['飛行', '飛行單位。首擊後最多再彈跳兩次，傷害依序為 1/3、1/9。', [3.6, 3.6, 4.2], .5, 24],
 };
 const unitProfile = kind => {
   const k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
   return {
-    name: k.name, role, description, camera, aim, fov,
+    name: k.name, english: k.source, role, description, camera, aim, fov,
     stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['單次傷害', k.damage], ['攻擊間隔', `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒`]],
     model: unitModels.high[kind], plain: unitModels.std[kind],
   };
@@ -21,7 +21,7 @@ const unitProfile = kind => {
 const profiles = {
   marine: unitProfile('marine'), dragoon: unitProfile('dragoon'), mutalisk: unitProfile('mutalisk'),
   commander: {
-    name: '指揮官', role: '購買區操作',
+    name: '指揮官', english: 'Commander', role: '購買區操作',
     description: '在自己的購買區移動，站上信標即可持續用金幣部署部隊。',
     stats: [['移動速度', `${RULES.commanderSpeed * HZ} 世界單位／秒`], ['部署間隔', `${RULES.purchaseGap / HZ} 秒`]],
     model: detailCommander, camera: [3.5, 2.55, 4.5], aim: 1.08, fov: 23,
@@ -43,7 +43,7 @@ function portrait(renderer, kind, quality) {
     const halo = new THREE.Mesh(new THREE.TorusGeometry(1.2, .018, 8, 64), new THREE.MeshBasicMaterial({ color: 0xa9ccff })); halo.rotation.x = Math.PI / 2; halo.position.y = .06; studio.add(base, halo);
     const back = new THREE.DirectionalLight(0xbfdcff, 2.4); back.position.set(1, 4, 5); studio.add(back);
   }
-  for (const [part, geometry] of Object.entries(geometries)) studio.add(new THREE.Mesh(geometry, mats[part]));
+  for (const [part, geometry] of Object.entries(geometries)) studio.add(new THREE.Mesh(geometry, mats[part.split(':')[0]]));
   studio.add(new THREE.HemisphereLight(0xdceafa, 0x5b6269, 1.85));
   for (const [color, intensity, x, y, z] of [[0xffe2bd, 3.1, -4, 7, -3], [0x9aceee, 2.3, 3, 2, 4]]) {
     const light = new THREE.DirectionalLight(color, intensity);
@@ -83,7 +83,7 @@ export function createDossier(renderer, card, panel, quality = () => 'std') {
     if (kind === visible) return;
     visible = kind;
     const data = profiles[kind];
-    name.textContent = data.name; role.textContent = data.role; description.textContent = data.description;
+    name.textContent = `${data.name}（${data.english}）`; role.textContent = data.role; description.textContent = data.description;
     stats.replaceChildren(...data.stats.flatMap(([label, value]) => {
       const term = document.createElement('dt'), detail = document.createElement('dd');
       term.textContent = label; detail.textContent = value;
@@ -94,6 +94,10 @@ export function createDossier(renderer, card, panel, quality = () => 'std') {
     images[key] ??= portrait(renderer, kind, quality());
     image.src = images[key];
     card.dataset.unit = kind;
+  }
+  for (const button of buttons) { // 中文在上、英文在下
+    const data = profiles[button.dataset.profile], english = document.createElement('small');
+    english.textContent = data.english; english.lang = 'en'; button.replaceChildren(data.name, english);
   }
   for (const button of buttons) button.onclick = () => { selected = button.dataset.profile; hovered = null; update(); };
   panel.addEventListener('toggle', () => { if (!panel.open) { selected = 'marine'; hovered = null; } update(); });
