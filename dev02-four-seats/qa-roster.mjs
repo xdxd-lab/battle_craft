@@ -1,9 +1,9 @@
-// BC01（模擬版本 3）驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
+// BC01 兵種（模擬版本 3 起）與版本 4 道路寬驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
 import assert from 'node:assert/strict';
 import * as L from '../dev05-layout/layout.mjs';
 import * as S from './sim.mjs';
 import { KINDS, CORE, applyDamage, canTarget, framesAt, unitStats } from './roster.mjs';
-import { corePos } from './arena.mjs';
+import { ARENA, corePos } from './arena.mjs';
 
 const rows = [], test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
 const none = () => S.createSim({ bots: [] });
@@ -130,6 +130,33 @@ test('可重現完整終局：固定種子加玩家指令，重跑與中途序�
   assert.equal(S.digest(st), a.final); assert(midair > 0, '序列化應涵蓋飛行中的投射物');
   if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, 'b2b76a9e 8a855c0b');
   return `${a.state.winner} ${(a.state.tick / 30).toFixed(0)} 秒 ${a.final} ${a.events}`;
+});
+test('飛行與地面：飛螳在空中、重騎兵在地面，兩者皆可攻空與地', () => {
+  assert.deepEqual([KINDS.mutalisk.air, KINDS.dragoon.air, KINDS.marine.air], [true, false, false]);
+  for (const k of ['mutalisk', 'dragoon']) assert.deepEqual([...KINDS[k].targets].sort(), ['air', 'ground']);
+});
+test('版本 4 道路可通行寬加 10%（視覺同步）；版本 3 維持原寬', () => {
+  assert(Math.abs(ARENA.laneWidth / L.DIM.laneWidth - 1.1) < 1e-12 && L.shopClearance(ARENA) > 0);
+  return [[3, 3.6], [4, 3.96]].map(([version, half]) => {
+    for (const kind of ['dragoon', 'mutalisk']) for (const [x, z] of [[9, -25], [-9, -25], [25, 9], [-25, -9]]) {
+      const st = S.createSim({ version, bots: [] }), u = unit(st, 'N', kind, x, z, idle); S.step(st);
+      assert(Math.abs(Math.min(Math.abs(u.x), Math.abs(u.z)) - half) < 1e-9, `v${version} ${kind} ${u.x},${u.z}`);
+    }
+    return `v${version} ±${half}`;
+  }).join('、');
+});
+test('版本 4 全電腦 60 局：皆終局，部隊不出道路、交會區與核心平台', () => {
+  const wins = {}, R = S.RULES, half = 3.96; let widest = 0;
+  for (let seed = 1; seed <= 60; seed++) {
+    const st = S.createSim({ seed }); assert.equal(st.version, 4);
+    while (st.mode === 'play') { assert(st.tick < 30 * 60 * 13); S.step(st); for (const u of st.units) { const ax = Math.abs(u.x), az = Math.abs(u.z), core = S.SEAT_IDS.some(id => { const [cx, cz] = corePos(id); return Math.hypot(u.x - cx, u.z - cz) <= R.platform + 1e-9; });
+      assert(core || Math.hypot(u.x, u.z) <= R.junction + 1e-9 || Math.min(ax, az) <= half + 1e-9, `${seed} ${u.x},${u.z}`); if (!core && Math.max(ax, az) > R.junction) widest = Math.max(widest, Math.min(ax, az)); } }
+    wins[st.winner] = (wins[st.winner] || 0) + 1;
+  }
+  assert(widest > 3.6, `加寬部分應有部隊使用 ${widest}`);
+  const rec = { version: 4, seed: 20261126, bots: ['N', 'W', 'S', 'E'], commands: [] }, a = S.replay(rec); assert.equal(S.replay(rec).final, a.final);
+  if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, '5a70a7ff d6d987b7');
+  return `勝場 ${JSON.stringify(wins)}；最寬 ${widest.toFixed(2)}；${a.final} ${a.events}`;
 });
 test('玩家全程不動也會終局', () => S.SEAT_IDS.map(id => { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); run(st, 30 * 60 * 13); assert.equal(st.mode, 'end'); return (st.tick / 30).toFixed(0); }).join('、') + ' 秒');
 console.table(rows); console.log('BC01 roster QA: OK');

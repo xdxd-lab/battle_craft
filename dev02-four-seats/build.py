@@ -11,8 +11,7 @@ import base64, json
 PH = ROOT.parent / 'assets/polyhaven'
 data = {name: 'data:image/jpeg;base64,' + base64.b64encode((PH / file).read_bytes()).decode('ascii') for name, file in {
     'floor_diff_512': 'painted_concrete_02_diff_512.jpg', 'floor_rough_512': 'painted_concrete_02_rough_512.jpg',
-    'floor_diff_1k': 'painted_concrete_02_diff_1k.jpg', 'floor_rough_1k': 'painted_concrete_02_rough_1k.jpg',
-    'ground_diff_1k': 'aerial_asphalt_01_diff_1k.jpg', 'ground_diff_2k': 'aerial_asphalt_01_diff_2k.jpg',
+    'ground_diff_1k': 'aerial_asphalt_01_diff_1k.jpg',
     'floor_diff_2k': 'hi/floor_diff_2k.jpg', 'floor_rough_2k': 'hi/floor_rough_2k.jpg', 'floor_nor_2k': 'hi/floor_nor_gl_2k.jpg', 'ground_diff_4k': 'hi/ground_diff_4k.jpg'}.items()}
 (ROOT / 'surface-data.generated.js').write_text('export default ' + json.dumps(data) + ';\n')
 VEND = VENDOR

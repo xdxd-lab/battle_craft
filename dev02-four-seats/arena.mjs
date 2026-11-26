@@ -10,6 +10,7 @@ const coreDistance = (L.DIM.coreDistance + platformWalkRadius) * LANE_SCALE - pl
 export const ARENA = {
   ...L.DIM,
   coreDistance,
+  laneWidth: L.DIM.laneWidth * 1.1, // 對戰通道加寬 10%
   platformWalkRadius,
   spawnRadial: L.DIM.spawnRadial + coreDistance - L.DIM.coreDistance,
   shopWidth: 9,
