@@ -14,3 +14,8 @@ v5 保留血條，最新訊息和事件紀錄帶對局時間。顏色區分我�
 - 用來源、GLB 大小、材質貼圖、三角形與繪製呼叫分別記錄。布偶救援隊測到把原 instance 縮成 0 仍會提交頂點，木桶替換後單張圖約多送 3.1 萬三角形；這是另一個專案的 Chrome 結果。BaattleCraft 的實機幀時間、GPU 記憶體與行動網路載入仍需量測。
 - 模型載入失敗時保留原物件或程序模型。切換場景或丟棄過期載入結果時，清理幾何、材質和貼圖；單一模型失敗應可各自回退。
 - [歷史版本與素材調查](battle_craft-research.md) 有來源及篩選理由。SC1、SC2 和 Web 試作的購兵條件與數值各自保留來源。3D 戰場優先維持半寫實／寫實材質與清楚的兵種輪廓，並保留辨識敵我、路線和信標所需的對比。
+
+## 重要開發知識來源
+
+- [SC2Mapster Wiki](https://sc2mapster.wiki.gg/) 是 StarCraft II 地圖編輯的社群知識庫。從 [Triggers](https://sc2mapster.wiki.gg/wiki/Triggers) 查事件、條件、動作與 Galaxy 腳本，從 [Data Editor](https://sc2mapster.wiki.gg/wiki/Data) 查單位、武器、效果與行為的資料結構。
+- 研究 SC2 版 BattleCraft 時，先用 Wiki 釐清編輯器概念，再回查對應版本的原地圖或作者改版紀錄。SC1 原版的數值、覆寫與判定優先回查 SCX／CHK 和該引擎的行為證據。
