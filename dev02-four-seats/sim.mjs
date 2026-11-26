@@ -32,9 +32,9 @@ const PADS_V2 = place([
 export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.incomeEvery / 2, costs: { marine: KINDS.marine.cost * 1.5 } };
 export const economyFor = version => version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
 const rosterPads = version => place([...KIND_IDS.map(kind => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name })), { locked: true, label: '未開放' }]);
-const PADS_V3 = rosterPads(3);
-export const PADS = rosterPads(VERSION); // 新對局使用
-export const padsFor = version => version >= 5 ? PADS : version >= 3 ? PADS_V3 : PADS_V2;
+const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5);
+export const padsFor = version => version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME = { x: .9, z: 0 };
 const GEOMETRY = {

@@ -12,14 +12,18 @@ export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼�
   let context = null, gains = null, buffers = null, paused = false, failed = !Context, peak = 0, dropped = 0, musicStarted = false;
   const voices = () => Object.values(active).reduce((a, b) => a + b, 0);
   const buffer = data => { const b = context.createBuffer(1, data.length, RATE); b.getChannelData(0).set(data); return b; };
+  const wanted = () => !paused && !document.hidden && (levels.music > 0 || levels.sfx > 0);
+  let music = null; const musicData = () => music ??= renderMusic();
+  if (!failed && levels.music) setTimeout(musicData, 200); // 開場閒置時先合成，避免第一次點擊停頓
   function sync() {
     if (!context) return;
     for (const k of ['music', 'sfx']) gains[k].gain.value = GAIN[levels[k]] * MIX[k];
-    const wanted = !paused && !document.hidden && (levels.music > 0 || levels.sfx > 0);
-    if (wanted !== (context.state === 'running')) (wanted ? context.resume() : context.suspend()).catch(() => {});
+    // state 要等 promise 完成才更新，所以每次都送出目標狀態；resume 完成後若目標已改為靜止再停一次
+    if (wanted()) context.resume().then(() => { if (!wanted()) return context.suspend(); }).catch(() => {});
+    else context.suspend().catch(() => {});
     if (levels.music && !musicStarted) {
       musicStarted = true;
-      const source = context.createBufferSource(); source.buffer = buffer(renderMusic()); source.loop = true; source.connect(gains.music); source.start();
+      const source = context.createBufferSource(); source.buffer = buffer(musicData()); source.loop = true; source.connect(gains.music); source.start();
     }
   }
   return {

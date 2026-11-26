@@ -224,7 +224,7 @@ await test('橫式設定按鈕不遮擋：844×390、1280×720 兩種開關組�
   }
 });
 await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、文字不溢出', async () => {
-  for (const [w, h] of [[844, 390], [1280, 720], [1600, 900]]) for (const quality of ['std', 'high']) {
+  for (const [w, h] of [[844, 340], [667, 375], [844, 375], [844, 390], [1280, 720], [1600, 900]]) for (const quality of ['std', 'high']) {
     const page = await open('S', { w, h, quality });
     const rows = await page.eval(`[...document.querySelectorAll('#bar button')].map(b => { const r = b.getBoundingClientRect(); return { id: b.id, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), over: b.scrollWidth > b.clientWidth, bottom: r.bottom }; })`);
     assert.deepEqual(rows.map(r => r.id), ['pause', 'speed', 'framing', 'opt-bars', 'view', 'again', 'opt-quality', 'opt-engineering', 'opt-music', 'opt-sfx']);
@@ -337,6 +337,8 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   await sleep(700); assert.equal((await A(page)).voices, 0, '播完釋放聲部'); const total = v => Object.values(v.played).reduce((x, y) => x + y, 0), first = total(await A(page));
   for (let i = 0; i < 100 && total(await A(page)) < first + 3; i++) { await page.eval('__step(6)'); await sleep(90); } assert(total(await A(page)) >= first + 3, '釋放後可再播放'); a = await A(page);
   await page.clickOn('#pause'); await stopped(page); const before = (await A(page)).played; await page.eval('__step(30)'); assert.deepEqual((await A(page)).played, before); await page.clickOn('#pause'); await running(page);
+  const click = n => page.eval(`for (let i = 0; i < ${n}; i++) document.getElementById('pause').click()`);
+  for (let i = 0; i < 5; i++) { await click(2); await sleep(150); assert.deepEqual([await page.eval('__dev02.mode()'), (await A(page)).state], ['play', 'running']); await click(1); await stopped(page); await click(2); await sleep(150); assert.deepEqual([await page.eval('__dev02.mode()'), (await A(page)).state], ['paused', 'suspended'], '連按後聲音須跟上暫停'); await click(1); await running(page); }
   const label = id => page.eval(`document.getElementById('${id}').textContent`);
   const levels = []; for (let i = 0; i < 4; i++) { await page.clickOn('#opt-sfx'); levels.push([await label('opt-sfx'), (await A(page)).sfx]); }
   assert.deepEqual(levels.map(v => v[0]), ['音效：大', '音效：關', '音效：小', '音效：中']); assert(levels[1][1] === 0 && levels[0][1] > levels[3][1] && levels[3][1] > levels[2][1]);
