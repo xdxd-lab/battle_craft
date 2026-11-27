@@ -75,6 +75,14 @@ let compactPadLabels = false;
 function buildPads() {
   W.clear(padGroup);
   for (const o of [...padModels.children]) padModels.remove(o); // 幾何與材質共用 looks／seatMats，不釋放
+  for (const id of S.SEAT_IDS) S.PADS.forEach((p, i) => { // 四席每座信標都立對應兵種的展示模型（觀戰與他席也看得到）；圈與標籤只畫自己的席位
+    if (!p.kind) return;
+    const M = W.seatMats[id], g = new THREE.Group(), [lx, lz] = S.DIM.shopPadPositions[i], spec = KINDS[p.kind];
+    for (const [part, geo] of Object.entries(looks.std[p.kind])) { const m = new THREE.Mesh(geo, { hull: M.paint, dark: W.MAT.black, lamp: M.glow }[part.split(':')[0]]); m.castShadow = true; m.userData.pad = i; g.add(m); }
+    const [wx, wz] = S.toWorld(id, lx, lz, S.DIM), home = L.seatById(id).dir;
+    g.position.set(wx, .42 + (spec.air ? .5 : spec.hover ? .2 : 0), wz); g.scale.setScalar(compactPadLabels ? 1.4 : 1.15); // 橫式矮螢幕再放大，維持可辨
+    g.userData.facing = Math.atan2(-home[0], -home[1]); g.userData.pad = i; g.userData.seat = id; padModels.add(g);
+  });
   if (!seat) return;
   S.PADS.forEach((p, i) => {
     const [x, z] = S.padWorld(seat, i, S.DIM);
@@ -92,17 +100,10 @@ function buildPads() {
     if (compactPadLabels) t.scale.set(2.65, 2.55, 1).multiplyScalar(six ? .7 : 1);
     else t.scale.set(p.locked ? 2.9 : 4.6, p.locked ? 1.05 : 1.66, 1).multiplyScalar(six ? .8 : 1);
     padGroup.add(t);
-    if (p.kind) { // 展示模型立在信標中央、縮小並緩慢自轉；自己的指揮官站上時暫時隱藏，避免重疊
-      const M = W.seatMats[seat], g = new THREE.Group(), [lx, lz] = S.DIM.shopPadPositions[i], spec = KINDS[p.kind];
-      for (const [part, geo] of Object.entries(looks.std[p.kind])) { const m = new THREE.Mesh(geo, { hull: M.paint, dark: W.MAT.black, lamp: M.glow }[part.split(':')[0]]); m.castShadow = true; m.userData.pad = i; g.add(m); }
-      const [wx, wz] = S.toWorld(seat, lx, lz, S.DIM), home = L.seatById(seat).dir;
-      g.position.set(wx, .42 + (spec.air ? .5 : spec.hover ? .2 : 0), wz); g.scale.setScalar(compactPadLabels ? 1.25 : .8); g.userData.facing = Math.atan2(-home[0], -home[1]); // 橫式矮螢幕放大，維持可辨
-      g.userData.pad = i; padModels.add(g);
-    }
   });
 }
 function padModelAt(e) {
-  pointRay(e); picks.length = 0; ray.intersectObjects(padModels.children.filter(g => g.visible), true, picks);
+  pointRay(e); picks.length = 0; ray.intersectObjects(padModels.children.filter(g => g.visible && g.userData.seat === seat), true, picks); // 只有自己席位的模型可點
   return picks.length ? picks[0].object.userData.pad : -1;
 }
 function markFallen(id) {
@@ -496,7 +497,7 @@ function draw(dt, k) {
   fx(shots, e => { const d = new THREE.Vector3(...e.b).sub(new THREE.Vector3(...e.a)), n = d.length() || 1; dummy.position.set(...e.a).addScaledVector(d, .5); dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.divideScalar(n)); dummy.scale.set(.1, .1, n); });
   fx(puffs, e => { dummy.position.set(e.x, e.y, e.z); dummy.quaternion.identity(); dummy.scale.setScalar((.6 + Math.max(0, .4 - e.life) * 5) * e.size); });
   for (const o of padGroup.children) if (!o.isSprite) o.scale.setScalar(state?.seats[seat]?.pad === o.userData.pad ? 1.12 : 1);
-  for (const g of padModels.children) { g.rotation.y = g.userData.facing + ((state?.tick ?? 0) + k) * .017; g.visible = state?.seats[seat]?.pad !== g.userData.pad; } // 展示模型隨模擬 tick 緩慢自轉（暫停即停）
+  for (const g of padModels.children) { g.rotation.y = g.userData.facing + ((state?.tick ?? 0) + k) * .017; g.visible = state?.seats[g.userData.seat]?.pad !== g.userData.pad; } // 該席指揮官站上時隱藏 // 展示模型隨模擬 tick 緩慢自轉（暫停即停）
   renderer.render(scene, camera);
 }
 function advance(dt) {
@@ -545,4 +546,4 @@ try {
 } catch (err) { console.error(err); $('card').innerHTML = '<h3>無法啟動 3D</h3><p>此裝置或瀏覽器無法使用 WebGL，這一版沒有 2D 備援。</p>'; }
 // 供自動核對：唯讀快照
 window.__dev02 = { audio: () => audio.info(), wings: wingTilts, cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count, hydralisk: darts.count, wraith: missiles.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
-  screen: (x, z, y = .1) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * canvas.clientWidth, (1 - v.y) / 2 * canvas.clientHeight]; }, pad: i => S.padWorld(seat, i, S.DIM), padModel: i => { const m = padModels.children.find(o => o.userData.pad === i); return m && [m.position.x, m.position.y + .8, m.position.z]; }, inside: () => { pose(); const b = [1e9, 1e9, -1e9, -1e9]; for (const p of L.framePoints(view, ARENA)) { const [x, y] = window.__dev02.screen(p[0], p[2], p[1]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b[0] >= safe.l - 1 && b[1] >= safe.t - 1 && b[2] <= safe.l + safe.w + 1 && b[3] <= safe.t + safe.h + 1; } };
+  screen: (x, z, y = .1) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * canvas.clientWidth, (1 - v.y) / 2 * canvas.clientHeight]; }, pad: i => S.padWorld(seat, i, S.DIM), padModels: () => padModels.children.map(g => ({ seat: g.userData.seat, pad: g.userData.pad, kind: S.PADS[g.userData.pad].kind, visible: g.visible })), padModel: i => { const m = padModels.children.find(o => o.userData.pad === i && o.userData.seat === seat); return m && [m.position.x, m.position.y + .8, m.position.z]; }, inside: () => { pose(); const b = [1e9, 1e9, -1e9, -1e9]; for (const p of L.framePoints(view, ARENA)) { const [x, y] = window.__dev02.screen(p[0], p[2], p[1]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b[0] >= safe.l - 1 && b[1] >= safe.t - 1 && b[2] <= safe.l + safe.w + 1 && b[3] <= safe.t + safe.h + 1; } };

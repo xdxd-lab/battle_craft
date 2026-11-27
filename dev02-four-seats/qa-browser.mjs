@@ -266,6 +266,8 @@ await test('六信標：點展示模型走向該信標（不開單位介紹）�
   for (const [w, h] of [[1600, 900], [844, 390]]) for (const id of S.SEAT_IDS) {
     const page = await open(id, { w, h });
     assert.equal(await page.eval(`document.querySelectorAll('#shop button').length`), 6);
+    const models = await page.eval('__dev02.padModels()'); assert.equal(models.length, 24, '四席各六座展示模型');
+    for (const sid of S.SEAT_IDS) assert.deepEqual(models.filter(m => m.seat === sid).map(m => m.kind), S.PADS.map(p => p.kind), `${sid} 展示模型`);
     for (let i = 0; i < 6; i++) {
       const at = await page.eval(`__dev02.padModel(${i})`); assert(at, `模型 ${i}`);
       const [x, y] = await page.eval(`__dev02.screen(${at[0]}, ${at[2]}, ${at[1]})`);
@@ -274,6 +276,12 @@ await test('六信標：點展示模型走向該信標（不開單位介紹）�
       await page.click(x, y); await page.eval('__step(70)');
       assert.equal((await page.snap()).seats[id].pad, i, `${w}x${h} ${id} 點模型 ${i + 1}`);
       assert.equal(await page.eval(`document.getElementById('profile-name').textContent`), before);
+      if (id === 'S') { // 踩住即購買：等到錢夠，最新一名必為該信標的兵種
+        const buys = (await page.snap()).seats[id].buys; let snap;
+        for (let n = 0; n < 200 && (snap = await page.snap()).seats[id].buys === buys; n++) await page.eval('__step(30)');
+        assert(snap.seats[id].buys > buys, `${w}x${h} 信標 ${i + 1} 未購買`); const mine = snap.units.filter(u => u.seat === id);
+        assert.equal(mine.reduce((m, u) => u.id > m.id ? u : m).kind, S.PADS[i].kind, `${w}x${h} 信標 ${i + 1} 兵種`);
+      }
     }
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51, text: '3' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51 }); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 2);
     await page.clickOn('#shop button[data-pad="5"]'); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 5);
