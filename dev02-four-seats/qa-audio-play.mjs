@@ -93,4 +93,15 @@ await test('音樂關閉時不解碼；打開後才解碼並播放', async () =>
   const lv = { music: 0, sfx: 2 }, n = decodes, { a, mine } = await fresh(lv, true); assert.equal(decodes, n); assert.equal(a.info().musicSource, 'idle'); assert.equal(mine().length, 0);
   lv.music = 2; a.sync(); await settle(); assert.equal(decodes, n + 1); assert.equal(a.info().musicSource, 'track'); assert.equal(mine().length, 1);
 });
+await test('聲部滿載：未發聲的兵種搶占最擁擠兵種的最舊聲部；已在發聲的兵種與平均分配時照舊略過', async () => {
+  const a = createAudio({ music: 0, sfx: 2 }); a.unlock(); await settle();
+  const start = sources.length, mine = () => sources.slice(start);
+  for (const k of ['marine', 'dragoon', 'marine', 'dragoon', 'marine', 'dragoon']) a.play(k);
+  assert.equal(a.info().voices, 6); const oldest = mine()[0];
+  a.play('mutalisk'); assert.equal(a.info().voices, 6); assert.equal(a.info().stolen, 1); assert.equal(oldest.stopped, 1, '最舊的陸戰隊被停');
+  assert.equal(a.info().played.mutalisk, 1);
+  const d = a.info().dropped; a.play('mutalisk'); a.play('dragoon'); assert.equal(a.info().dropped, d + 2, '已在發聲的兵種滿載時略過'); assert.equal(a.info().stolen, 1);
+  a.play('hydralisk'); a.play('archon'); a.play('wraith'); assert.equal(a.info().voices, 6); assert.equal(a.info().stolen, 4);
+  const d2 = a.info().dropped; a.play('marine'); assert.equal(a.info().dropped, d2 + 1, '各兵種僅一聲部時不再搶占'); a.stopEffects();
+});
 console.table(rows); console.log('audio playback QA: OK');

@@ -6,6 +6,7 @@ import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 import * as W from '../dev05-layout/world.js';
 import { corePos } from './arena.mjs';
 
+export const BAR_HALF = 3.08; // 主城血條半寬（含底框），main.js 以寬 6 繪製
 export const STAGE_AT = [.75, .5, .25];
 export const STAGE_NAMES = ['完好', '輕損', '重損', '危急'];
 export const coreStage = (hp, max) => STAGE_AT.filter(at => hp <= max * at).length;
@@ -44,9 +45,15 @@ export function createCoreStatus(max) {
       layer.remove(...parts); layer.add(new THREE.Mesh(merged, material));
     }
     const tag = W.label(240, 100, () => {}); tag.visible = false; tag.name = `core-hp-${s.id}`; W.scene.add(tag);
-    return { id: s.id, index, root, layers, flames, puffs, sparks, tag, anchor: new THREE.Vector3(x, 10.2, z), stage: 0, text: '' };
+    return { id: s.id, index, root, layers, flames, puffs, sparks, tag, anchor: new THREE.Vector3(x, 10.2, z), stage: 0, text: '', shift: 0 };
   });
-  const right = new THREE.Vector3();
+  let lastCamera = null;
+  const right = new THREE.Vector3(), probe = new THREE.Vector3();
+  const ndc = (at, u, camera) => probe.copy(at).addScaledVector(right, u).project(camera).x; // 沿畫面水平方向 u 單位處的 NDC x
+  const fit = (at, lo, hi, camera, edge = .98) => { // 讓 [lo, hi] 落在 ±edge 內所需的平移（世界單位，局部線性近似）
+    const a = ndc(at, lo, camera), b = ndc(at, hi, camera), per = (b - a) / (hi - lo);
+    return b > edge ? (edge - b) / per : a < -edge ? (-edge - a) / per : 0;
+  };
   function write(c, text, color) {
     const map = c.tag.material.map, g = map.image.getContext('2d'); g.clearRect(0, 0, 240, 100);
     g.fillStyle = 'rgba(7,11,15,.86)'; g.beginPath(); g.roundRect(3, 3, 234, 94, 16); g.fill(); g.lineWidth = 6; g.strokeStyle = color; g.stroke();
@@ -55,15 +62,19 @@ export function createCoreStatus(max) {
   return {
     // t 為模擬 tick（含插值），暫停時動畫一起停住
     update(state, t, camera, showTags, compact, colorOf) {
-      right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      lastCamera = camera; camera.updateMatrixWorld(); right.set(1, 0, 0).applyQuaternion(camera.quaternion);
       for (const c of cores) {
         const v = state?.seats[c.id]; c.stage = v ? coreStage(v.hp, max) : 0;
         c.layers.forEach((g, i) => { g.visible = c.stage > i; });
         c.tag.visible = !!(showTags && v?.alive);
+        // 血條（中心 ±BAR_HALF）與右側數字視為一組；靠畫面左右緣（如 667 寬的東席）時整組沿畫面水平方向平移，不被裁切
+        const k = compact ? 1.4 : 1, off = 3.2 + 1.65 * k, hi = off + 1.55 * k;
+        c.shift = 0; for (let i = 0; i < 2; i++) c.shift += fit(c.anchor, c.shift - BAR_HALF, c.shift + hi, camera);
+        c.screen = [ndc(c.anchor, c.shift - BAR_HALF, camera), ndc(c.anchor, c.shift + hi, camera)];
         if (c.tag.visible) {
-          const text = String(Math.ceil(v.hp)), color = colorOf(c.id), k = compact ? 1.4 : 1;
+          const text = String(Math.ceil(v.hp)), color = colorOf(c.id);
           if (text !== c.text || color !== c.color) { write(c, text, color); c.color = color; }
-          c.tag.scale.set(3.1 * k, 1.3 * k, 1); c.tag.position.copy(c.anchor).addScaledVector(right, 3.2 + 1.65 * k);
+          c.tag.scale.set(3.1 * k, 1.3 * k, 1); c.tag.position.copy(c.anchor).addScaledVector(right, off + c.shift);
         }
         if (!c.stage) continue;
         const s = t / 30;
@@ -78,6 +89,8 @@ export function createCoreStatus(max) {
       for (const c of cores) { c.root.updateMatrixWorld(true); for (const layer of c.layers) layer.traverse(o => { if (!o.isMesh) return; const a = o.geometry.attributes.position; for (let i = 0; i < a.count; i++) { p.fromBufferAttribute(a, i).applyMatrix4(o.matrixWorld); if (p.y < 2) far = Math.max(far, Math.hypot(p.x - c.root.position.x, p.z - c.root.position.z)); } }); }
       return far;
     },
-    info: () => Object.fromEntries(cores.map(c => [c.id, { stage: c.stage, layers: c.layers.filter(g => g.visible).length, label: c.tag.visible ? c.text : null }])),
+    // 血條中心：依 update 算出的平移，和數字一起避開畫面邊緣
+    barAt: id => { const c = cores.find(c => c.id === id); return probe.copy(c.anchor).addScaledVector(right, c.shift).toArray(); },
+    info: () => Object.fromEntries(cores.map(c => [c.id, { stage: c.stage, layers: c.layers.filter(g => g.visible).length, label: c.tag.visible ? c.text : null, shift: c.tag.visible ? Math.round(c.shift * 100) / 100 : 0, screen: c.tag.visible ? c.screen.map(v => Math.round(v * 1000) / 1000) : null, anchor: c.anchor.clone().project(lastCamera ?? new THREE.PerspectiveCamera()).toArray().map(v => Math.round(v * 1000) / 1000) }])),
   };
 }

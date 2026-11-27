@@ -476,13 +476,13 @@ function draw(dt, k) {
     const top = LOOK[u.kind].top + lift; bar(x, top, z, 1.1, .16, u.hp / spec.hp, relColor(u.seat));
     if (spec.shield) bar(x, top + .36, z, 1.1, .13, u.sh / spec.shield, '#6fe8ff');
   }
+  coreStatus.update(state, (state?.tick ?? 0) + k, camera, display.bars, compactPadLabels, relColor); // 先算血量數字與血條的平移
   for (const s of L.SEATS) {
     for (const kind of KIND_IDS) squads[s.id][kind].forEach(m => { m.count = counts[s.id][kind]; m.instanceMatrix.needsUpdate = true; });
     const v = state?.seats[s.id]; if (!v) { commanders[s.id].visible = false; continue; }
-    const c = commanders[s.id], [x, z] = corePos(s.id); c.visible = v.alive; c.position.set(v.commander.x, .1, v.commander.z); if (v.commander.dx || v.commander.dz) c.rotation.y = Math.atan2(v.commander.dx, v.commander.dz);
-    bar(x, 10.2, z, 6, .55, v.hp / CORE_MAX, relColor(s.id));
+    const c = commanders[s.id]; c.visible = v.alive; c.position.set(v.commander.x, .1, v.commander.z); if (v.commander.dx || v.commander.dz) c.rotation.y = Math.atan2(v.commander.dx, v.commander.dz);
+    bar(...coreStatus.barAt(s.id), 6, .55, v.hp / CORE_MAX, relColor(s.id));
   }
-  coreStatus.update(state, (state?.tick ?? 0) + k, camera, display.bars, compactPadLabels, relColor);
   shadows.count = shade; shadows.instanceMatrix.needsUpdate = true;
   const PROJ = { dragoon: [orbs, 1.3], mutalisk: [glaives, FLY_HEIGHT + .5], hydralisk: [darts, 1.2], wraith: [missiles, FLY_HEIGHT + .3] }, flying = { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0 };
   for (const s of mode === 'end' ? [] : state?.shots ?? []) { // 終局後模擬停止，飛行中的投射物不再畫出

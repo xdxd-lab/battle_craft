@@ -17,7 +17,7 @@ export function loopRange(channels, limit = TRIM_LIMIT, floor = 1e-4) {
 export function createAudio(levels, { track = null } = {}) { // levels：{ music, sfx } 0～3，由呼叫端持有與保存
   const Context = window.AudioContext || window.webkitAudioContext;
   const played = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, 0])), last = {}, live = new Set(); // live：發聲中的戰鬥音效
-  let context = null, gains = null, buffers = null, paused = false, failed = !Context, peak = 0, dropped = 0, musicStarted = false;
+  let context = null, gains = null, buffers = null, paused = false, failed = !Context, peak = 0, dropped = 0, stolen = 0, musicStarted = false;
   const release = voice => { if (live.delete(voice)) voice.gain.disconnect(); };
   // 立刻斷開並停掉：暫停中的 context 不會前進，若只靠 suspend，恢復時會接著播完舊音效
   function stopEffects() { for (const voice of [...live]) { release(voice); voice.source.stop(); } }
@@ -67,13 +67,19 @@ export function createAudio(levels, { track = null } = {}) { // levels：{ music
       // suspend() 完成前 state 仍是 running，所以暫停與隱藏要直接判斷
       if (!context || quiet() || context.state !== 'running' || !levels.sfx || !buffers[kind]) return;
       const now = performance.now() / 1000;
-      if (live.size >= LIMIT.total || [...live].filter(v => v.kind === kind).length >= LIMIT.perKind || now - (last[kind] ?? -9) < LIMIT.gap) { dropped++; return; }
+      const voices = [...live], mine = voices.filter(v => v.kind === kind).length;
+      if (mine >= LIMIT.perKind || now - (last[kind] ?? -9) < LIMIT.gap) { dropped++; return; }
+      if (live.size >= LIMIT.total) { // 滿載：尚未發聲的兵種搶占最擁擠兵種的最舊聲部，避免常見兵種把少見兵種餓死
+        const count = k => voices.filter(v => v.kind === k).length, crowded = voices.reduce((m, v) => count(v.kind) > count(m.kind) ? v : m, voices[0]);
+        if (mine > 0 || count(crowded.kind) < 2) { dropped++; return; }
+        release(crowded); crowded.source.stop(); stolen++;
+      }
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffers[kind]; source.playbackRate.value = .94 + (played[kind] % 5) * .03; gain.gain.value = SOUNDS[kind].gain;
       const voice = { kind, source, gain };
       source.connect(gain).connect(gains.sfx); source.onended = () => release(voice);
       last[kind] = now; live.add(voice); played[kind]++; peak = Math.max(peak, live.size); source.start();
     },
-    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, musicSource, voices: live.size, peak, dropped, played: { ...played } }),
+    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, musicSource, voices: live.size, peak, dropped, stolen, played: { ...played } }),
   };
 }

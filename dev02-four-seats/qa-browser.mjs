@@ -223,7 +223,8 @@ await test('橫式設定按鈕不遮擋：844×390、1280×720 兩種開關組�
     if (SHOTS && w === 844) await page.shot(path.join(SHOTS, `display-phone-${flip ? 'off' : 'on'}.png`)); await page.done();
   }
 });
-await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、文字不溢出', async () => {
+await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、文字不溢出；畫面內核心的血條與數字不被裁切', async () => {
+  const shifted = new Set();
   for (const [w, h] of [[844, 340], [667, 375], [844, 375], [844, 390], [1280, 720], [1600, 900]]) for (const quality of ['std', 'high']) {
     const page = await open('S', { w, h, quality });
     const rows = await page.eval(`[...document.querySelectorAll('#bar button')].map(b => { const r = b.getBoundingClientRect(); return { id: b.id, x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), over: b.scrollWidth > b.clientWidth, bottom: r.bottom }; })`);
@@ -231,8 +232,11 @@ await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、�
     for (let i = 0; i < rows.length; i += 2) assert.equal(rows[i].y, rows[i + 1].y, `${w} 第 ${i / 2 + 1} 列`);
     assert(Math.max(...rows.map(r => r.w)) - Math.min(...rows.map(r => r.w)) <= 12 && new Set(rows.map(r => r.x)).size <= 4, `${w} ${JSON.stringify(rows)}`);
     assert(rows.every(r => !r.over && r.bottom <= h), `${w}x${h} ${JSON.stringify(rows)}`);
+    await page.eval('__step(2)'); const cores = await page.eval('__dev02.cores()'); // 核心在畫面內時，血量數字不得被左右緣裁切
+    for (const [id, c] of Object.entries(cores)) if (c.label && Math.abs(c.anchor[0]) < 1 && Math.abs(c.anchor[1]) < 1) { assert(c.screen[0] >= -1 && c.screen[1] <= 1, `${w}x${h} ${id} 核心血量 ${JSON.stringify(c)}`); if (c.shift) shifted.add(`${w}${id}`); }
     if (SHOTS) await page.shot(path.join(SHOTS, `hud-${w}-${quality}.png`)); await page.done();
   }
+  assert(shifted.has('667E'), '667 寬東席核心應平移（原本被右緣裁切）'); return `平移：${[...shifted].join(' ')}`;
 });
 await test('飛螳、死靈戰機飛行（離地、有影子）；重騎兵、刺蛇地面；破壞能低空懸浮', async () => {
   const page = await open('none', { seed: 11, quality: 'high' }); const seen = {}, want = ['dragoon', 'mutalisk', 'hydralisk', 'wraith', 'archon'];
@@ -353,7 +357,7 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   const page = await browser.open(`${url}#seed=11`, { stepped: true, prelude: `if (!sessionStorage.k) { localStorage.clear(); sessionStorage.k = 1 }` });
   await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)');
   assert.deepEqual([(await A(page)).state, (await A(page)).musicStarted], ['locked', false], '互動前不建立 AudioContext');
-  await page.clickOn('[data-seat="none"]'); await running(page); await page.until(`__dev02.audio().musicSource === 'track' && __dev02.audio().musicStarted`); let a = await A(page); // 內嵌 CC0 曲檔實際解碼 assert(a.musicStarted && a.music > 0 && a.sfx > 0);
+  await page.clickOn('[data-seat="none"]'); await running(page); await page.until(`__dev02.audio().musicSource === 'track' && __dev02.audio().musicStarted`); let a = await A(page); assert(a.musicStarted && a.music > 0 && a.sfx > 0); // 內嵌 CC0 曲檔實際解碼
   for (let i = 0; i < 600 && !(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped) && await page.eval('__dev02.mode()') === 'play'; i++) { await page.eval('__step(6)'); await sleep(8); a = await A(page); assert(a.voices <= 6, `聲部 ${a.voices}`); }
   assert(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped > 0 && a.peak >= 2 && a.peak <= 6, JSON.stringify(a));
   await sleep(700); assert.equal((await A(page)).voices, 0, '播完釋放聲部'); const total = v => Object.values(v.played).reduce((x, y) => x + y, 0), first = total(await A(page));
