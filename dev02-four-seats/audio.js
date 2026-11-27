@@ -20,7 +20,7 @@ export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼�
   if (!failed && levels.music) setTimeout(musicData, 200); // 開場閒置時先合成，避免第一次點擊停頓
   function sync() {
     if (!context) return;
-    if (quiet() || !levels.sfx) stopEffects();
+    if (quiet() || !levels.sfx || context.state !== 'running') stopEffects(); // 後者：系統中斷後由輸入恢復
     for (const k of ['music', 'sfx']) gains[k].gain.value = GAIN[levels[k]] * MIX[k];
     // state 要等 promise 完成才更新，所以每次都送出目標狀態；resume 完成後若目標已改為靜止再停一次
     if (wanted()) context.resume().then(() => { if (!wanted()) return context.suspend(); }).catch(() => {});
@@ -36,6 +36,7 @@ export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼�
       if (failed || (!levels.music && !levels.sfx)) return;
       if (!context) try {
         context = new Context();
+        context.onstatechange = () => { if (context.state !== 'running') stopEffects(); }; // 系統或瀏覽器自行中斷
         gains = Object.fromEntries(['music', 'sfx'].map(k => { const g = context.createGain(); g.connect(context.destination); return [k, g]; }));
         buffers = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, buffer(renderSound(k))]));
       } catch (error) { console.warn('聲音無法啟動', error); failed = true; context = null; return; }

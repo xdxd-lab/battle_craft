@@ -5,7 +5,9 @@ import { createAudio } from './audio.js';
 const pending = [], sources = [];
 const settle = async () => { for (let i = 0; i < 8; i++) { pending.splice(0).forEach(f => f()); await Promise.resolve(); await Promise.resolve(); } };
 const node = () => ({ gain: { value: 1 }, connected: false, connect(to) { this.connected = true; return to; }, disconnect() { this.connected = false; } });
+let made;
 class Context {
+  constructor() { made = this; }
   state = 'suspended'; destination = node();
   createGain() { return node(); }
   createBuffer(_, length) { const data = new Float32Array(length); return { getChannelData: () => data }; }
@@ -52,5 +54,11 @@ await test('快速切換只以最後狀態為準', async () => {
 await test('關閉音效即停掉發聲中的音效，音樂不受影響；再開局清空', async () => {
   fire(); const old = effects().slice(-3); levels.sfx = 0; audio.sync(); assert(stoppedAll(old)); assert.equal(audio.info().voices, 0); levels.sfx = 2; audio.sync(); await settle();
   fire(); const next = effects().slice(-3); audio.stopEffects(); assert(stoppedAll(next)); assert.equal(audio.info().voices, 0); assert.equal(music()[0].stopped, 0);
+});
+await test('系統中斷（state 非本頁改變）：舊音效清掉，輸入或系統恢復後不續播', async () => {
+  for (const notify of [true, false]) {
+    fire(); const old = effects().slice(-3); made.state = 'interrupted'; if (notify) made.onstatechange();
+    audio.unlock(); await settle(); assert.equal(audio.info().state, 'running'); assert(stoppedAll(old)); assert.equal(audio.info().voices, 0); assert.equal(music()[0].stopped, 0);
+  }
 });
 console.table(rows); console.log('audio playback QA: OK');
