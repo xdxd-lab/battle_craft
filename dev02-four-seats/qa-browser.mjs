@@ -5,6 +5,7 @@ import path from 'node:path';
 import { launch, sleep } from '../tools/browser.mjs';
 import * as S from './sim.mjs';
 import * as L from '../dev05-layout/layout.mjs';
+import { TRACKS, BATTLE_AT_SECONDS } from './music-tracks.mjs';
 
 // 三兵種本體三角面
 const stdTri = { marine: 192, dragoon: 148, mutalisk: 160, hydralisk: 216, archon: 196, wraith: 180 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436, hydralisk: 704, archon: 776, wraith: 448 };
@@ -365,7 +366,7 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   const page = await browser.open(`${url}#seed=11`, { stepped: true, prelude: `if (!sessionStorage.k) { localStorage.clear(); sessionStorage.k = 1 }` });
   await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)');
   assert.deepEqual([(await A(page)).state, (await A(page)).musicStarted], ['locked', false], '互動前不建立 AudioContext');
-  await page.clickOn('[data-seat="none"]'); await running(page); await page.until(`__dev02.audio().musicStarted`); let a = await A(page); assert(a.musicStarted && a.music > 0 && a.sfx > 0 && a.musicSource === 'synth', JSON.stringify(a)); // 預設合成音樂
+  await page.clickOn('[data-seat="none"]'); await running(page); await page.until(`__dev02.audio().musicStarted`); let a = await A(page); assert(a.musicStarted && a.music > 0 && a.sfx > 0 && a.musicSource === 'track' && a.phase === 'opening', JSON.stringify(a)); // 內嵌曲檔實際解碼、開場曲
   for (let i = 0; i < 600 && !(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped) && await page.eval('__dev02.mode()') === 'play'; i++) { await page.eval('__step(6)'); await sleep(8); a = await A(page); assert(a.voices <= 6, `聲部 ${a.voices}`); }
   assert(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped > 0 && a.peak >= 2 && a.peak <= 6, JSON.stringify(a));
   await sleep(700); assert.equal((await A(page)).voices, 0, '播完釋放聲部'); const total = v => Object.values(v.played).reduce((x, y) => x + y, 0), first = total(await A(page));
@@ -379,7 +380,7 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   await page.clickOn('#opt-sfx'); await page.clickOn('#opt-sfx'); const mute = (await A(page)).played; await page.eval('__step(200)'); assert.deepEqual((await A(page)).played, mute, '音效關閉不播放'); assert((await A(page)).music > 0, '音樂獨立'); await running(page);
   await page.clickOn('#opt-music'); await page.clickOn('#opt-music'); assert.equal(await label('opt-music'), '音樂：關'); await stopped(page); assert.equal((await A(page)).music, 0);
   await page.reload(); await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)'); assert.deepEqual([await label('opt-music'), await label('opt-sfx')], ['音樂：關', '音效：關']);
-  await page.clickOn('[data-seat="N"]'); assert.equal((await A(page)).state, 'locked', '全關時不建立'); await page.clickOn('#opt-music'); await running(page); await page.until(`__dev02.audio().musicStarted`); assert.deepEqual([await label('opt-music'), (await A(page)).musicSource], ['音樂：小', 'synth']);
+  await page.clickOn('[data-seat="N"]'); assert.equal((await A(page)).state, 'locked', '全關時不建立'); await page.clickOn('#opt-music'); await running(page); await page.until(`__dev02.audio().musicStarted`); await page.until(`__dev02.audio().musicSource === 'track'`); assert.equal(await label('opt-music'), '音樂：小');
   await page.eval(`localStorage.setItem('battle_craft.dev02.display', '{"music":9,"sfx":"x"}')`); await page.reload(); await page.until(`!!window.__dev02`); assert.deepEqual([await label('opt-music'), await label('opt-sfx')], ['音樂：中', '音效：中']); assert.deepEqual(page.errors, []); await page.close();
   const mutedRun = await open('N', { seed: 21 }), loudRun = await open('N', { seed: 21 });
   for (const id of ['#opt-music', '#opt-music', '#opt-sfx', '#opt-sfx']) await mutedRun.clickOn(id);
@@ -424,13 +425,20 @@ await test('聲音背景與恢復：隱藏／暫停期間戰鬥續跑不發新�
   await cover.close(); assert.deepEqual(real.errors, []); await real.close();
   return hidden ? '含真實分頁隱藏' : '真實分頁未能進入隱藏，僅模擬';
 });
-await test('終局：勝／敗皆立即停掉戰鬥音效且不再新啟動；只開音樂、只開音效、再來一局，音樂照設定', async () => {
+await test('終局與音樂階段：開場→激戰只切一次並維持到終局、曲名顯示；勝／敗立即停掉戰鬥音效且不再新啟動；只開音樂、只開音效、再來一局', async () => {
   const A = p => p.eval('__dev02.audio()'), total = v => Object.values(v.played).reduce((x, y) => x + y, 0), out = [];
   for (const [seat, music, sfx, seed] of [['S', true, true, 11], ['N', true, false, 11], ['E', false, true, 3]]) { // 種子 3 東席閒置仍勝（Node 搜尋）
     const page = await open(seat, { seed });
     if (!sfx) { await page.clickOn('#opt-sfx'); await page.clickOn('#opt-sfx'); } if (!music) { await page.clickOn('#opt-music'); await page.clickOn('#opt-music'); }
-    let a = await A(page), busy = 0;
-    for (let i = 0; i < 3000 && await page.eval('__dev02.mode()') === 'play'; i++) { await page.eval('__step(15)'); if (sfx && i % 10 === 0) { a = await A(page); busy = Math.max(busy, a.voices); } }
+    let a = await A(page), busy = 0; const phases = [];
+    if (music) { await page.until(`__dev02.audio().musicSource === 'track'`); a = await A(page); assert(TRACKS.some(t => t.id === a.track && t.phase === 'opening'), a.track); assert.equal(await page.eval(`document.getElementById('now-playing').hidden`), false); const label = await page.eval(`document.getElementById('now-playing').textContent`); assert(label.includes(TRACKS.find(t => t.id === a.track).title), label); }
+    else assert.equal(await page.eval(`document.getElementById('now-playing').hidden`), true, '音樂關閉不顯示曲名');
+    for (let i = 0; i < 3000 && await page.eval('__dev02.mode()') === 'play'; i++) {
+      await page.eval('__step(15)'); a = await A(page); busy = Math.max(busy, a.voices);
+      if (phases.at(-1)?.[0] !== a.phase) phases.push([a.phase, (await page.snap()).tick, Object.values((await page.snap()).seats).some(v => v.hp < S.coreMax(S.VERSION))]);
+    }
+    assert.deepEqual(phases.map(p => p[0]), ['opening', 'battle'], JSON.stringify(phases)); const [, at, hit] = phases[1]; assert(hit || at >= BATTLE_AT_SECONDS * S.HZ, '激戰觸發條件'); // 只切一次，維持到對局結束
+    if (music) { await page.until(`__dev02.audio().phase === 'battle' && __dev02.audio().musicSource === 'track'`); const now = (await A(page)).track; assert(TRACKS.some(t => t.id === now && t.phase === 'battle'), now); }
     assert.equal(await page.eval('__dev02.mode()'), 'end'); a = await A(page);
     const rec = await page.eval('__dev02.record()'); assert.equal(rec.digest, await page.eval('__dev02.digest()'), '終局紀錄應寫入摘要'); assert.equal(rec.ticks, (await page.snap()).tick); assert.match(rec.digest, /^[0-9a-f]{8}$/);
     assert.equal(a.voices, 0, `${seat} 終局仍有 ${a.voices} 個音效`); const played = total(a); if (sfx) assert(played > 0 && busy > 0); else assert.equal(played, 0, '只開音樂不得有音效');
@@ -438,9 +446,10 @@ await test('終局：勝／敗皆立即停掉戰鬥音效且不再新啟動；�
     assert(music ? a.musicStarted && a.music > 0 : a.music === 0, `音樂照設定 ${JSON.stringify(a)}`); if (music) assert.equal(a.state, 'running', '終局後音樂續播');
     const result = await page.eval(`document.getElementById('result').textContent`);
     await page.clickOn('#restart'); await page.clickOn(`[data-seat="${seat}"]`); await page.eval('__step(2)'); a = await A(page);
+    assert.equal(a.phase, 'opening', '新的一局回到開場');
     assert.equal(await page.eval('__dev02.mode()'), 'play'); assert.equal(a.voices, 0); assert(music ? a.musicStarted && a.music > 0 : a.music === 0);
     if (sfx) { for (let i = 0; i < 200 && total(await A(page)) === played; i++) await page.eval('__step(15)'); assert(total(await A(page)) > played, '再來一局音效恢復'); }
-    out.push(`${seat}${result}:${music ? '樂' : ''}${sfx ? '效' : ''}`); await page.done();
+    out.push(`${seat}${result}:${music ? '樂' : ''}${sfx ? '效' : ''}@${(phases[1][1] / S.HZ).toFixed(0)}s`); await page.done();
   }
   assert(out.some(r => r.includes('勝利')) && out.some(r => r.includes('敗北')), out.join(' ')); return out.join(' ');
 });

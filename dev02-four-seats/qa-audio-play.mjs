@@ -1,29 +1,34 @@
 // 播放行為驗收（純 Node）：以可手動完成 suspend／resume 的假 AudioContext 檢查非同步窗口、暫停、隱藏與恢復。
 import assert from 'node:assert/strict';
-import { createAudio } from './audio.js';
+import { createAudio, MUSIC_FADE } from './audio.js';
 
 const pending = [], sources = [];
 const settle = async () => { for (let i = 0; i < 8; i++) { pending.splice(0).forEach(f => f()); await Promise.resolve(); await Promise.resolve(); } };
-const node = () => ({ gain: { value: 1 }, connected: false, connect(to) { this.connected = true; this.to = to; return to; }, disconnect() { this.connected = false; } });
+const node = () => ({ gain: { value: 1, setValueAtTime(v) { this.value = v; }, linearRampToValueAtTime(v) { this.ramp = v; } }, connected: false, connect(to) { this.connected = true; this.to = to; return to; }, disconnect() { this.connected = false; } });
 let made;
 class Context {
   constructor() { made = this; }
-  state = 'suspended'; destination = node();
+  state = 'suspended'; destination = node(); currentTime = 0;
   createGain() { return node(); }
   createBuffer(_, length) { const data = new Float32Array(length); return { getChannelData: () => data }; }
-  createBufferSource() { const s = { ...node(), started: 0, stopped: 0, loop: false, playbackRate: { value: 1 }, start() { this.started++; }, stop() { this.stopped++; } }; sources.push(s); return s; }
+  createBufferSource() { const s = { ...node(), started: 0, stopped: 0, loop: false, playbackRate: { value: 1 }, start(when, offset) { this.started++; this.offset = offset; }, stop(when) { this.stopped++; this.stopAt = when; } }; sources.push(s); return s; }
   to(state) { return new Promise(done => pending.push(() => { this.state = state; done(); })); } // state 於稍後才更新
   resume() { return this.to('running'); }
   suspend() { return this.to('suspended'); }
 }
 let clock = 0;
-globalThis.window = { AudioContext: Context };
+const fakeTrack = (frames = 44100) => { const ch = [new Float32Array(frames), new Float32Array(frames)]; ch[0].fill(.3, 1000, frames - 500); return { numberOfChannels: 2, sampleRate: 44100, duration: frames / 44100, getChannelData: i => ch[i] }; };
+let decodes = 0, decodeResult = () => Promise.resolve(fakeTrack());
+class Offline { decodeAudioData(bytes) { decodes++; assert(bytes instanceof ArrayBuffer && bytes.byteLength > 0); return decodeResult(new TextDecoder().decode(bytes)); } }
+const T = (id, phase) => ({ id, phase, title: id.toUpperCase(), author: 'test', license: 'CC0', data: btoa(id) });
+const TRACKS = [T('o1', 'opening'), T('o2', 'opening'), T('o3', 'opening'), T('b1', 'battle'), T('b2', 'battle')];
+globalThis.window = { AudioContext: Context, OfflineAudioContext: Offline };
 globalThis.document = { hidden: false };
 Object.defineProperty(globalThis, 'performance', { value: { now: () => clock += 100 }, configurable: true });
 
 const rows = [], test = async (name, fn) => { await fn(); rows.push({ 案例: name }); };
-const levels = { music: 2, sfx: 2 }, audio = createAudio(levels);
-audio.unlock(); await settle();
+const levels = { music: 2, sfx: 2 }, audio = createAudio(levels, { tracks: TRACKS, random: () => 0 });
+audio.setPhase('opening'); audio.unlock(); await settle();
 const music = () => sources.filter(s => s.loop), effects = () => sources.filter(s => !s.loop);
 const fire = () => ['marine', 'dragoon', 'mutalisk'].forEach(k => audio.play(k));
 const stoppedAll = list => list.every(s => s.stopped === 1);
@@ -71,27 +76,45 @@ await test('系統自行恢復（沒有輸入、不呼叫 unlock／sync）：舊
 await test('漏掉中斷事件時，輸入恢復前的 sync 仍清掉舊音效', async () => {
   fire(); const old = effects().slice(-3); made.state = 'interrupted'; audio.unlock(); await settle(); assert.equal(audio.info().state, 'running'); silenced(old);
 });
-// 曲檔：以假的離線 context 控制解碼成功或失敗；開場 200 毫秒後才解碼
-const wait = ms => new Promise(done => setTimeout(done, ms));
-const fakeTrack = (frames = 44100) => { const ch = [new Float32Array(frames), new Float32Array(frames)]; ch[0].fill(.3, 1000, frames - 500); return { numberOfChannels: 2, sampleRate: 44100, duration: frames / 44100, getChannelData: i => ch[i] }; };
-let decodes = 0, decodeResult;
-window.OfflineAudioContext = class { decodeAudioData(bytes) { decodes++; assert(bytes instanceof ArrayBuffer && bytes.byteLength > 0); return decodeResult(); } };
-const fresh = async (lv, ok) => {
-  decodeResult = ok ? () => Promise.resolve(fakeTrack()) : () => Promise.reject(new Error('壞檔')); const warn = console.warn; console.warn = () => {};
-  const before = sources.length, a = createAudio(lv, { track: btoa('ID3fake') }); a.unlock(); await settle(); await wait(250); await settle(); console.warn = warn;
-  return { a, mine: () => sources.slice(before).filter(s => s.loop) };
+// 曲目與階段：random 依序取值決定選曲；解碼以假的離線 context 立即完成或失敗
+const run = async (lv, seq = [0], opts = {}) => {
+  let k = 0; const shown = [], before = sources.length, warn = console.warn; console.warn = () => {};
+  const a = createAudio(lv, { tracks: TRACKS, random: () => seq[k++ % seq.length], onTrack: t => shown.push(t?.id ?? null), ...opts }); a.unlock(); await settle();
+  const mine = () => sources.slice(before).filter(s => s.loop), restore = () => { console.warn = warn; };
+  return { a, mine, shown, restore };
 };
-await test('曲檔解碼成功：播放曲檔、略過頭尾補零設循環區間、從循環起點開始、只有一條', async () => {
-  const n = decodes, { a, mine } = await fresh({ music: 2, sfx: 2 }, true); assert.equal(decodes, n + 1); assert.equal(a.info().musicSource, 'track'); assert(a.info().musicStarted);
-  const [m] = mine(); assert.equal(mine().length, 1); assert.equal(m.loopStart, 1000 / 44100); assert.equal(m.loopEnd, (44100 - 500) / 44100); assert.equal(m.started, 1);
-  a.sync(); await settle(); assert.equal(mine().length, 1, 'sync 不重啟');
+await test('開場：隨機選一首開場曲，解碼後播放；略過頭尾補零設循環區間、從循環起點開始；sync 不重啟', async () => {
+  const { a, mine, shown, restore } = await run({ music: 2, sfx: 2 }, [.5]); a.setPhase('opening'); await settle(); restore();
+  assert.deepEqual([a.info().phase, a.info().track, a.info().musicSource], ['opening', 'o2', 'track']);
+  const [m] = mine(); assert.equal(mine().length, 1); assert.equal(m.loopStart, 1000 / 44100); assert.equal(m.loopEnd, (44100 - 500) / 44100); assert.equal(m.offset, m.loopStart);
+  a.sync(); a.setPhase('opening'); await settle(); assert.equal(mine().length, 1, '同階段不重啟'); assert.deepEqual(shown, ['o2']);
 });
-await test('曲檔解碼失敗：退回合成音樂，仍只有一條', async () => {
-  const { a, mine } = await fresh({ music: 2, sfx: 2 }, false); assert.equal(a.info().musicSource, 'synth'); assert.equal(mine().length, 1); assert(a.info().musicStarted);
+await test('激戰：只切一次、交叉淡入（舊曲排程停止、新曲漸強）；舊曲播完即釋放解碼；再呼叫不換曲', async () => {
+  const { a, mine, shown, restore } = await run({ music: 2, sfx: 2 }, [0, .99]); a.setPhase('opening'); await settle();
+  const [old] = mine(); a.setPhase('battle'); await settle(); restore();
+  assert.deepEqual([a.info().phase, a.info().track], ['battle', 'b2']); assert.equal(mine().length, 2);
+  assert.equal(old.stopped, 1); assert.equal(old.stopAt, MUSIC_FADE, '舊曲淡出後停'); assert.equal(mine()[1].to.gain.ramp, 1, '新曲漸強');
+  assert.deepEqual(a.info().decoded.sort(), ['b2', 'o1']); old.onended(); assert.deepEqual(a.info().decoded, ['b2'], '淡出完成後釋放舊曲');
+  a.setPhase('battle'); await settle(); assert.equal(mine().length, 2); assert.equal(a.info().switches, 2); assert.deepEqual(shown, ['o1', 'b2']);
 });
-await test('音樂關閉時不解碼；打開後才解碼並播放', async () => {
-  const lv = { music: 0, sfx: 2 }, n = decodes, { a, mine } = await fresh(lv, true); assert.equal(decodes, n); assert.equal(a.info().musicSource, 'idle'); assert.equal(mine().length, 0);
-  lv.music = 2; a.sync(); await settle(); assert.equal(decodes, n + 1); assert.equal(a.info().musicSource, 'track'); assert.equal(mine().length, 1);
+await test('新的一局：重新隨機選開場曲並交叉換曲', async () => {
+  const { a, restore } = await run({ music: 2, sfx: 2 }, [0, 0, .7]); a.setPhase('opening'); await settle(); a.setPhase('battle'); await settle();
+  a.setPhase('opening', true); await settle(); restore(); assert.deepEqual([a.info().phase, a.info().track], ['opening', 'o3']);
+});
+await test('解碼失敗：改選同階段其他曲；同階段全壞則不播音樂、不出錯', async () => {
+  decodeResult = id => id === 'o1' ? Promise.reject(new Error('壞檔')) : Promise.resolve(fakeTrack());
+  let r = await run({ music: 2, sfx: 2 }, [0]); r.a.setPhase('opening'); await settle(); r.restore(); assert.equal(r.a.info().track, 'o2');
+  decodeResult = () => Promise.reject(new Error('壞檔'));
+  r = await run({ music: 2, sfx: 2 }, [0]); r.a.setPhase('opening'); await settle(); r.restore(); assert.deepEqual([r.a.info().track, r.a.info().musicSource, r.mine().length], [null, 'none', 0]);
+  decodeResult = () => Promise.resolve(fakeTrack());
+});
+await test('音樂關閉：不解碼、不播放；播放中關閉立即停止；再打開重新播放同一首', async () => {
+  const lv = { music: 0, sfx: 2 }, n = decodes, { a, mine, shown, restore } = await run(lv, [0]); a.setPhase('opening'); await settle();
+  assert.equal(decodes, n); assert.equal(a.info().musicSource, 'off'); assert.equal(mine().length, 0);
+  lv.music = 2; a.sync(); await settle(); assert.equal(decodes, n + 1); assert.equal(a.info().track, 'o1'); assert.equal(mine().length, 1);
+  lv.music = 0; a.sync(); assert.equal(mine()[0].stopped, 1, '關閉立即停'); assert.equal(a.info().track, null);
+  lv.music = 1; a.sync(); await settle(); restore(); assert.equal(mine().length, 2); assert.equal(a.info().track, 'o1'); assert.equal(decodes, n + 1, '不重複解碼');
+  assert.deepEqual(shown, ['o1', null, 'o1'], '曲名顯示跟著開關');
 });
 await test('聲部滿載：未發聲的兵種搶占最擁擠兵種的最舊聲部；已在發聲的兵種與平均分配時照舊略過', async () => {
   const a = createAudio({ music: 0, sfx: 2 }); a.unlock(); await settle();

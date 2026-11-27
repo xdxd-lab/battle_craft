@@ -1,10 +1,11 @@
 // 瀏覽器端播放：互動後才建立 AudioContext；音樂、音效分開調整；限制同時聲部與觸發間隔。只讀事件，不影響模擬。
-// 背景音樂優先用內嵌的 CC0 循環曲（呼叫端傳入 base64 MP3），解碼失敗或未提供時改用程序合成。
-import { RATE, SOUNDS, renderSound, renderMusic } from './audio-synth.mjs';
+// 背景音樂：內嵌曲檔（呼叫端傳入 base64 MP3），分開場／激戰兩階段，各階段隨機選一首；換曲交叉淡入。音樂關閉時不解碼、不播放。
+import { RATE, SOUNDS, renderSound } from './audio-synth.mjs';
 
 export const LEVEL_NAMES = ['關', '小', '中', '大'];
 const GAIN = [0, .3, .6, 1];
-const MIX = { music: .4, sfx: .5 };
+const MIX = { music: .8, sfx: .4 }; // 2026-11-27 依遊戲內實錄調整：原 .4／.5 時音樂「中」比音效低約 7 dB，被蓋過
+export const MUSIC_FADE = 1.5; // 換曲交叉淡入秒數
 export const LIMIT = { total: 6, perKind: 3, gap: .07 }; // 同時聲部、單一兵種聲部、同兵種最短間隔（實際秒數，不隨遊戲倍速）
 
 export const TRIM_LIMIT = 2400; // 解碼後頭尾最多略過的靜音 frame（MP3 編碼器補零），約 50 毫秒
@@ -14,7 +15,7 @@ export function loopRange(channels, limit = TRIM_LIMIT, floor = 1e-4) {
   let a = 0, b = n; while (a < Math.min(limit, n) && !loud(a)) a++; while (b > Math.max(n - limit, a + 1) && !loud(b - 1)) b--;
   return [a, b];
 }
-export function createAudio(levels, { track = null } = {}) { // levels：{ music, sfx } 0～3，由呼叫端持有與保存
+export function createAudio(levels, { tracks = [], random = Math.random, onTrack = () => {} } = {}) { // levels：{ music, sfx } 0～3，由呼叫端持有與保存
   const Context = window.AudioContext || window.webkitAudioContext;
   const played = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, 0])), last = {}, live = new Set(); // live：發聲中的戰鬥音效
   let context = null, gains = null, buffers = null, paused = false, failed = !Context, peak = 0, dropped = 0, stolen = 0, musicStarted = false;
@@ -24,17 +25,40 @@ export function createAudio(levels, { track = null } = {}) { // levels：{ music
   const buffer = data => { const b = context.createBuffer(1, data.length, RATE); b.getChannelData(0).set(data); return b; };
   const quiet = () => paused || document.hidden;
   const wanted = () => !quiet() && (levels.music > 0 || levels.sfx > 0);
-  let music = null, musicSource = track ? 'pending' : 'synth', trackBuffer = null; const musicData = () => music ??= renderMusic();
-  // 曲檔以離線 context 解碼（不需使用者互動），完成後若已解鎖就開始播放；失敗則退回合成
-  function decodeTrack() {
+  // 音樂：want＝本階段選中的曲；current＝正在播的曲。只保留 want 與 current 的解碼結果，換曲完成即釋放
+  let phase = null, want = null, current = null, switches = 0; const decoded = new Map(), decoding = new Set(), broken = new Set();
+  const pick = p => { const list = tracks.filter(t => t.phase === p && !broken.has(t.id)); return list.length ? list[Math.floor(random() * list.length)] : null; };
+  function load(t) { // 曲檔以離線 context 解碼（不需使用者互動）；完成後若已解鎖就開始播放
+    if (decoded.has(t.id) || decoding.has(t.id)) return;
+    decoding.add(t.id);
+    const fail = error => { decoding.delete(t.id); broken.add(t.id); console.warn(`背景音樂 ${t.title} 無法解碼，改選同階段其他曲`, error); if (want === t) { want = pick(phase); if (want && levels.music) load(want); } musicChanged(); };
     try {
-      const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext, bytes = Uint8Array.from(atob(track), c => c.charCodeAt(0));
-      new Offline(2, 1, 44100).decodeAudioData(bytes.buffer).then(b => { trackBuffer = b; musicSource = 'track'; if (context) sync(); }, fail);
+      const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext, bytes = Uint8Array.from(atob(t.data), c => c.charCodeAt(0));
+      new Offline(2, 1, 44100).decodeAudioData(bytes.buffer).then(b => { decoding.delete(t.id); if (t === want || t === current?.track) decoded.set(t.id, b); sync(); }, fail);
     } catch (error) { fail(error); }
   }
-  function fail(error) { console.warn('背景音樂曲檔無法解碼，改用合成', error); musicSource = 'synth'; musicData(); if (context) sync(); }
-  if (!failed && levels.music) setTimeout(track ? decodeTrack : musicData, 200); // 開場閒置時先準備，避免第一次點擊停頓
-  else if (!failed && track) musicSource = 'idle'; // 音樂關閉時不解碼；之後打開再解碼
+  const at = () => context.currentTime;
+  function fadeOut(m) { // 淡出後停掉並釋放（不是 want 才釋放解碼結果）
+    m.gain.gain.setValueAtTime(m.gain.gain.value, at()); m.gain.gain.linearRampToValueAtTime(0, at() + MUSIC_FADE);
+    m.source.stop(at() + MUSIC_FADE); m.source.onended = () => { m.gain.disconnect(); if (m.track !== want && m.track !== current?.track) decoded.delete(m.track.id); };
+  }
+  function syncMusic() {
+    if (!levels.music || !want) { if (current) { current.source.onended = null; current.source.stop(); current.gain.disconnect(); current = null; musicChanged(); } return; } // 關閉音樂：立即停，不出聲
+    if (current?.track === want) return;
+    const b = decoded.get(want.id); if (!b) { load(want); return; }
+    const [a, e] = loopRange([...Array(b.numberOfChannels)].map((_, i) => b.getChannelData(i)));
+    const source = context.createBufferSource(), gain = context.createGain();
+    source.buffer = b; source.loop = true; source.loopStart = a / b.sampleRate; source.loopEnd = e / b.sampleRate; source.connect(gain).connect(gains.music);
+    const first = !current; gain.gain.setValueAtTime(first ? 1 : 0, at()); if (!first) { gain.gain.linearRampToValueAtTime(1, at() + MUSIC_FADE); fadeOut(current); }
+    source.start(0, source.loopStart); current = { track: want, source, gain }; musicStarted = true; switches++; musicChanged();
+  }
+  function musicChanged() { onTrack(current && levels.music ? current.track : null); }
+  // 進入階段：同階段重呼叫不換曲；repick（新的一局）時重新隨機
+  function setPhase(p, repick = false) {
+    if (p === phase && !repick) return;
+    phase = p; const next = pick(p); if (want && want !== current?.track && want !== next) decoded.delete(want.id); want = next;
+    if (want && levels.music) load(want); sync();
+  }
   function sync() {
     if (!context) return;
     if (quiet() || !levels.sfx || context.state !== 'running') stopEffects(); // 後者：系統中斷後由輸入恢復
@@ -42,16 +66,10 @@ export function createAudio(levels, { track = null } = {}) { // levels：{ music
     // state 要等 promise 完成才更新，所以每次都送出目標狀態；resume 完成後若目標已改為靜止再停一次
     if (wanted()) context.resume().then(() => { if (!wanted()) return context.suspend(); }).catch(() => {});
     else context.suspend().catch(() => {});
-    if (levels.music && musicSource === 'idle') { musicSource = 'pending'; decodeTrack(); }
-    if (levels.music && !musicStarted && musicSource !== 'pending') {
-      musicStarted = true;
-      const source = context.createBufferSource();
-      if (musicSource === 'track') { const [a, b] = loopRange([...Array(trackBuffer.numberOfChannels)].map((_, i) => trackBuffer.getChannelData(i))); source.buffer = trackBuffer; source.loopStart = a / trackBuffer.sampleRate; source.loopEnd = b / trackBuffer.sampleRate; source.loop = true; source.connect(gains.music); source.start(0, source.loopStart); }
-      else { source.buffer = buffer(musicData()); source.loop = true; source.connect(gains.music); source.start(); }
-    }
+    syncMusic();
   }
   return {
-    sync, stopEffects,
+    sync, stopEffects, setPhase,
     unlock() {
       if (failed || (!levels.music && !levels.sfx)) return;
       if (!context) try {
@@ -80,6 +98,6 @@ export function createAudio(levels, { track = null } = {}) { // levels：{ music
       source.connect(gain).connect(gains.sfx); source.onended = () => release(voice);
       last[kind] = now; live.add(voice); played[kind]++; peak = Math.max(peak, live.size); source.start();
     },
-    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, musicSource, voices: live.size, peak, dropped, stolen, played: { ...played } }),
+    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, musicSource: !levels.music ? 'off' : current ? 'track' : want ? 'pending' : 'none', phase, track: current?.track.id ?? null, wanted: want?.id ?? null, decoded: [...decoded.keys()], switches, voices: live.size, peak, dropped, stolen, played: { ...played } }),
   };
 }

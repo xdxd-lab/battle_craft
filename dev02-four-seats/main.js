@@ -9,7 +9,8 @@ import { createDossier } from './dossier.js';
 import { detailCommander, detailMaterials, triangles } from './detail-models.js';
 import { unitModels, FLY_HEIGHT, WING_HINGE, HOVER_HEIGHT } from './unit-models.js';
 import { createAudio, LEVEL_NAMES } from './audio.js';
-import MUSIC_TRACK from './music-data.generated.js';
+import MUSIC_DATA from './music-data.generated.js';
+import { TRACKS, PHASE_NAMES, battleDue } from './music-tracks.mjs';
 import { KINDS, KIND_IDS, ATTACKS, CORE } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
@@ -17,7 +18,7 @@ import { createCoreStatus } from './core-status.js';
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
 const SPEEDS = [1, 2, 4], DEFAULT_SPEED = 1;
-let state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
+let inBattle = false, state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
 let renderer, camera, dossier, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
 
 // ---------- 場景物件 ----------
@@ -323,6 +324,7 @@ function start(id, seed = (Date.now() ^ (Math.random() * 2 ** 32)) >>> 0) {
   seat = L.seatById(id) ? id : null;
   record = { version: S.VERSION, seed, bots: S.SEAT_IDS.filter(x => x !== seat), commands: [] };
   state = S.createSim(record); queue = []; keys.clear(); accumulator = 0; mode = 'play'; speed = DEFAULT_SPEED; logRows = [];
+  inBattle = false; audio.setPhase('opening', true); // 每局重新隨機選開場曲
   mouse = null; dossier.reset();
   $('log').replaceChildren(); W.clear(fallGroup); shots.live = []; puffs.live = []; prevPos = new Map(); prevShots = new Map();
   buildPads(); setFraming(false); setView(L.parseView(seat ? `seat:${seat}` : 'team:A'), true); shopUi(); $('cover').hidden = true; canvas.focus(); hud();
@@ -348,6 +350,7 @@ function tick() {
     if (e.type === 'fall') markFallen(e.seat);
     logRows.push(e); write(e);
   }
+  if (!inBattle && battleDue(state, CORE_MAX, S.HZ)) { inBattle = true; audio.setPhase('battle'); } // 激戰：只切一次，維持到對局結束
   while (shots.live.length > 120) shots.live.shift(); while (puffs.live.length > 120) puffs.live.shift();
   if (state.mode === 'end') finish();
 }
@@ -392,7 +395,8 @@ for (const k of ['bars', 'log']) display[k] = display[k] !== false;
 display.engineering = display.engineering === true;
 for (const k of ['music', 'sfx']) if (![0, 1, 2, 3].includes(display[k])) display[k] = 2;
 // 聲音：瀏覽器要求互動後才能出聲，第一次點擊或按鍵才建立 AudioContext
-const audio = createAudio(display, { track: hash.get('music') === 'track' ? MUSIC_TRACK : null }); // 預設用合成音樂；〈Pulse〉實測大段近乎無聲、只剩零星脈衝（見 research/BC-MUSIC.md），待使用者選曲。#music=track 只在本次改用曲檔對照
+const nowPlaying = t => { const e = $('now-playing'); e.hidden = !t; e.textContent = t ? `♪ ${PHASE_NAMES[t.phase]}｜${t.title} — ${t.author}（${t.license}）` : ''; }; // 顯示目前曲名
+const audio = createAudio(display, { tracks: TRACKS.map(t => ({ ...t, data: MUSIC_DATA[t.id] })), onTrack: nowPlaying }); // 開場／激戰各自隨機選曲，只影響呈現，不碰模擬
 for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, () => audio.unlock(), true);
 function applyDisplay(save) {
   document.body.classList.toggle('no-bars', !display.bars); document.body.classList.toggle('no-log', !display.log);

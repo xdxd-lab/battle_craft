@@ -7,7 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parent
 VENDOR = ROOT.parent / 'vendor'
 ESBUILD = ROOT.parent / 'node_modules/.bin/esbuild'
 
-import base64, json
+import base64, json, re
 PH = ROOT.parent / 'assets/polyhaven'
 data = {name: 'data:image/jpeg;base64,' + base64.b64encode((PH / file).read_bytes()).decode('ascii') for name, file in {
     'floor_diff_512': 'painted_concrete_02_diff_512.jpg', 'floor_rough_512': 'painted_concrete_02_rough_512.jpg',
@@ -15,8 +15,11 @@ data = {name: 'data:image/jpeg;base64,' + base64.b64encode((PH / file).read_byte
     'floor_diff_2k': 'hi/floor_diff_2k.jpg', 'floor_rough_2k': 'hi/floor_rough_2k.jpg', 'floor_nor_2k': 'hi/floor_nor_gl_2k.jpg', 'ground_diff_4k': 'hi/ground_diff_4k.jpg'}.items()}
 (ROOT / 'surface-data.generated.js').write_text('export default ' + json.dumps(data) + ';\n')
 VEND = VENDOR
-# 背景音樂：CC0 循環曲（來源與處理見 assets/music/README.md），以 base64 內嵌供離線單檔使用
-(ROOT / 'music-data.generated.js').write_text('export default ' + json.dumps(base64.b64encode((ROOT.parent / 'assets/music/pulse-loop.mp3').read_bytes()).decode('ascii')) + ';\n')
+# 背景音樂：music-tracks.mjs 列出的循環曲（來源與處理見 assets/music/README.md），以 base64 內嵌供離線單檔使用
+MUSIC = ROOT.parent / 'assets/music'
+files = re.findall(r"id: '([^']+)', file: '([^']+)'", (ROOT / 'music-tracks.mjs').read_text())
+assert len(files) >= 2, files
+(ROOT / 'music-data.generated.js').write_text('export default ' + json.dumps({i: base64.b64encode((MUSIC / f).read_bytes()).decode('ascii') for i, f in files}) + ';\n')
 GARDEN = ROOT.parent / 'assets/3dgarden'
 b64 = lambda p: base64.b64encode(p.read_bytes()).decode('ascii')
 (ROOT / 'prop-data.generated.js').write_text('export default ' + json.dumps({

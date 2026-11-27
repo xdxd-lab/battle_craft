@@ -1,9 +1,10 @@
-// 合成音訊驗收（純 Node）：長度、音量範圍、彼此可區分、背景音樂循環接點；合成器不引入音檔，播放端只解碼內嵌的 CC0 曲檔。
+// 合成音訊驗收（純 Node）：長度、音量範圍、彼此可區分、背景音樂循環接點；合成器不引入音檔，播放端只解碼內嵌的 CC0 曲檔；曲目表與激戰觸發。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { RATE, SOUNDS, MUSIC, renderSound, renderMusic } from './audio-synth.mjs';
 import { KIND_IDS } from './roster.mjs';
 import { loopRange, TRIM_LIMIT } from './audio.js';
+import { TRACKS, PHASES, BATTLE_AT_SECONDS, battleDue } from './music-tracks.mjs';
 
 const rows = [], test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
 const rms = d => Math.sqrt(d.reduce((a, v) => a + v * v, 0) / d.length), peak = d => d.reduce((a, v) => Math.max(a, Math.abs(v)), 0);
@@ -17,7 +18,7 @@ test('六個音效彼此可區分（亮度兩兩相差 8% 以上）', () => {
   const all = KIND_IDS.map(k => brightness(renderSound(k))); for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) assert(Math.abs(all[i] / all[j] - 1) > .08, `${KIND_IDS[i]} ${KIND_IDS[j]} ${all[i]} ${all[j]}`);
   return KIND_IDS.map((k, i) => `${k} ${all[i].toFixed(0)}`).join('、');
 });
-test('背景音樂：24 秒循環、不削波、接點無跳變、各小節皆有聲', () => {
+test('合成背景音樂（2026-11-27 起不播放，保留對照）：24 秒循環、不削波、接點無跳變、各小節皆有聲', () => {
   const d = renderMusic(), bar = d.length / 8;
   assert.equal(d.length, Math.round(MUSIC.beats * 60 / MUSIC.bpm * RATE)); assert(Math.abs(peak(d) - .8) < 1e-6);
   let step = 0; for (let i = 1; i < d.length; i++) step = Math.max(step, Math.abs(d[i] - d[i - 1]));
@@ -31,9 +32,17 @@ test('不從網路或外部路徑載入音檔：合成器不碰音檔；播放�
   assert(!/fetch\(|new Audio|\.(mp3|ogg|wav|m4a)|data:audio|XMLHttpRequest/i.test(src('audio.js')), 'audio.js');
   assert.equal(src('audio.js').match(/decodeAudioData/g).length, 1, '只有一處解碼');
 });
-test('單檔 HTML 內嵌的曲檔與 assets/music/pulse-loop.mp3 位元相同', () => { // 讀已追蹤的輸出，不需先建置
-  const file = fs.readFileSync(new URL('../assets/music/pulse-loop.mp3', import.meta.url));
-  assert(fs.readFileSync(new URL('battle_craft-dev02.html', import.meta.url), 'utf8').includes(`"${file.toString('base64')}"`)); return `${file.length} B`;
+test('曲目表：開場／激戰各至少兩首、id 不重複、檔案存在且皆 CC0；單檔 HTML 內嵌位元相同', () => { // 讀已追蹤的輸出，不需先建置
+  assert.deepEqual(PHASES.map(p => TRACKS.filter(t => t.phase === p).length >= 2), [true, true]); assert.equal(new Set(TRACKS.map(t => t.id)).size, TRACKS.length);
+  const html = fs.readFileSync(new URL('battle_craft-dev02.html', import.meta.url), 'utf8');
+  return TRACKS.map(t => { assert.equal(t.license, 'CC0', t.id); const file = fs.readFileSync(new URL(`../assets/music/${t.file}`, import.meta.url)); assert(html.includes(`"${file.toString('base64')}"`), t.id); return `${t.id} ${file.length} B`; }).join('、');
+});
+test('激戰觸發：任一核心首次受損或滿 BATTLE_AT_SECONDS 秒，取較早者', () => {
+  const seats = hp => ({ N: { hp: 900 }, S: { hp } });
+  assert.equal(battleDue({ tick: 0, seats: seats(900) }, 900, 30), false);
+  assert.equal(battleDue({ tick: 30 * BATTLE_AT_SECONDS - 1, seats: seats(900) }, 900, 30), false);
+  assert.equal(battleDue({ tick: 30 * BATTLE_AT_SECONDS, seats: seats(900) }, 900, 30), true);
+  assert.equal(battleDue({ tick: 10, seats: seats(899.5) }, 900, 30), true); return `${BATTLE_AT_SECONDS} 秒`;
 });
 test('循環區間：略過頭尾補零（上限 TRIM_LIMIT），兩聲道取有聲者', () => {
   const ch = n => new Float32Array(n), a = ch(10000), b = ch(10000); a.fill(.5, 300, 9000); b.fill(.5, 200, 8000);
