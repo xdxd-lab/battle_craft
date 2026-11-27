@@ -235,6 +235,12 @@ await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、�
     assert(rows.every(r => !r.over && r.bottom <= h), `${w}x${h} ${JSON.stringify(rows)}`);
     await page.eval('__step(2)'); const cores = await page.eval('__dev02.cores()'); // 核心在畫面內時，血量數字不得被左右緣裁切
     for (const [id, c] of Object.entries(cores)) if (c.label && Math.abs(c.anchor[0]) < 1 && Math.abs(c.anchor[1]) < 1) { assert(c.screen[0] >= -1 && c.screen[1] <= 1, `${w}x${h} ${id} 核心血量 ${JSON.stringify(c)}`); if (c.shift) shifted.add(`${w}${id}`); }
+    await page.until(`__dev02.audio().musicSource === 'track'`); // 曲名列：可見、不超出畫面底部、不撐寬側欄、不蓋到按鈕
+    const np = await page.eval(`(() => { const e = document.getElementById('now-playing'), r = e.getBoundingClientRect(), p = e.parentElement.getBoundingClientRect(), b = document.getElementById('opt-sfx').getBoundingClientRect(); return { hidden: e.hidden, text: e.textContent, bottom: r.bottom, right: r.right, pright: p.right, wide: e.scrollWidth > e.clientWidth, below: r.top >= b.bottom - 1 }; })()`);
+    assert(!np.hidden && np.text.includes('♪') && np.bottom <= h && np.right <= np.pright + 1 && !np.wide && np.below, `${w}x${h} 曲名列 ${JSON.stringify(np)}`);
+    const longest = TRACKS.map(t => `♪ ${t.phase === 'opening' ? '開場' : '激戰'}｜${t.title} — ${t.author}（${t.license}）`).sort((x, y) => y.length - x.length)[0]; // 最長曲名也要放得下
+    const fit = await page.eval(`(() => { const e = document.getElementById('now-playing'), old = e.textContent; e.textContent = ${JSON.stringify(longest)}; const r = e.getBoundingClientRect(), ok = r.bottom <= ${h} && e.scrollWidth <= e.clientWidth; e.textContent = old; return ok; })()`); assert(fit, `${w}x${h} 最長曲名放不下`);
+    const again = await page.eval(`[...document.querySelectorAll('#bar button')].map(b => Math.round(b.getBoundingClientRect().width))`); assert.deepEqual(again, rows.map(r => r.w), '曲名列不改變按鈕寬度');
     if (SHOTS) await page.shot(path.join(SHOTS, `hud-${w}-${quality}.png`)); await page.done();
   }
   assert(shifted.has('667E'), '667 寬東席核心應平移（原本被右緣裁切）'); return `平移：${[...shifted].join(' ')}`;

@@ -32,10 +32,10 @@ test('不從網路或外部路徑載入音檔：合成器不碰音檔；播放�
   assert(!/fetch\(|new Audio|\.(mp3|ogg|wav|m4a)|data:audio|XMLHttpRequest/i.test(src('audio.js')), 'audio.js');
   assert.equal(src('audio.js').match(/decodeAudioData/g).length, 1, '只有一處解碼');
 });
-test('曲目表：開場／激戰各至少兩首、id 不重複、檔案存在且皆 CC0；單檔 HTML 內嵌位元相同', () => { // 讀已追蹤的輸出，不需先建置
-  assert.deepEqual(PHASES.map(p => TRACKS.filter(t => t.phase === p).length >= 2), [true, true]); assert.equal(new Set(TRACKS.map(t => t.id)).size, TRACKS.length);
+test('曲目表：開場／激戰各三首、id 不重複、檔案存在、授權為 CC0 或 CC BY 4.0（須署名）；單檔 HTML 內嵌位元相同', () => { // 讀已追蹤的輸出，不需先建置
+  assert.deepEqual(PHASES.map(p => TRACKS.filter(t => t.phase === p).length), [3, 3], '使用者指定開場、激戰各三首'); assert.equal(new Set(TRACKS.map(t => t.id)).size, TRACKS.length);
   const html = fs.readFileSync(new URL('battle_craft-dev02.html', import.meta.url), 'utf8');
-  return TRACKS.map(t => { assert.equal(t.license, 'CC0', t.id); const file = fs.readFileSync(new URL(`../assets/music/${t.file}`, import.meta.url)); assert(html.includes(`"${file.toString('base64')}"`), t.id); return `${t.id} ${file.length} B`; }).join('、');
+  return TRACKS.map(t => { assert(['CC0', 'CC BY 4.0'].includes(t.license) && t.title && t.author, t.id); if (t.license !== 'CC0') assert(t.credit.startsWith(`"${t.title}" ${t.author} (incompetech.com) Licensed under Creative Commons: By Attribution 4.0`) && t.credit.includes('creativecommons.org/licenses/by/4.0') && t.credit.includes('調整'), '署名格式（incompetech 原站 Attribution Code＋修改說明）'); const file = fs.readFileSync(new URL(`../assets/music/${t.file}`, import.meta.url)); assert(html.includes(`"${file.toString('base64')}"`), t.id); return `${t.id} ${file.length} B`; }).join('、');
 });
 test('激戰觸發：任一核心首次受損或滿 BATTLE_AT_SECONDS 秒，取較早者', () => {
   const seats = hp => ({ N: { hp: 900 }, S: { hp } });

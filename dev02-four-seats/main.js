@@ -10,7 +10,7 @@ import { detailCommander, detailMaterials, triangles } from './detail-models.js'
 import { unitModels, FLY_HEIGHT, WING_HINGE, HOVER_HEIGHT } from './unit-models.js';
 import { createAudio, LEVEL_NAMES } from './audio.js';
 import MUSIC_DATA from './music-data.generated.js';
-import { TRACKS, PHASE_NAMES, battleDue } from './music-tracks.mjs';
+import { TRACKS, PHASE_NAMES, MUSIC_CREDITS, battleDue } from './music-tracks.mjs';
 import { KINDS, KIND_IDS, ATTACKS, CORE } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
@@ -362,7 +362,7 @@ function finish() {
 }
 function menu() {
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。六座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按 1／2／3 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。六座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按 1／2／3 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
@@ -395,7 +395,7 @@ for (const k of ['bars', 'log']) display[k] = display[k] !== false;
 display.engineering = display.engineering === true;
 for (const k of ['music', 'sfx']) if (![0, 1, 2, 3].includes(display[k])) display[k] = 2;
 // 聲音：瀏覽器要求互動後才能出聲，第一次點擊或按鍵才建立 AudioContext
-const nowPlaying = t => { const e = $('now-playing'); e.hidden = !t; e.textContent = t ? `♪ ${PHASE_NAMES[t.phase]}｜${t.title} — ${t.author}（${t.license}）` : ''; }; // 顯示目前曲名
+const nowPlaying = t => { const e = $('now-playing'); e.hidden = !t; e.textContent = t ? `♪ ${PHASE_NAMES[t.phase]}｜${t.title} — ${t.author}（${t.license}）` : ''; e.title = t?.credit ?? ''; }; // 顯示目前曲名
 const audio = createAudio(display, { tracks: TRACKS.map(t => ({ ...t, data: MUSIC_DATA[t.id] })), onTrack: nowPlaying }); // 開場／激戰各自隨機選曲，只影響呈現，不碰模擬
 for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, () => audio.unlock(), true);
 function applyDisplay(save) {

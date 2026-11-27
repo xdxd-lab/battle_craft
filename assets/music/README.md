@@ -1,10 +1,10 @@
-# 背景音樂（CC0）
+# 背景音樂（CC0／CC BY 4.0）
 
 DEV02 的背景音樂由使用者於 2026-11-27 試聽後選定，分「開場」與「激戰」兩個階段。曲目表與觸發條件見 [dev02-four-seats/music-tracks.mjs](../../dev02-four-seats/music-tracks.mjs)，選曲與量測經過見 [research/BC-MUSIC.md](../../research/BC-MUSIC.md)。建置時，`dev02-four-seats/build.py` 會把這裡的 MP3 以 base64 內嵌進單檔 HTML，離線開啟也能播放。
 
 ## 曲目、來源與授權
 
-所有原檔都在 2026-11-27 從 OpenGameArt 下載，頁面的授權欄都是 CC0，頁面快照存在本機。
+前五首於 2026-11-27 從 OpenGameArt 下載，頁面的授權欄都是 CC0，頁面快照存在本機。Volatile Reaction 於 2026-11-28 從 incompetech 下載，授權為 CC BY 4.0，詳見下方。
 
 | 檔案 | 階段 | 曲名／作者 | 頁面 | 原檔（下載網址的檔名、位元組、md5） |
 | --- | --- | --- | --- | --- |
@@ -13,15 +13,18 @@ DEV02 的背景音樂由使用者於 2026-11-27 試聽後選定，分「開場�
 | urgent.mp3 | 開場 | Urgent／SRG774 | 同上 | `urgent_2.ogg`，828,217 B，`4bca5249ebb7f99b94eabc117bd9b239` |
 | space-battle.mp3 | 激戰 | Space Battle／MintoDog | [Space Battle](https://opengameart.org/content/space-battle) | `space_battle_bpm130.mp3`，3,547,547 B，`d578fefc12b1100f3735e710747f7b86` |
 | claimed-by-the-void.mp3 | 激戰 | Claimed by the Void（loop 版）／Vitalezzz | [Claimed by the Void](https://opengameart.org/content/claimed-by-the-void) | `claimed_by_the_void_loop.mp3`，7,801,264 B，`568414fb9b936e8eb820a3c31f8c8fb7` |
+| volatile-reaction.mp3 | 激戰 | Volatile Reaction／Kevin MacLeod | [incompetech 曲目頁](https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400039) | `Volatile Reaction.mp3`（incompetech `mp3-royaltyfree/`，2026-11-28），5,293,585 B，`1b21d77beda1f4743c11d618e38d1113` |
 
-下載網址的格式為 `https://opengameart.org/sites/default/files/<原檔檔名>`。
+OpenGameArt 的下載網址格式為 `https://opengameart.org/sites/default/files/<原檔檔名>`。
 
 - **SRG774 曲包的授權原文**："This asset pack is released under the Creative Commons CC0 Public Domain Dedication."。作者另外說明不強制署名，但歡迎註明。
 - **Urgent 與 Airy 用 Ogg 版**：使用者試聽的是 Ogg 版。同頁的 `urgent_0.mp3` 是另一個母帶，整體只有 −43 LUFS，不採用。
 - **Vitalezzz**：頁面的 Copyright/Attribution Notice 寫的是 "Vitalezzz - Claimed by the Void"，授權欄為 CC0。
-- **使用者選的第六首 Volatile Reaction（Kevin MacLeod，激戰組）目前未內嵌**：Wikimedia Commons 上的副本標示 CC BY 3.0，但 incompetech 本站的逐曲授權頁是 JavaScript 動態載入，讀不到，資料檔也沒有授權欄位。一手來源核實前，不內嵌、也不算可用。
+- **Volatile Reaction 已核實授權（2026-11-28）**：用 headless 瀏覽器讀 incompetech 原站的曲目頁（ISRC USUAN1400039）。頁面的 Attribution Code 寫 "Licensed under Creative Commons: By Attribution 4.0 License"。Wikimedia Commons 的副本標的是 CC BY 3.0，以原站為準。依 CC BY 4.0 的規定，遊戲內附上以下署名：
+  - 曲名列顯示「Volatile Reaction — Kevin MacLeod（CC BY 4.0）」，滑鼠停留時顯示完整署名。
+  - 選單底部的「背景音樂」列有完整署名：`"Volatile Reaction" Kevin MacLeod (incompetech.com) Licensed under Creative Commons: By Attribution 4.0 License http://creativecommons.org/licenses/by/4.0/`，並註明本遊戲已剪接循環、調整動態與響度。
 
-遊戲內曲名列會顯示「曲名 — 作者（CC0）」，作為來源註明。
+遊戲內曲名列會顯示「曲名 — 作者（授權）」，作為來源註明。
 
 ## 處理
 
@@ -33,6 +36,8 @@ node tools/make-music-loop.mjs $S/pulse_0.mp3 assets/music/pulse.mp3 --fade 2 --
 node tools/make-music-loop.mjs $S/urgent_2.ogg assets/music/urgent.mp3 --fade 2
 node tools/make-music-loop.mjs $S/space_battle_bpm130.mp3 assets/music/space-battle.mp3 --fade 1.846
 node tools/make-music-loop.mjs $S/claimed_by_the_void_loop.mp3 assets/music/claimed-by-the-void.mp3 --fade 2
+node tools/make-music-loop.mjs "$S/Volatile Reaction.mp3" assets/music/volatile-reaction.mp3 --end 159.871 --fade 2.7097 --target -16 --compress \
+  --dyn "acompressor=threshold=-36dB:ratio=8:attack=80:release=1500:makeup=14:knee=6"
 ```
 
 處理步驟（ffmpeg 9.0.2）：
@@ -50,6 +55,11 @@ node tools/make-music-loop.mjs $S/claimed_by_the_void_loop.mp3 assets/music/clai
 | urgent.mp3 | 54.9 秒 | 659,583 | `5f1c2d616f58a9a16a5cfd9b30e1d862` | −14.3 | −21.7 | −25.8／−22.2 | .0030／.0034 |
 | space-battle.mp3 | 86.8 秒 | 1,042,016 | `6ecf20146e72675e98aeea58d7179dab` | −16.4 | −21.0 | −23.6／−21.0 | .0078／.0182 |
 | claimed-by-the-void.mp3 | 193.0 秒 | 2,317,209 | `c629e68141553d212c0d5fec9b1698c5` | −20.4 | −21.0 | −27.9／−20.9 | .0009／.0073 |
+| volatile-reaction.mp3 | 157.2 秒 | 1,886,816 | `514c0ef3115cb6ce92cc3b6dbbc117b6` | −14.2 | −16.1 | −30.5／−20.9 | .0172／.0101 |
+
+**Volatile Reaction 的處理**：原曲是管弦樂，安靜段與大聲段相差約 24 dB，結尾有一記收尾重擊，之後是 5 秒的殘響。
+- 循環點：截在第 59 小節（155 BPM、7/4 拍，每小節 2.7097 秒），也就是 159.871 秒、收尾重擊之前，再以一小節長度做交叉淡入，讓拍點對齊。
+- 響度：先做慢速壓縮。即使如此，安靜段仍以低音域為主，小喇叭放不出來，所以把目標拉高到 −16，讓瞬時響度的中位數（−20.9）和其他曲目一致。代價是大聲段會比其他曲目大約 5 dB。
 
 響度單位為 LUFS，瞬時響度每 0.5 秒一個值。Pulse 是心跳節奏，拍與拍之間會掉到 −38 左右，這是曲子本身的特性；壓縮前會低到 −50。
 
