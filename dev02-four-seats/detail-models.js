@@ -1,4 +1,4 @@
-// 原創可辨識剪影：突擊機是低矮裝甲楔形，指揮官以直立塔身與雙燈識別。
+// 高細節共用造型工具與指揮官模型（直立塔身與雙燈識別）。
 import * as THREE from 'three';
 import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 
@@ -26,23 +26,6 @@ export function edged(g) {
   for (let i = 0; i < n.count; i++) { const y = Math.abs(n.getY(i)), v = y > .93 ? .9 : y > .2 ? 1.55 : .55; c.set([v, v, v], i * 3); }
   g.setAttribute('color', new THREE.BufferAttribute(c, 3)); return g;
 }
-// 三組材質沿用席位塗裝、深色金屬、自發光識別，以免在戰況中失去隊伍辨讀。
-export function detailDrone() {
-  const hull = [armor(oct, 0, .63, 0, 1, 1, .20, .06)];
-  // 小型砲塔與前伸砲管標示車頭方向（+z 為前，與標準模型一致）
-  const dark = [armor(hex, 0, .86, -.18, .44, .60, .18, .04),
-    box(.12, .12, .72, 0, .98, .52),
-    armor(hex, 0, .38, 0, .97, 1.60, .15, .04)];
-  const lamps = [box(.30, .07, .12, 0, .76, .66)];
-  for (const side of [-1, 1]) {
-    hull.push(armor(hex, side * .64, .61, .10, .49, 1.55, .17, .035));
-    dark.push(cylinder(.20, .26, .18, 8, side * .58, .41, .37),
-      cylinder(.15, .19, .22, 4, side * .58, .54, -.31));
-    lamps.push(box(.13, .06, .30, side * .66, .83, .24));
-  }
-  return { hull: edged(group(hull)), dark: edged(group(dark)), lamp: group(lamps) };
-}
-
 export function detailCommander() {
   const hull = [armor(oct, 0, .77, 0, .76, .61, .78, .075)];
   const dark = [armor(hex, 0, .17, 0, 1.37, 1.48, .22, .065),

@@ -1,4 +1,4 @@
-// BC01 兵種（模擬版本 3 起）與版本 4 道路寬驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
+// BC01 兵種（模擬版本 3 起）、版本 4 道路寬與版本 5 經濟驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
 import assert from 'node:assert/strict';
 import * as L from '../dev05-layout/layout.mjs';
 import * as S from './sim.mjs';
@@ -148,7 +148,7 @@ test('版本 4 道路可通行寬加 10%（視覺同步）；版本 3 維持原�
 test('版本 4 全電腦 60 局：皆終局，部隊不出道路、交會區與核心平台', () => {
   const wins = {}, R = S.RULES, half = 3.96; let widest = 0;
   for (let seed = 1; seed <= 60; seed++) {
-    const st = S.createSim({ seed }); assert.equal(st.version, 4);
+    const st = S.createSim({ version: 4, seed });
     while (st.mode === 'play') { assert(st.tick < 30 * 60 * 13); S.step(st); for (const u of st.units) { const ax = Math.abs(u.x), az = Math.abs(u.z), core = S.SEAT_IDS.some(id => { const [cx, cz] = corePos(id); return Math.hypot(u.x - cx, u.z - cz) <= R.platform + 1e-9; });
       assert(core || Math.hypot(u.x, u.z) <= R.junction + 1e-9 || Math.min(ax, az) <= half + 1e-9, `${seed} ${u.x},${u.z}`); if (!core && Math.max(ax, az) > R.junction) widest = Math.max(widest, Math.min(ax, az)); } }
     wins[st.winner] = (wins[st.winner] || 0) + 1;
@@ -157,6 +157,36 @@ test('版本 4 全電腦 60 局：皆終局，部隊不出道路、交會區與�
   const rec = { version: 4, seed: 20261126, bots: ['N', 'W', 'S', 'E'], commands: [] }, a = S.replay(rec); assert.equal(S.replay(rec).final, a.final);
   if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, '5a70a7ff d6d987b7');
   return `勝場 ${JSON.stringify(wins)}；最寬 ${widest.toFixed(2)}；${a.final} ${a.events}`;
+});
+test('版本 5 經濟：48 金起、每秒 2 金、陸戰隊 7.5；舊版維持 12／每秒 1／5', () => {
+  assert.equal(S.VERSION, 5); assert.deepEqual(S.ECONOMY, { startGold: 48, incomeEvery: 15, costs: { marine: 7.5 } });
+  for (const [version, start, perSecond, costs] of [[1, 12, 1, [5, 12]], [2, 12, 1, [5, 12]], [3, 12, 1, [5, 12, 14]], [4, 12, 1, [5, 12, 14]], [5, 48, 2, [7.5, 12, 14]]]) {
+    const st = S.createSim({ version, bots: [] }); assert(S.SEAT_IDS.every(id => st.seats[id].gold === start), `v${version}`);
+    run(st, 14); assert.equal(st.seats.N.gold, start); run(st, 1); assert.equal(st.seats.N.gold, version === 5 ? start + 1 : start); run(st, 285); assert.equal(st.seats.N.gold, start + perSecond * 10);
+    assert.deepEqual(S.padsFor(version).filter(p => !p.locked).map(p => p.cost), costs, `v${version}`);
+  }
+});
+test('半金門檻：7 金不能買、湊到 7.5 以上才成交，餘額保留半金', () => {
+  const at = gold => { const st = none(), [x, z] = S.padWorld('S', 0); Object.assign(st.seats.S.commander, { x, z }); st.seats.S.gold = gold; return st; };
+  const short = at(7), e = S.step(short); assert(e.some(v => v.type === 'wait' && v.cost === 7.5) && !e.some(v => v.type === 'buy')); assert.equal(short.seats.S.gold, 7);
+  const [buy] = until(short, 'buy'); assert.deepEqual([buy.tick, buy.cost, buy.gold], [15, 7.5, .5]);
+  const exact = at(7.5); assert.equal(S.step(exact).find(v => v.type === 'buy').gold, 0);
+  const half = at(6.5); assert.equal(until(half, 'buy')[0].gold, 0);
+});
+test('版本 5 全電腦 60 局：終局、金幣帳逐秒相符、各席單一兵種不超過繪製上限；固定摘要', () => {
+  let peak = 0, longest = 0; const wins = {};
+  for (let seed = 1; seed <= 60; seed++) {
+    const st = S.createSim({ seed }), earned = Object.fromEntries(S.SEAT_IDS.map(id => [id, 48]));
+    while (st.mode === 'play') {
+      assert(st.tick < 30 * 60 * 13); const alive = S.SEAT_IDS.filter(id => st.seats[id].alive); S.step(st); if (st.tick % 15 === 0) for (const id of alive) earned[id]++;
+      if (st.tick % 15 === 0) for (const id of S.SEAT_IDS) { const s = st.seats[id]; assert.equal(s.gold + s.spent, earned[id]); assert(s.gold >= 0 && Number.isInteger(s.gold * 2)); for (const kind of Object.keys(KINDS)) peak = Math.max(peak, st.units.filter(u => u.seat === id && u.kind === kind).length); }
+    }
+    wins[st.winner] = (wins[st.winner] || 0) + 1; longest = Math.max(longest, st.tick);
+  }
+  assert(peak < 128, `繪製上限 ${peak}`);
+  const rec = { version: 5, seed: 20261126, bots: ['N', 'W', 'S', 'E'], commands: [] }, a = S.replay(rec); assert.equal(S.replay(rec).final, a.final);
+  if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, '2007c247 46e76872');
+  return `勝場 ${JSON.stringify(wins)}；最長 ${(longest / 30).toFixed(0)} 秒；單席單兵種峰值 ${peak}；${a.final} ${a.events}`;
 });
 test('玩家全程不動也會終局', () => S.SEAT_IDS.map(id => { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); run(st, 30 * 60 * 13); assert.equal(st.mode, 'end'); return (st.tick / 30).toFixed(0); }).join('、') + ' 秒');
 console.table(rows); console.log('BC01 roster QA: OK');

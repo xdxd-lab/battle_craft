@@ -6,7 +6,7 @@ import { KINDS, KIND_IDS, CORE, unitStats } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
 
 export const HZ = 30;
-export const VERSION = 4; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%（舊版保留供重播）
+export const VERSION = 5; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
   startGold: 12, incomeEvery: 30, purchaseGap: 15, // v5：12 金起始、每秒 1 金、兩次購買至少 0.5 秒
@@ -28,8 +28,13 @@ const PADS_V2 = place([
   { locked: true, label: '未開放' },
   { locked: true, label: '未開放' },
 ]);
-export const PADS = place([...KIND_IDS.map(kind => ({ kind, cost: KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name })), { locked: true, label: '未開放' }]);
-export const padsFor = version => version >= 3 ? PADS : PADS_V2;
+// 版本 5 經濟：以版本 3、4 的值乘上倍率。7.5 金不取整；金幣只會是 0.5 的倍數，二進位浮點可精確表示。
+export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.incomeEvery / 2, costs: { marine: KINDS.marine.cost * 1.5 } };
+export const economyFor = version => version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+const rosterPads = version => place([...KIND_IDS.map(kind => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name })), { locked: true, label: '未開放' }]);
+const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5);
+export const padsFor = version => version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME = { x: .9, z: 0 };
 const GEOMETRY = {
@@ -41,6 +46,7 @@ const GEOMETRY = {
 };
 GEOMETRY[3] = GEOMETRY[2];
 GEOMETRY[4] = { ...GEOMETRY[2], dim: { ...ARENA, laneHalf: RULES.laneHalf * 1.1 } };
+GEOMETRY[5] = GEOMETRY[4];
 export const SEAT_IDS = L.SEATS.map(s => s.id);
 
 // 北席本地座標 ⇄ 世界座標（90° 旋轉，浮點無誤差）
@@ -67,7 +73,7 @@ export function createSim({ seed = 1, bots = SEAT_IDS, version = VERSION } = {})
   const state = { version, seed: seed >>> 0, tick: 0, mode: 'play', winner: null, serial: 0, units: [], seats: {}, bots: {} };
   for (const s of L.SEATS) {
     const [x, z] = toWorld(s.id, HOME.x, HOME.z, dim);
-    state.seats[s.id] = { id: s.id, team: s.team, alive: true, gold: RULES.startGold, hp: coreMax(version), commander: { x, z, dx: 0, dz: 0 }, goal: null, dir: null, pad: -1, nextBuy: 0, waiting: false, buys: 0, spent: 0, deployed: 0, lost: 0, kills: 0 };
+    state.seats[s.id] = { id: s.id, team: s.team, alive: true, gold: economyFor(version).startGold, hp: coreMax(version), commander: { x, z, dx: 0, dz: 0 }, goal: null, dir: null, pad: -1, nextBuy: 0, waiting: false, buys: 0, spent: 0, deployed: 0, lost: 0, kills: 0 };
   }
   if (version >= 3) Object.assign(state, { shots: [], shotSerial: 0 });
   SEAT_IDS.forEach((id, i) => { if (bots.includes(id)) state.bots[id] = { rng: mix(state.seed, i), pad: -1, until: 0, left: 0, seen: 0 }; });
@@ -261,7 +267,7 @@ export function step(state, commands = []) {
   for (const c of botCommands(state, dim)) apply(state, c, geometry);
   const live = SEAT_IDS.map(id => state.seats[id]).filter(s => s.alive);
   live.forEach(s => moveCommander(s, geometry));
-  if (state.tick % RULES.incomeEvery === 0) for (const s of live) s.gold++;
+  if (state.tick % economyFor(state.version).incomeEvery === 0) for (const s of live) s.gold++;
   for (const s of live) checkBeacon(state, s, emit, dim);
   if (state.version >= 3) stepCores(state, stepRoster(state, emit, dim, { RULES, waypoint, clampWalk }), emit);
   else stepUnits(state, emit, dim);
