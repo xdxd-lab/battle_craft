@@ -279,8 +279,8 @@ await test('主城：血量數字與損壞階段隨本體血量、血條開關�
 });
 await test('九信標：點展示模型走向該信標（不開單位介紹）、按鈕與數字鍵 1–9、購兵列不溢出、桌面與橫式不被 HUD 遮住', async () => {
   const out = [];
-  for (const [w, h] of [[1600, 900], [1280, 720], [844, 390], [667, 375]]) for (const id of S.SEAT_IDS) {
-    if (w === 1280 || w === 667) { if (id !== 'S' && id !== 'E') continue; }
+  for (const [w, h] of [[1600, 900], [1280, 720], [932, 430], [844, 390], [740, 360], [667, 375]]) for (const id of S.SEAT_IDS) {
+    if (w !== 1600 && w !== 844) { if (id !== 'S' && id !== 'E') continue; }
     const page = await open(id, { w, h });
     assert.equal(await page.eval(`document.querySelectorAll('#shop button').length`), 9);
     const shop = await page.eval(`(() => { const r = [...document.querySelectorAll('#shop button')].map(b => { const x = b.getBoundingClientRect(); return { l: x.left, r: x.right, t: x.top, b: x.bottom, over: b.scrollWidth > b.clientWidth + 1 }; }), box = id => { const x = document.getElementById(id).getBoundingClientRect(); return { l: x.left, r: x.right, t: x.top, b: x.bottom }; }; return { r, hud: [box('bar'), box('panel')].filter(x => x.r > x.l) }; })()`);
@@ -305,6 +305,11 @@ await test('九信標：點展示模型走向該信標（不開單位介紹）�
     }
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51, text: '3' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51 }); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 2);
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: '9', code: 'Digit9', windowsVirtualKeyCode: 57, text: '9' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: '9', code: 'Digit9', windowsVirtualKeyCode: 57 }); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 8);
+    // 訊息列（含最長的金幣不足提示）在購兵列上方、不壓到任何按鈕、在畫面內、字級可讀
+    const msg = await page.eval(`(() => { const m = document.getElementById('msg'); m.textContent = '04:59　金幣不足（需 40 金）；保持站立，存夠會自動購買。'; const r = m.getBoundingClientRect(), shop = [...document.querySelectorAll('#shop button')].map(b => b.getBoundingClientRect()), hit = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+      return { r: [r.left, r.top, r.right, r.bottom], over: shop.some(b => hit(r, b)) || ['bar', 'panel'].some(id => hit(r, document.getElementById(id).getBoundingClientRect())), above: r.bottom <= Math.min(...shop.map(b => b.top)) + .5, font: parseFloat(getComputedStyle(m).fontSize), lines: Math.round(r.height / parseFloat(getComputedStyle(m).lineHeight || 14)) }; })()`);
+    assert(!msg.over && msg.above && msg.r[0] >= 0 && msg.r[1] >= 0 && msg.r[2] <= w && msg.font >= 11, `${w}x${h} 訊息列 ${JSON.stringify(msg)}`);
+    if (SHOTS && id === 'S') { await page.eval('__step(1)'); await page.shot(path.join(SHOTS, `nine-msg-${w}x${h}.png`)); }
     await page.clickOn('#shop button[data-pad="5"]'); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 5);
     const kinds = new Set((await page.snap()).units.filter(u => u.seat === id).map(u => u.kind)); out.push(`${id}:${kinds.size}`);
     if (SHOTS && (id === 'S' || id === 'E')) await page.shot(path.join(SHOTS, `nine-pads-${id}-${w}x${h}.png`));
@@ -355,7 +360,7 @@ await test('四席各買九兵種；模型、盾條、五種飛行中投射物�
   const left = await open('none', { seed: 3 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0, scout: 0 }); await left.done();
   for (const quality of ['std', 'high']) {
     const card = await open('N', { quality });
-    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈戰機（Wraith）', '對地 8／對空 20'], ['battlecruiser', '戰鬥巡洋艦（Battlecruiser）', '基礎護甲\n3'], ['scout', '斥候（Scout）', '對地 8／對空 14×2'], ['scourge', '自殺蟲（Scourge）', '110（自爆）']]) {
+    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈戰機（Wraith）', '對地 8／對空 20'], ['battlecruiser', '戰鬥巡洋艦（Battlecruiser）', '基礎護甲\n3'], ['scout', '斥候（Scout）', '對地 8／對空 14×2'], ['scourge', '自殺蟲（Scourge）', '一次性（自爆後陣亡）']]) {
       await card.clickOn(`[data-profile="${kind}"]`); const text = await card.eval(`document.getElementById('dossier').innerText`); assert(text.includes(name) && text.includes(attack), text);
       if (SHOTS) await card.shot(path.join(SHOTS, `dossier-${quality}-${kind}.png`));
     }

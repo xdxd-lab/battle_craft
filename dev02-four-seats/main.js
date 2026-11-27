@@ -169,11 +169,19 @@ function setFraming(full) {
   fittedView = null;
   $('framing').textContent = full ? '切近景' : '切全景';
 }
+// 訊息列一律貼在購兵列上緣之上（九鈕兩列、三列高度隨畫面變），不壓到按鈕文字
+function placeMsg() {
+  const top = $('shop').childElementCount ? $('shop').getBoundingClientRect().top : innerHeight - 10, panel = $('panel');
+  $('msg').style.bottom = `${Math.ceil(innerHeight - top + 6)}px`;
+  panel.style.maxHeight = innerWidth > innerHeight ? `${Math.max(120, Math.floor(top - 52 - panel.getBoundingClientRect().top))}px` : ''; // 橫式：介紹面板止於購兵列與兩行訊息之上
+  return innerHeight - top;
+}
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+  const shopH = placeMsg();
   const compact = h <= 560;
   if (compact !== compactPadLabels) { compactPadLabels = compact; buildPads(); }
-  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portrait ? 170 : h > 560 ? 116 : 90; // 保留購兵列與訊息列，最下列信標不被遮（九鈕：直式三列、橫式兩列）
+  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + 34); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
   let l = portrait ? 0 : bar.right + 8, r = portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 : 0;
   if (!portrait && w - 2 * Math.max(l, r) > h * 1.25) l = r = Math.max(l, r);
   safe = { l, t, w: Math.max(80, w - l - r), h: Math.max(80, h - t - bottom) };
@@ -370,6 +378,7 @@ function menu() {
 function shopUi() {
   $('shop').innerHTML = seat ? S.PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${i + 1}　${p.label}</b><small>${p.cost} 金<i> → ${p.count} 名</i></small></button>`).join('') : '';
   for (const b of $('shop').querySelectorAll('button')) b.onclick = () => { gotoPad(+b.dataset.pad); canvas.focus(); };
+  placeMsg();
   $('gold-label').textContent = seat ? `${seatName(seat)}金幣` : '金幣'; 
   $('cores').innerHTML = L.SEATS.map(s => `<div class="core" id="core-${s.id}"><b style="background:${s.primary};border-color:${s.secondary}">${s.name}</b><div class="hp" style="color:${relColor(s.id)}"><i></i></div><span style="color:${relColor(s.id)}"></span></div>`).join('');
 }

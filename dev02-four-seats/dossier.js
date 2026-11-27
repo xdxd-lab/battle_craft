@@ -20,7 +20,7 @@ const unitProfile = kind => {
   const k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
   return {
     name: k.name, english: k.source, role, description, camera, aim, fov,
-    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
+    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', k.suicide ? '一次性（自爆後陣亡）' : `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
     model: unitModels.high[kind], plain: unitModels.std[kind],
   };
 };
