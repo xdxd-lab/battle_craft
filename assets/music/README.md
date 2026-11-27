@@ -1,6 +1,6 @@
 # 背景音樂（CC0）
 
-DEV02 的背景音樂。建置時 `dev02-four-seats/build.py` 會把 `pulse-loop.mp3` 以 base64 內嵌進單檔 HTML，離線開啟也能播放。若解碼失敗，或網址帶 `#music=synth`，就改用 `audio-synth.mjs` 的程序合成音樂。選曲經過見 [research/BC-MUSIC.md](../../research/BC-MUSIC.md)。
+DEV02 的背景音樂候選。2026-11-27 實測發現這首曲子大段近乎無聲，預設已改回合成音樂，只有帶 `#music=track` 時才播放（見 BC-MUSIC 的「實測」）。建置時 `dev02-four-seats/build.py` 會把 `pulse-loop.mp3` 以 base64 內嵌進單檔 HTML，離線開啟也能播放。以 `#music=track` 播放時若解碼失敗，會改用 `audio-synth.mjs` 的程序合成音樂。選曲經過見 [research/BC-MUSIC.md](../../research/BC-MUSIC.md)。
 
 ## 來源與授權
 

@@ -18,7 +18,7 @@ export const STEPPED = `(() => { let q = [], id = 0, t = 1000; const dead = new 
 export async function launch({ width = 1280, height = 800, args = [] } = {}) {
   if (!CHROME) throw new Error('找不到 Chrome，請以 CHROME 指定執行檔');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bc-qa-'));
-  const proc = spawn(CHROME, ['--headless=new', `--use-angle=${ANGLE}`, '--enable-unsafe-swiftshader', '--hide-scrollbars', ...args, '--no-first-run', '--disable-extensions', '--remote-debugging-port=0', `--user-data-dir=${dir}`, `--window-size=${width},${height}`, 'about:blank'], { stdio: 'ignore' });
+  const proc = spawn(CHROME, ['--headless=new', '--mute-audio', `--use-angle=${ANGLE}`, '--enable-unsafe-swiftshader', '--hide-scrollbars', ...args, '--no-first-run', '--disable-extensions', '--remote-debugging-port=0', `--user-data-dir=${dir}`, `--window-size=${width},${height}`, 'about:blank'], { stdio: 'ignore' });
   const portFile = path.join(dir, 'DevToolsActivePort');
   for (let i = 0; i < 200 && !fs.existsSync(portFile); i++) await sleep(50);
   await sleep(100);

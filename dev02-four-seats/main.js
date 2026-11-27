@@ -352,14 +352,14 @@ function tick() {
   if (state.mode === 'end') finish();
 }
 function finish() {
-  mode = 'end'; keys.clear(); record.ticks = state.tick; record.digest = S.digest(state);
+  mode = 'end'; keys.clear(); audio.stopEffects(); record.ticks = state.tick; // 終局立即停掉殘留戰鬥音效；模擬已停，不再觸發新音效，音樂照設定續播 record.digest = S.digest(state);
   const won = state.winner === 'draw' ? '平手' : !seat ? `${L.TEAMS[state.winner].name}獲勝` : L.seatById(seat).team === state.winner ? '勝利' : '敗北';
   $('card').innerHTML = `<h3 id="result">${won}</h3><p>${time(state.tick)}　種子 ${state.seed}</p><table><tr><th>席位</th><th>核心</th><th>購買</th><th>花費</th><th>部署</th><th>損失</th><th>擊破</th></tr>${L.SEATS.map(s => { const v = state.seats[s.id]; return `<tr><td>${s.name}席（${relName(s.id)}）</td><td>${v.alive ? Math.ceil(v.hp) : '失守'}</td><td>${v.buys}</td><td>${v.spent}</td><td>${v.deployed}</td><td>${v.lost}</td><td>${v.kills}</td></tr>`; }).join('')}</table><div class="row"><button class="go" id="restart">再來一局</button><button id="look">查看戰場</button></div>`;
   $('restart').onclick = menu; $('look').onclick = () => { $('cover').hidden = true; }; $('cover').hidden = false;
 }
 function menu() {
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。三座信標分別購買陸戰隊、重騎兵、飛螳。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按 1／2／3 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。六座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按 1／2／3 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
@@ -392,7 +392,7 @@ for (const k of ['bars', 'log']) display[k] = display[k] !== false;
 display.engineering = display.engineering === true;
 for (const k of ['music', 'sfx']) if (![0, 1, 2, 3].includes(display[k])) display[k] = 2;
 // 聲音：瀏覽器要求互動後才能出聲，第一次點擊或按鍵才建立 AudioContext
-const audio = createAudio(display, { track: hash.get('music') === 'synth' ? null : MUSIC_TRACK }); // #music=synth 只在本次改用合成音樂對照
+const audio = createAudio(display, { track: hash.get('music') === 'track' ? MUSIC_TRACK : null }); // 預設用合成音樂；〈Pulse〉實測大段近乎無聲、只剩零星脈衝（見 research/BC-MUSIC.md），待使用者選曲。#music=track 只在本次改用曲檔對照
 for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, () => audio.unlock(), true);
 function applyDisplay(save) {
   document.body.classList.toggle('no-bars', !display.bars); document.body.classList.toggle('no-log', !display.log);
