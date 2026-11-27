@@ -3,7 +3,7 @@
 離線單檔 `battle_craft-dev02.html`，用瀏覽器開啟即可從選席玩到終局（需 WebGL）。單人加三電腦；根目錄首頁提供線上遊玩與下載入口，v5 保留。
 
 - 建置：`python3 dev02-four-seats/build.py`（或 `npm run build`）。
-- 測試：`qa-sim.mjs`（版本 1／2 回歸）、`qa-roster.mjs`（版本 3～5）與 `qa-audio.mjs`（合成音訊），皆含於 `npm test`；`node dev02-four-seats/qa-browser.mjs`（`npm run test:browser`，需本機 Chrome）。
+- 測試：`qa-sim.mjs`（版本 1／2 回歸）、`qa-roster.mjs`（版本 3～5）、`qa-audio.mjs`（合成音訊）與 `qa-audio-play.mjs`（暫停與隱藏時的播放），皆含於 `npm test`；`node dev02-four-seats/qa-browser.mjs`（`npm run test:browser`，需本機 Chrome）。
 - 操作：點自己購買區地面、按 `1`／`2`／`3`（陸戰隊、重騎兵、飛螳）、或 WASD／方向鍵移動指揮官；站上信標自動購兵。`V` 切換個人／隊伍視角，空白鍵暫停，速度可切 0.5×／1×／2×（預設 1×），也可觀戰。一般模式切換視窗或分頁後對局繼續；工程模式失焦會暫停。
 - 顯示設定：「血條」控制戰場部隊／核心血條與核心血量數字、左側核心條（左側數字保留）；「事件紀錄」只控制詳細紀錄的顯示，即時提示、底層事件與輸入紀錄照常，重開可見關閉期間的近期事件（最多 80 列）。預設皆開，存於瀏覽器 localStorage，重開一局與重新載入保留；無法保存時只在本次生效。
 - 預設近景以對局中心尺寸接近星點版的 1.2 倍為目標，保留目前方向的隊伍／個人角度。用「切全景」查看四席與全部通道，再按「切近景」返回。

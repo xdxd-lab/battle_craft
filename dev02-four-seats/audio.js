@@ -8,15 +8,19 @@ export const LIMIT = { total: 6, perKind: 3, gap: .07 }; // 同時聲部、單�
 
 export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼叫端持有與保存
   const Context = window.AudioContext || window.webkitAudioContext;
-  const active = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, 0])), played = { ...active }, last = {};
+  const played = Object.fromEntries(Object.keys(SOUNDS).map(k => [k, 0])), last = {}, live = new Set(); // live：發聲中的戰鬥音效
   let context = null, gains = null, buffers = null, paused = false, failed = !Context, peak = 0, dropped = 0, musicStarted = false;
-  const voices = () => Object.values(active).reduce((a, b) => a + b, 0);
+  const release = voice => { if (live.delete(voice)) voice.gain.disconnect(); };
+  // 立刻斷開並停掉：暫停中的 context 不會前進，若只靠 suspend，恢復時會接著播完舊音效
+  function stopEffects() { for (const voice of [...live]) { release(voice); voice.source.stop(); } }
   const buffer = data => { const b = context.createBuffer(1, data.length, RATE); b.getChannelData(0).set(data); return b; };
-  const wanted = () => !paused && !document.hidden && (levels.music > 0 || levels.sfx > 0);
+  const quiet = () => paused || document.hidden;
+  const wanted = () => !quiet() && (levels.music > 0 || levels.sfx > 0);
   let music = null; const musicData = () => music ??= renderMusic();
   if (!failed && levels.music) setTimeout(musicData, 200); // 開場閒置時先合成，避免第一次點擊停頓
   function sync() {
     if (!context) return;
+    if (quiet() || !levels.sfx) stopEffects();
     for (const k of ['music', 'sfx']) gains[k].gain.value = GAIN[levels[k]] * MIX[k];
     // state 要等 promise 完成才更新，所以每次都送出目標狀態；resume 完成後若目標已改為靜止再停一次
     if (wanted()) context.resume().then(() => { if (!wanted()) return context.suspend(); }).catch(() => {});
@@ -27,7 +31,7 @@ export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼�
     }
   }
   return {
-    sync,
+    sync, stopEffects,
     unlock() {
       if (failed || (!levels.music && !levels.sfx)) return;
       if (!context) try {
@@ -39,14 +43,16 @@ export function createAudio(levels) { // levels：{ music, sfx } 0～3，由呼�
     },
     setPaused(value) { if (value !== paused) { paused = value; sync(); } },
     play(kind) {
-      if (!context || context.state !== 'running' || !levels.sfx || !buffers[kind]) return;
+      // suspend() 完成前 state 仍是 running，所以暫停與隱藏要直接判斷
+      if (!context || quiet() || context.state !== 'running' || !levels.sfx || !buffers[kind]) return;
       const now = performance.now() / 1000;
-      if (voices() >= LIMIT.total || active[kind] >= LIMIT.perKind || now - (last[kind] ?? -9) < LIMIT.gap) { dropped++; return; }
+      if (live.size >= LIMIT.total || [...live].filter(v => v.kind === kind).length >= LIMIT.perKind || now - (last[kind] ?? -9) < LIMIT.gap) { dropped++; return; }
       const source = context.createBufferSource(), gain = context.createGain();
       source.buffer = buffers[kind]; source.playbackRate.value = .94 + (played[kind] % 5) * .03; gain.gain.value = SOUNDS[kind].gain;
-      source.connect(gain).connect(gains.sfx); source.onended = () => { active[kind]--; gain.disconnect(); };
-      last[kind] = now; active[kind]++; played[kind]++; peak = Math.max(peak, voices()); source.start();
+      const voice = { kind, source, gain };
+      source.connect(gain).connect(gains.sfx); source.onended = () => release(voice);
+      last[kind] = now; live.add(voice); played[kind]++; peak = Math.max(peak, live.size); source.start();
     },
-    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, voices: voices(), peak, dropped, played: { ...played } }),
+    info: () => ({ state: failed ? 'unavailable' : context?.state ?? 'locked', music: gains?.music.gain.value ?? 0, sfx: gains?.sfx.gain.value ?? 0, musicStarted, voices: live.size, peak, dropped, played: { ...played } }),
   };
 }

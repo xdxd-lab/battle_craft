@@ -355,5 +355,40 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   await none.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await none.eval('__step(2)'); await none.clickOn('[data-seat="N"]'); await none.clickOn('#opt-sfx'); await none.eval('__step(300)'); assert.equal((await A(none)).state, 'unavailable'); assert((await none.eval('__dev02.snapshot().tick')) >= 300); assert.deepEqual(none.errors, []); await none.close();
   return `播放 ${JSON.stringify(a.played)}、略過 ${a.dropped}、同時峰值 ${a.peak}`;
 });
+await test('聲音背景與恢復：隱藏／暫停期間戰鬥續跑不發新音效、舊音效已停、恢復與再開局無殘留', async () => {
+  const SPY = `localStorage.clear(); window.__src = []; const make = AudioContext.prototype.createBufferSource; AudioContext.prototype.createBufferSource = function () { const s = make.call(this), stop = s.stop.bind(s); s.stops = 0; s.stop = (...a) => { s.stops++; stop(...a); }; __src.push(s); return s; };`;
+  const page = await browser.open(`${url}#seed=11`, { stepped: true, prelude: SPY }); await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)'); await page.clickOn('[data-seat="none"]'); await page.until(`__dev02.audio().state === 'running'`);
+  const A = () => page.eval('__dev02.audio()'), total = v => Object.values(v.played).reduce((a, b) => a + b, 0);
+  const battle = async () => { for (let i = 0; i < 300 && !(await A()).voices; i++) { await page.eval('__step(3)'); await sleep(20); } assert((await A()).voices > 0, '應有發聲中的音效'); };
+  const music = () => page.eval('__src.filter(s => s.loop).map(s => s.stops)');
+  for (const [via, enter, leave] of [
+    ['暫停', `document.getElementById('pause').click()`, `document.getElementById('pause').click()`],
+    ['模擬隱藏', `Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange'))`, `delete document.hidden; document.dispatchEvent(new Event('visibilitychange'))`],
+  ]) {
+    await battle();
+    // 同一工作內進入靜止並讀值：此時 suspend() 尚未完成
+    const sounding = await page.eval('__dev02.audio().voices'), stops = () => page.eval('__src.filter(s => !s.loop && s.stops).length'), was = await stops();
+    const inside = await page.eval(`(() => { ${enter}; return __dev02.audio(); })()`);
+    assert.equal(inside.voices, 0, via); assert(await stops() - was >= 1 && sounding >= 1, '發聲中的來源應被停掉'); const before = total(inside), tick = await page.eval('__dev02.snapshot().tick');
+    await page.until(`__dev02.audio().state === 'suspended'`);
+    if (via === '模擬隱藏') await page.until(`__dev02.snapshot().tick > ${tick + 60}`, 15000); else await page.eval('__step(60)');
+    assert.equal(total(await A()), before, `${via}期間不發新音效`);
+    const resumed = await page.eval(`(() => { ${leave}; return __dev02.audio(); })()`); assert.equal(resumed.voices, 0);
+    await page.until(`__dev02.audio().state === 'running'`); assert.equal((await A()).voices, 0, '恢復後無續播'); assert.deepEqual(await music(), [0], '音樂同一條、未停掉');
+  }
+  await battle(); await page.eval(`document.getElementById('again').click()`); assert.equal((await A()).voices, 0); await page.until(`__dev02.audio().state === 'running'`); await page.clickOn('[data-seat="N"]'); assert.equal((await A()).voices, 0);
+  await page.eval('__step(30)'); assert.deepEqual(await music(), [0]); assert.deepEqual(page.errors, []); await page.close();
+  // 真實背景：另開分頁蓋到前景
+  const real = await browser.open(`${url}#seed=11`, { prelude: SPY }); await real.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await real.send('Emulation.setFocusEmulationEnabled', { enabled: false }); await real.clickOn('[data-seat="none"]'); await real.until(`__dev02.audio().voices > 0`, 30000);
+  const cover = await browser.open('about:blank'); await cover.send('Page.bringToFront');
+  let hidden = false; for (let i = 0; i < 40 && !hidden; i++) { await sleep(50); hidden = await real.eval('document.hidden'); }
+  if (hidden) {
+    await real.until(`__dev02.audio().state === 'suspended'`); const a = await real.eval('[__dev02.audio(), __dev02.snapshot().tick]'); await sleep(2500); const b = await real.eval('[__dev02.audio(), __dev02.snapshot().tick]');
+    assert(b[1] > a[1], '背景續跑'); assert.equal(b[0].voices, 0); assert.deepEqual(b[0].played, a[0].played);
+    await real.send('Page.bringToFront'); await real.until(`!document.hidden && __dev02.audio().state === 'running'`);
+  }
+  await cover.close(); assert.deepEqual(real.errors, []); await real.close();
+  return hidden ? '含真實分頁隱藏' : '真實分頁未能進入隱藏，僅模擬';
+});
 await sleep(50); await browser.close();
 console.table(rows); console.log(`DEV02 browser QA: OK (${browser.angle})`);
