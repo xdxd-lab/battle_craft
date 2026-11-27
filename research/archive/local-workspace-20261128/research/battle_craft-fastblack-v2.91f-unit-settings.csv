@@ -1,0 +1,229 @@
+unit_id,source,hp,hp_x256,shields,base_armor,build_time_game_frames,unit_table_minerals,unit_table_gas,name_string_id,map_display_name
+0,map_override,400,102400,0,0,0,0,0,78,Universal Soldier $150
+1,map_override,300,76800,0,0,0,0,0,79,Elite Sniper $150
+2,map_override,900,230400,0,0,0,0,0,80,Razorspin Rider $200
+3,map_override,750,192000,0,0,0,0,0,81,Herculean Defender $300
+4,map_override,0,0,0,0,0,1,1,0,
+5,map_override,2000,512000,0,0,0,0,0,82,Armored Abomination $500
+6,map_override,0,0,0,0,0,1,1,0,
+7,map_override,6000,1536000,0,0,0,0,0,309,Loyal Laborer $500
+8,map_override,800,204800,0,0,0,0,0,84,Silent Apparition $300
+9,map_override,1,256,0,0,15,0,0,85,Raging Kamikaze
+10,map_override,2200,563200,0,0,0,0,0,86,Infernal Berserker $500
+11,map_override,1,256,0,0,0,0,0,87,Glorious Martyr
+12,map_override,2000,512000,0,0,0,0,0,88,Nuclear Deathship $500
+13,engine_default,,,,,,,,,
+14,map_override,100,25600,0,0,1500,200,200,89,Kill All Enemy Units $4000
+15,map_override,1,256,0,0,15,0,0,90,ArchBerzelius
+16,map_override,3500,896000,0,0,0,0,0,91,Stealthy Assailant $1500
+17,map_override,2600,665600,0,0,0,0,0,92,Mechanical Juggernaut $750
+18,map_override,0,0,0,0,0,1,1,0,
+19,map_override,2250,576000,0,0,0,0,0,93,Relentless Vindicator $500
+20,map_override,2700,691200,0,0,0,0,0,94,Ethereal Knight $1000
+21,map_override,1760,450560,0,0,0,0,0,95,Almighty Ascender $1000
+22,engine_default,,,,,,,,,
+23,map_override,2500,640000,0,0,0,0,0,96,Aggressive Pillager $750
+24,engine_default,,,,,,,,,
+25,engine_default,,,,,,,,,
+26,engine_default,,,,,,,,,
+27,engine_default,,,,,,,,,
+28,map_override,6000,1536000,0,0,0,0,0,97,InvulnerableDreadnought$1500
+29,map_override,1000,256000,0,0,0,0,0,98,Vengeful Retaliator $500
+30,engine_default,,,,,,,,,
+31,engine_default,,,,,,,,,
+32,map_override,650,166400,0,0,0,0,0,99,Napalm Strider $150
+33,engine_default,,,,,,,,,
+34,engine_default,,,,,,,,,
+35,engine_default,,,,,,,,,
+36,engine_default,,,,,,,,,
+37,map_override,350,89600,0,0,0,0,0,100,Vicious Hellspawn $200
+38,map_override,485,124160,0,0,0,0,0,101,Malevolent Reaper $150
+39,map_override,800,204800,0,0,0,0,0,102,Brutish Behemoth $200
+40,engine_default,,,,,,,,,
+41,map_override,1,256,0,0,0,0,0,103,Zerg Horde
+42,map_override,0,0,0,0,0,0,0,104,<==Save Air Units $500
+43,map_override,800,204800,0,0,0,0,0,105,Deadstar Dragon $300
+44,map_override,750,192000,0,0,0,0,0,106,Monstrous Chimera $500
+45,engine_default,,,,,,,,,
+46,engine_default,,,,,,,,,
+47,map_override,1000,256000,0,0,0,0,0,107,Raging Kamikaze $200
+48,map_override,2000,512000,0,0,0,0,0,108,Apocalypse Beast $500
+49,engine_default,,,,,,,,,
+50,map_override,1000,256000,0,0,0,0,0,109,Unsubdued Fury $200
+51,map_override,6600,1689600,0,0,0,0,0,110,Sultry Sorceress $1500
+52,engine_default,,,,,,,,,
+53,map_override,1200,307200,0,0,0,0,0,111,Skysplitting Basilisk $500
+54,map_override,1750,448000,0,0,0,0,0,112,CBRealFolkBlues
+55,map_override,1760,450560,0,0,0,0,0,113,Unwieldy Punisher $1000
+56,engine_default,,,,,,,,,
+57,engine_default,,,,,,,,,
+58,map_override,1000,256000,0,0,0,0,0,114,Enigmatic Phantom $300
+59,engine_default,,,,,,,,,
+60,map_override,750,192000,0,0,0,0,0,115,Forsaken Annihilator $1500
+61,engine_default,,,,,,,,,
+62,map_override,2800,716800,0,0,0,0,0,116,Mighty Leviathan $500
+63,engine_default,,,,,,,,,
+64,map_override,1,256,0,0,0,0,0,117,Protoss Troops
+65,map_override,850,217600,0,0,0,0,0,118,Heroic Paladin $150
+66,map_override,700,179200,0,0,0,0,0,119,Foreboding Colossus $200
+67,engine_default,,,,,,,,,
+68,map_override,1750,448000,0,0,0,0,0,120,Mystic Titan $300
+69,engine_default,,,,,,,,,
+70,map_override,1000,256000,0,0,0,0,0,121,Heaven Sentinel $300
+71,map_override,1750,448000,0,0,0,0,0,122,Cloaked Conciliator $2000
+72,engine_default,,,,,,,,,
+73,engine_default,,,,,,,,,
+74,engine_default,,,,,,,,,
+75,engine_default,,,,,,,,,
+76,map_override,4375,1120000,0,0,0,0,0,123,Thunder Walker $1000
+77,map_override,2200,563200,0,0,0,0,0,124,Valiant Seraph $500
+78,map_override,1750,448000,0,0,0,0,0,125,Doomsday Monolith $500
+79,map_override,2800,716800,0,0,0,0,0,126,Nefarious Necromancer $500
+80,engine_default,,,,,,,,,
+81,map_override,5000,1280000,0,100,0,0,0,127,Unforgiving Conqueror $750
+82,engine_default,,,,,,,,,
+83,map_override,1500,384000,0,0,0,0,0,128,Merciless Subjugator $300
+84,engine_default,,,,,,,,,
+85,map_override,0,0,0,0,0,0,0,129,Malevolent Warbringer
+86,engine_default,,,,,,,,,
+87,engine_default,,,,,,,,,
+88,map_override,2200,563200,0,0,0,0,0,130,Benevolent Archangel $1000
+89,engine_default,,,,,,,,,
+90,engine_default,,,,,,,,,
+91,engine_default,,,,,,,,,
+92,engine_default,,,,,,,,,
+93,engine_default,,,,,,,,,
+94,engine_default,,,,,,,,,
+95,engine_default,,,,,,,,,
+96,engine_default,,,,,,,,,
+97,engine_default,,,,,,,,,
+98,engine_default,,,,,,,,,
+99,engine_default,,,,,,,,,
+100,map_override,850,217600,0,0,0,0,0,131,Sadistic Assassin $500
+101,engine_default,,,,,,,,,
+102,engine_default,,,,,,,,,
+103,engine_default,,,,,,,,,
+104,map_override,2150,550400,0,0,0,0,0,132,Adept Marksman $1000
+105,engine_default,,,,,,,,,
+106,engine_default,,,,,,,,,
+107,engine_default,,,,,,,,,
+108,engine_default,,,,,,,,,
+109,engine_default,,,,,,,,,
+110,engine_default,,,,,,,,,
+111,engine_default,,,,,,,,,
+112,map_override,1,256,0,0,0,0,0,133,<==Kill All Units in Center $0
+113,engine_default,,,,,,,,,
+114,engine_default,,,,,,,,,
+115,engine_default,,,,,,,,,
+116,engine_default,,,,,,,,,
+117,engine_default,,,,,,,,,
+118,engine_default,,,,,,,,,
+119,engine_default,,,,,,,,,
+120,engine_default,,,,,,,,,
+121,engine_default,,,,,,,,,
+122,map_override,1,256,0,0,0,0,0,134,Kill All Units in Center $0
+123,map_override,750,192000,0,1,1200,100,50,135,<==Kill Reavers $0
+124,map_override,1000,256000,0,60,0,0,0,136,Lethal Bartizan
+125,map_override,1,256,0,0,15,0,0,137,<==Summon Turrets $2000
+126,engine_default,,,,,,,,,
+127,map_override,1,256,0,0,15,0,0,138,Armageddon $4000
+128,engine_default,,,,,,,,,
+129,map_override,10000,2560000,0,0,0,1,1,287,<Super Zergling $1000>
+130,engine_default,,,,,,,,,
+131,engine_default,,,,,,,,,
+132,engine_default,,,,,,,,,
+133,engine_default,,,,,,,,,
+134,engine_default,,,,,,,,,
+135,engine_default,,,,,,,,,
+136,engine_default,,,,,,,,,
+137,map_override,1,256,0,0,15,0,0,141,Control Enemy Units $8000
+138,engine_default,,,,,,,,,
+139,engine_default,,,,,,,,,
+140,engine_default,,,,,,,,,
+141,engine_default,,,,,,,,,
+142,engine_default,,,,,,,,,
+143,engine_default,,,,,,,,,
+144,map_override,7500,1920000,0,75,0,0,0,142,Vile Tower
+145,engine_default,,,,,,,,,
+146,map_override,7500,1920000,0,75,0,0,0,143,Corrupt Artifact
+147,engine_default,,,,,,,,,
+148,engine_default,,,,,,,,,
+149,map_override,750,192000,0,1,600,50,0,289,Everlasting Elixir $2500
+150,map_override,1,256,0,0,15,0,0,144,Construct Stronghold $600==>
+151,engine_default,,,,,,,,,
+152,engine_default,,,,,,,,,
+153,engine_default,,,,,,,,,
+154,engine_default,,,,,,,,,
+155,engine_default,,,,,,,,,
+156,map_override,9999,2559744,9999,100,0,0,0,145,Crystal Fortress
+157,engine_default,,,,,,,,,
+158,engine_default,,,,,,,,,
+159,map_override,1,256,0,0,0,0,0,146,<==Erect Blockade $2000
+160,engine_default,,,,,,,,,
+161,engine_default,,,,,,,,,
+162,map_override,5000,1280000,5000,50,0,0,0,147,Quantum Fortification
+163,engine_default,,,,,,,,,
+164,engine_default,,,,,,,,,
+165,engine_default,,,,,,,,,
+166,engine_default,,,,,,,,,
+167,engine_default,,,,,,,,,
+168,map_override,0,0,0,0,0,0,0,148,by CBRealFolkBlues
+169,map_override,1,256,0,0,0,0,0,149,Eternal Rapture
+170,engine_default,,,,,,,,,
+171,engine_default,,,,,,,,,
+172,map_override,1,256,0,0,1,0,0,275,by CBRealFolkBlues
+173,map_override,1,256,0,0,0,0,0,150,<==Erect Blockade $2000
+174,engine_default,,,,,,,,,
+175,map_override,9999,2559744,0,100,0,0,0,151,Stalwart Barricade
+176,engine_default,,,,,,,,,
+177,engine_default,,,,,,,,,
+178,engine_default,,,,,,,,,
+179,engine_default,,,,,,,,,
+180,engine_default,,,,,,,,,
+181,engine_default,,,,,,,,,
+182,engine_default,,,,,,,,,
+183,engine_default,,,,,,,,,
+184,engine_default,,,,,,,,,
+185,engine_default,,,,,,,,,
+186,engine_default,,,,,,,,,
+187,engine_default,,,,,,,,,
+188,engine_default,,,,,,,,,
+189,map_override,1,256,0,0,0,0,0,152,Eternal Rapture $300
+190,engine_default,,,,,,,,,
+191,engine_default,,,,,,,,,
+192,engine_default,,,,,,,,,
+193,engine_default,,,,,,,,,
+194,map_override,100000,25600000,0,0,0,250,0,290,Where the Fun Begins...
+195,map_override,1,256,0,0,15,0,0,153,PJLProductiveJunctionLocation
+196,map_override,1,256,0,0,0,0,0,266,Armageddon $4000
+197,engine_default,,,,,,,,,
+198,engine_default,,,,,,,,,
+199,engine_default,,,,,,,,,
+200,map_override,800,204800,0,1,2400,200,50,154,<==Kill All Enemy Units $4000
+201,engine_default,,,,,,,,,
+202,engine_default,,,,,,,,,
+203,engine_default,,,,,,,,,
+204,engine_default,,,,,,,,,
+205,engine_default,,,,,,,,,
+206,engine_default,,,,,,,,,
+207,engine_default,,,,,,,,,
+208,engine_default,,,,,,,,,
+209,engine_default,,,,,,,,,
+210,engine_default,,,,,,,,,
+211,engine_default,,,,,,,,,
+212,engine_default,,,,,,,,,
+213,engine_default,,,,,,,,,
+214,engine_default,,,,,,,,,
+215,engine_default,,,,,,,,,
+216,engine_default,,,,,,,,,
+217,map_override,1,256,0,0,0,0,0,272,<Construct Stronghold $200>
+218,engine_default,,,,,,,,,
+219,engine_default,,,,,,,,,
+220,engine_default,,,,,,,,,
+221,engine_default,,,,,,,,,
+222,engine_default,,,,,,,,,
+223,engine_default,,,,,,,,,
+224,engine_default,,,,,,,,,
+225,engine_default,,,,,,,,,
+226,engine_default,,,,,,,,,
+227,engine_default,,,,,,,,,

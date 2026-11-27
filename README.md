@@ -37,6 +37,7 @@ npm test
 ## 資料來源與素材授權
 
 - [SC1 SPEED／FastBlack 與 SC2 歷史版本、外部資源與現況](research/battle_craft-research.md)
+- [原主工作區歷史文件快照（2026-11-28）](research/archive/local-workspace-20261128/README.md)
 - [跨 AI 研究交接快照](research/battle_craft-source-master-handoff.md) · [3D Garden 開發指南快照](research/battle_craft-source-3dgarden-handoff.md)
 - [3D Garden 模型及個別來源](assets/3dgarden/README.md) · [3D Garden 授權](https://www.3dgarden.app/licence)
 - [Three.js MIT 授權](vendor/THREE-LICENSE.txt) · [Draco Apache 2.0 授權](vendor/addons/draco/LICENSE.txt)
