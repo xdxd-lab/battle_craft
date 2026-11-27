@@ -2,7 +2,7 @@
 
 2026-11-28。新對局升為模擬版本 7：沿用版本 6 的道路寬與六兵種，加入戰鬥巡洋艦（Battlecruiser）、斥候（Scout）、自殺蟲（Scourge），每席九座信標。另外兩項規則只在版本 7 生效：每次金幣收入改為 3 金（原本 1 金），基礎護甲開始計算。版本 1～6 的信標、經濟、電腦選擇、亂數消耗與固定摘要都不變，v6 仍為 `c037ba37 6207bb5a`（`qa-roster.mjs`）。
 
-查證分工：QA3 查 BWAPI 原版數值，QA4 逐版查 BattleCraft 的 Trigger 與 UNIx。兩份完整報告與解析腳本存在本機 `~/Projects/.archive/BC-NINE-UNITS/`，不進儲存庫。關鍵行已由 t2p 抽查：BWAPI `defaultArmorAmount` 依 ID 取值；Trigger 抽查了 SPEED #55 與 v2.91f #38、#58。
+查證分工：QA3 查 BWAPI 原版數值，QA4 逐版查 BattleCraft 的 Trigger 與 UNIx。兩份完整報告與解析腳本存在本機 `~/Projects/.archive/BC-NINE-UNITS/`，不進儲存庫。t2p 依 ID 自行取值核對過：BWAPI `defaultArmorAmount`（九兵種護甲），以及 `WeaponType.cpp` 的傷害、factor、冷卻、最大射程（ATS／ATA Laser Battery 25／1／30／192、Dual Photon Blasters 8／1／30／128、Anti-Matter Missiles 14／2／22／128、Suicide Scourge 110／1／1／3）。同一方法取 Gauss Rifle、Burst Lasers、Gemini Missiles、Needle Spines、Psionic Shockwave，都與版本 6 已用的值一致，證明索引正確。Trigger 抽查了 SPEED #55 與 v2.91f #38、#58。
 
 ## 原版數值（BWAPI 預設，未含升級）
 
@@ -21,6 +21,7 @@
 
 - **移速單位未核實**：topSpeed 的單位推定為 px/frame，但 BWAPI 的 UnitType.h 沒能取得，所以未確認。對照組：陸戰隊 4.0、重騎兵 5.0、飛螳 6.67、刺蛇 3.66、破壞能 4.92、死靈戰機 6.67。
 - **基礎護甲**：陸戰隊 0、重騎兵 1，其餘六兵種與斥候、自殺蟲都是 0；戰鬥巡洋艦是 3。
+- **彈體速度與到達時間未查**：原版只確認了「雷射即時」「飛彈為投射物」「自殺蟲接觸自爆」。斥候飛彈的原版彈速與到達時間沒有查到，本作的每 tick .25 是自訂值（與死靈戰機飛彈相同）。傷害類型（普通／爆炸）取自 QA3 的 BWAPI 解析，並以 Blizzard 傷害說明交叉確認，t2p 沒有另外從 `wpnDamageType` 取值。
 
 ## BattleCraft 各版實際扣款與生成數
 
@@ -133,6 +134,6 @@
 ## 限制
 
 - 外觀、音色與標籤的可讀性都未經人眼人耳驗收，需要 QA2 看。
-- 九座信標的標籤縮小後，在 844 寬以下可能不易閱讀。
+- 可讀性要分開看：購兵按鈕（編號、名稱、價格）與數字鍵 1～9 在 1600／1280／844／667 四種寬度都測過、在畫面內且文字不溢出；但信標地面標籤縮成 0.6 倍後，連 1600 寬的截圖裡都很小，需要 QA2 判斷是否要改成只顯示編號或加大。
 - Safari／iOS 與實機觸控未測。
 - 大和砲、斥候的升級、自殺蟲一次兩隻，以及地圖的英雄覆寫，都沒有採用。
