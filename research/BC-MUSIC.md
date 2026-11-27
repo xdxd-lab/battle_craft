@@ -1,6 +1,6 @@
 # BC-MUSIC：DEV02 背景音樂
 
-> **目前狀態（2026-11-28）**：已改為開場／激戰兩階段、五首內嵌 CC0 曲目，詳見末節「定案」。以下各節依時間保留歷次決策，其中的 `#music=*` 參數與 `pulse-loop.mp3` 已移除。
+> **目前狀態（2026-11-28）**：已改為開場／激戰兩階段、六首內嵌曲目（五首 CC0，加上 Kevin MacLeod〈Volatile Reaction〉CC BY 4.0，選單附署名、曲目頁與授權條款連結），詳見末節「定案」。以下各節依時間保留歷次決策，其中的 `#music=*` 參數與 `pulse-loop.mp3` 已移除。
 
 2026-11-27 起，DEV02 的背景音樂預設使用 CC0 曲〈Pulse〉（SRG774，Dark Sci-Fi Audio Pack）。原本的程序合成音樂保留下來，用於解碼失敗時的備援，也可用 `#music=synth` 切回對照。來源、授權原文、雜湊與處理指令見 [assets/music/README.md](../assets/music/README.md)。
 

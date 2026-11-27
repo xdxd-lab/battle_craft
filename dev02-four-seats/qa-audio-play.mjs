@@ -108,6 +108,16 @@ await test('解碼失敗：改選同階段其他曲；同階段全壞則不播�
   r = await run({ music: 2, sfx: 2 }, [0]); r.a.setPhase('opening'); await settle(); r.restore(); assert.deepEqual([r.a.info().track, r.a.info().musicSource, r.mine().length], [null, 'none', 0]);
   decodeResult = () => Promise.resolve(fakeTrack());
 });
+await test('開場正播時切激戰、激戰曲全解碼失敗：舊開場曲立即停、不再出聲', async () => {
+  decodeResult = () => Promise.resolve(fakeTrack());
+  const { a, mine, shown, restore } = await run({ music: 2, sfx: 2 }, [0, 0]); a.setPhase('opening'); await settle();
+  assert.equal(a.info().track, 'o1'); const opening = mine()[0];
+  decodeResult = id => id.startsWith('b') ? Promise.reject(new Error('壞檔')) : Promise.resolve(fakeTrack());
+  a.setPhase('battle'); await settle(); restore();
+  assert.deepEqual([a.info().phase, a.info().track, a.info().wanted, a.info().musicSource], ['battle', null, null, 'none']);
+  assert.equal(opening.stopped, 1, '舊開場曲停止'); assert.equal(mine().length, 1, '沒有新的音樂來源'); assert.equal(shown.at(-1), null, '曲名列清空');
+  decodeResult = () => Promise.resolve(fakeTrack());
+});
 await test('音樂關閉：不解碼、不播放；播放中關閉立即停止；再打開重新播放同一首', async () => {
   const lv = { music: 0, sfx: 2 }, n = decodes, { a, mine, shown, restore } = await run(lv, [0]); a.setPhase('opening'); await settle();
   assert.equal(decodes, n); assert.equal(a.info().musicSource, 'off'); assert.equal(mine().length, 0);

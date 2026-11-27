@@ -31,7 +31,7 @@ export function createAudio(levels, { tracks = [], random = Math.random, onTrack
   function load(t) { // 曲檔以離線 context 解碼（不需使用者互動）；完成後若已解鎖就開始播放
     if (decoded.has(t.id) || decoding.has(t.id)) return;
     decoding.add(t.id);
-    const fail = error => { decoding.delete(t.id); broken.add(t.id); console.warn(`背景音樂 ${t.title} 無法解碼，改選同階段其他曲`, error); if (want === t) { want = pick(phase); if (want && levels.music) load(want); } musicChanged(); };
+    const fail = error => { decoding.delete(t.id); broken.add(t.id); console.warn(`背景音樂 ${t.title} 無法解碼，改選同階段其他曲`, error); if (want === t) { want = pick(phase); if (want && levels.music) load(want); } musicChanged(); sync(); }; // sync：同階段全壞時 want 為 null，要停掉仍在播的上一階段曲
     try {
       const Offline = window.OfflineAudioContext || window.webkitOfflineAudioContext, bytes = Uint8Array.from(atob(t.data), c => c.charCodeAt(0));
       new Offline(2, 1, 44100).decodeAudioData(bytes.buffer).then(b => { decoding.delete(t.id); if (t === want || t === current?.track) decoded.set(t.id, b); sync(); }, fail);

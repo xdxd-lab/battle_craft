@@ -224,6 +224,15 @@ await test('橫式設定按鈕不遮擋：844×390、1280×720 兩種開關組�
     if (SHOTS && w === 844) await page.shot(path.join(SHOTS, `display-phone-${flip ? 'off' : 'on'}.png`)); await page.done();
   }
 });
+await test('選單音樂署名：CC BY 曲目頁與授權條款連結可觸控（高度 ≥44px、捲動可達、不超出畫面寬）', async () => {
+  for (const [w, h] of [[667, 375], [844, 390], [1280, 720]]) {
+    const page = await browser.open(`${url}#seed=7`, { stepped: true, w, h }); await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`);
+    const links = await page.eval(`[...document.querySelectorAll('.credit-links a')].map(a => { a.scrollIntoView({ block: 'center' }); const r = a.getBoundingClientRect(); return { href: a.href, target: a.target, h: r.height, left: r.left, right: r.right, top: r.top, bottom: r.bottom }; })`);
+    assert.deepEqual(links.map(l => l.href), ['https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1400039', 'https://creativecommons.org/licenses/by/4.0/']);
+    assert(links.every(l => l.target === '_blank' && l.h >= 44 && l.left >= 0 && l.right <= w && l.top >= 0 && l.bottom <= h), `${w}x${h} ${JSON.stringify(links)}`);
+    assert(await page.eval(`document.getElementById('music-credits').textContent.includes('Volatile Reaction')`)); assert.deepEqual(page.errors, []); await page.close();
+  }
+});
 await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、文字不溢出；畫面內核心的血條與數字不被裁切', async () => {
   const shifted = new Set();
   for (const [w, h] of [[844, 340], [667, 375], [844, 375], [844, 390], [1280, 720], [1600, 900]]) for (const quality of ['std', 'high']) {
