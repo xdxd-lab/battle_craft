@@ -2,7 +2,7 @@
 
 2026-11-26。對照 [SPEED 2tzpVkp9](https://scmscx.com/map/2tzpVkp9) 和 [FastBlack v2.91f](https://scmscx.com/map/7zGY2kzG) 的本機 SCX、CHK 與 Trigger 匯出。所用檔案與[樣本雜湊表](battle_craft-scx-checksums.csv)一致。原論壇附件仍未取得，這兩版結論各適用於各自的鏡像。畫面證據及來源界線見[原作研究](battle_craft-research.md#歷史畫面與介面)。
 
-畫面字詞、實際扣款、生成單位 ID 與引擎攻擊類型應各自核對。現階段可借鏡對地、對空、雙用途、濺射等職責，正式兵種名稱、資產與平衡數值由 BaattleCraft 自行設計。
+畫面字詞、實際扣款、生成單位 ID 與引擎攻擊類型應各自核對。現階段可借鏡對地、對空、雙用途、濺射等職責，正式兵種名稱、資產與平衡數值由 BaattleCraft 自行設計。本專案中文稱 Protoss 為「神民」；表內英文單位名、Trigger 字串與外部來源名稱照原文保留。
 
 ## 購兵比對：Trigger、顯示名稱、護甲、攻擊方式
 
@@ -30,6 +30,16 @@ SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`
 
 SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
 
+### 後續候選兵種（2026-11-27 名稱已確認，未實作）
+
+| 中文名 | 英文 | v2.91f 礦／計畫數 | v2.91f HP／盾 |
+|---|---|---|---|
+| 刺蛇 | Hydralisk | 150／15 | 485／0 |
+| 破壞能 | Archon | 300／12 | 1750／0 |
+| 死靈戰機 | Wraith | 300／8 | 800／0 |
+
+來源界線：礦／計畫數取自上表的 v2.91f Trigger 扣款與 Create Unit 合計；HP／盾是 v2.91f CHK `UNIx` 覆寫值，由本機讀取筆記整理（本機專用，未納入儲存庫，也不附地圖檔），與 QA2 初查一致；可從公開的 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)取得同一地圖自行核對，地圖雜湊見[樣本雜湊表](battle_craft-scx-checksums.csv)。兩者都只代表 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)這一版地圖，不是原作者首發檔，也不是 Blizzard 普通單位的原版數值；原版數值另以官方資料標示，本節未列。以上皆為對照資料，不是 BaattleCraft 的定案規格；新遊戲的價格、血量、攻擊與素材另行設計。
+
 ## UNIx、UNIS 與引擎預設的界線
 
 兩個本機 CHK 均為 VER 205，含一個 4168-byte `UNIx`，本次找到的完整 UNIx 位於 SPEED offset 356479、v2.91f offset 375108；SPEED 檔案正常結束，v2.91f 後續 WAV 長度異常。依 [scmJS UNIx 格式](https://docs.scmjs.dev/chk/unix/)及[載入順序](https://docs.scmjs.dev/chk/how-the-game-loads-a-map/)，Brood War UMS 讀 UNIx；不要因為有 UNIS 就假設會覆蓋該版本 UNIx。每個類型的 flag 為 0 才套用該表對應單位 HP、盾、護甲、名稱等；非零使用既有／引擎值。重複 settings section 依條目合併，非簡單最後整段取代。以上表列類型逐一讀得 flag 均為 0，因此護甲是地圖自訂值，即使數字偶爾與預設相同。
@@ -50,7 +60,7 @@ SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成�
 | Artanis Scout | 飛行 | Dual Photon Blasters，普通 | Anti-Matter Missiles，爆炸 | Protoss Air Armor |
 | Hunter Killer | 地面 | Needle Spines，爆炸 | Needle Spines，爆炸 | Zerg Carapace |
 
-SC1 將小／中／大體型、基礎護甲值和護甲升級組分開。震盪傷害對中／大體型倍率為 50%／25%，爆炸傷害對小／中體型為 50%／75%，普通傷害的體型倍率一致。神族護盾的傷害倍率規則也另行處理。SC2 的輕甲、重甲等屬性及加成要按其版本判讀。[Blizzard 傷害說明](https://classic.battle.net/scc/gs/damage.shtml) · [BWAPI 單位資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp) · [BWAPI 武器資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp)
+SC1 將小／中／大體型、基礎護甲值和護甲升級組分開。震盪傷害對中／大體型倍率為 50%／25%，爆炸傷害對小／中體型為 50%／75%，普通傷害的體型倍率一致。神民（Protoss）護盾的傷害倍率規則也另行處理。SC2 的輕甲、重甲等屬性及加成要按其版本判讀。[Blizzard 傷害說明](https://classic.battle.net/scc/gs/damage.shtml) · [BWAPI 單位資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp) · [BWAPI 武器資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp)
 
 ## 介面字詞
 
