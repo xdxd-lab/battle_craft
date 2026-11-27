@@ -2,7 +2,7 @@
 
 2026-11-26。對照 [SPEED 2tzpVkp9](https://scmscx.com/map/2tzpVkp9) 和 [FastBlack v2.91f](https://scmscx.com/map/7zGY2kzG) 的本機 SCX、CHK 與 Trigger 匯出。所用檔案與[樣本雜湊表](battle_craft-scx-checksums.csv)一致。原論壇附件仍未取得，這兩版結論各適用於各自的鏡像。畫面證據及來源界線見[原作研究](battle_craft-research.md#歷史畫面與介面)。
 
-畫面字詞、實際扣款、生成單位 ID 與引擎攻擊類型應各自核對。現階段可借鏡對地、對空、雙用途、濺射等職責，正式兵種名稱、資產與平衡數值由 BaattleCraft 自行設計。
+畫面字詞、實際扣款、生成單位 ID 與引擎攻擊類型應各自核對。現階段可借鏡對地、對空、雙用途、濺射等職責，正式兵種名稱、資產與平衡數值由 BaattleCraft 自行設計。本專案中文稱 Protoss 為「神民」；表內英文單位名、Trigger 字串與外部來源名稱照原文保留。
 
 ## 購兵比對：Trigger、顯示名稱、護甲、攻擊方式
 
@@ -50,7 +50,7 @@ SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成�
 | Artanis Scout | 飛行 | Dual Photon Blasters，普通 | Anti-Matter Missiles，爆炸 | Protoss Air Armor |
 | Hunter Killer | 地面 | Needle Spines，爆炸 | Needle Spines，爆炸 | Zerg Carapace |
 
-SC1 將小／中／大體型、基礎護甲值和護甲升級組分開。震盪傷害對中／大體型倍率為 50%／25%，爆炸傷害對小／中體型為 50%／75%，普通傷害的體型倍率一致。神族護盾的傷害倍率規則也另行處理。SC2 的輕甲、重甲等屬性及加成要按其版本判讀。[Blizzard 傷害說明](https://classic.battle.net/scc/gs/damage.shtml) · [BWAPI 單位資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp) · [BWAPI 武器資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp)
+SC1 將小／中／大體型、基礎護甲值和護甲升級組分開。震盪傷害對中／大體型倍率為 50%／25%，爆炸傷害對小／中體型為 50%／75%，普通傷害的體型倍率一致。神民（Protoss）護盾的傷害倍率規則也另行處理。SC2 的輕甲、重甲等屬性及加成要按其版本判讀。[Blizzard 傷害說明](https://classic.battle.net/scc/gs/damage.shtml) · [BWAPI 單位資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp) · [BWAPI 武器資料](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp)
 
 ## 介面字詞
 
