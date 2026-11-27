@@ -4,7 +4,7 @@ import { createAudio } from './audio.js';
 
 const pending = [], sources = [];
 const settle = async () => { for (let i = 0; i < 8; i++) { pending.splice(0).forEach(f => f()); await Promise.resolve(); await Promise.resolve(); } };
-const node = () => ({ gain: { value: 1 }, connected: false, connect(to) { this.connected = true; return to; }, disconnect() { this.connected = false; } });
+const node = () => ({ gain: { value: 1 }, connected: false, connect(to) { this.connected = true; this.to = to; return to; }, disconnect() { this.connected = false; } });
 let made;
 class Context {
   constructor() { made = this; }
@@ -55,10 +55,20 @@ await test('關閉音效即停掉發聲中的音效，音樂不受影響；再�
   fire(); const old = effects().slice(-3); levels.sfx = 0; audio.sync(); assert(stoppedAll(old)); assert.equal(audio.info().voices, 0); levels.sfx = 2; audio.sync(); await settle();
   fire(); const next = effects().slice(-3); audio.stopEffects(); assert(stoppedAll(next)); assert.equal(audio.info().voices, 0); assert.equal(music()[0].stopped, 0);
 });
-await test('系統中斷（state 非本頁改變）：舊音效清掉，輸入或系統恢復後不續播', async () => {
-  for (const notify of [true, false]) {
-    fire(); const old = effects().slice(-3); made.state = 'interrupted'; if (notify) made.onstatechange();
-    audio.unlock(); await settle(); assert.equal(audio.info().state, 'running'); assert(stoppedAll(old)); assert.equal(audio.info().voices, 0); assert.equal(music()[0].stopped, 0);
-  }
+const interrupt = () => { made.state = 'interrupted'; made.onstatechange(); };
+const silenced = old => { assert(stoppedAll(old), '舊來源應已停'); assert(old.every(s => !s.to.connected), '舊音效增益應已斷開'); assert.equal(audio.info().voices, 0); assert.equal(music()[0].stopped, 0); };
+await test('系統中斷：事件一到就清掉舊音效（不靠任何輸入），之後輸入恢復不續播', async () => {
+  fire(); const old = effects().slice(-3); assert.equal(audio.info().voices, 3); interrupt(); silenced(old); // 必須在 unlock 之前成立
+  const count = sources.length; fire(); assert.equal(sources.length, count, '中斷中不啟動');
+  audio.unlock(); await settle(); assert.equal(audio.info().state, 'running'); silenced(old); assert.equal(sources.length, count);
+});
+await test('系統自行恢復（沒有輸入、不呼叫 unlock／sync）：舊音效不續播，新音效照常', async () => {
+  fire(); const old = effects().slice(-3); assert.equal(audio.info().voices, 3); interrupt(); silenced(old);
+  const count = sources.length; made.state = 'running'; made.onstatechange(); await Promise.resolve();
+  silenced(old); assert.equal(sources.length, count); assert(old.every(s => s.started === 1));
+  fire(); assert.equal(sources.length, count + 3); const next = effects().slice(-3); assert(next.every(s => s.stopped === 0)); made.onstatechange(); assert.equal(audio.info().voices, 3, 'running 事件不清新音效'); audio.stopEffects();
+});
+await test('漏掉中斷事件時，輸入恢復前的 sync 仍清掉舊音效', async () => {
+  fire(); const old = effects().slice(-3); made.state = 'interrupted'; audio.unlock(); await settle(); assert.equal(audio.info().state, 'running'); silenced(old);
 });
 console.table(rows); console.log('audio playback QA: OK');
