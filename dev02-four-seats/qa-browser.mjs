@@ -8,8 +8,8 @@ import * as L from '../dev05-layout/layout.mjs';
 import { TRACKS, BATTLE_AT_SECONDS } from './music-tracks.mjs';
 
 // 三兵種本體三角面
-const stdTri = { marine: 192, dragoon: 148, mutalisk: 160, hydralisk: 216, archon: 196, wraith: 180 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436, hydralisk: 704, archon: 776, wraith: 448 };
-const gold = tick => S.ECONOMY.startGold + Math.floor(tick / S.ECONOMY.incomeEvery);
+const stdTri = { marine: 192, dragoon: 148, mutalisk: 160, hydralisk: 216, archon: 196, wraith: 180, battlecruiser: 240, scout: 168, scourge: 242 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436, hydralisk: 704, archon: 776, wraith: 448, battlecruiser: 728, scout: 324, scourge: 576 };
+const E = S.economyFor(S.VERSION), gold = tick => E.startGold + Math.floor(tick / E.incomeEvery) * (E.income ?? 1); // 新對局（版本 7）每次收入 3 金
 const here = path.dirname(fileURLToPath(import.meta.url)), SHOTS = process.env.SHOTS;
 const url = pathToFileURL(path.join(here, 'battle_craft-dev02.html')).href;
 const browser = await launch({ width: 1600, height: 900 }), rows = [];
@@ -34,10 +34,10 @@ await test('四席：點信標購兵、HUD 與帳目相符、WASD 依鏡頭方�
     assert.equal(await page.eval('__dev02.view()'), 'seat:' + id);
     let s = await page.snap(); const h = s.seats[id].commander;
     await page.clickWorld(x, z, 12); let first = 0;
-    for (let i = 0; i < 90; i++) { await page.eval('__step(1)'); s = await page.snap(); if (!first && s.seats[id].buys) first = s.tick; if (Math.hypot(s.seats[id].commander.x - x, s.seats[id].commander.z - z) > S.RULES.padRadius) assert.equal(s.seats[id].spent, 0); }
+    for (let i = 0; i < 90; i++) { await page.eval('__step(1)'); s = await page.snap(); if (!first && s.seats[id].buys) first = s.tick; if (Math.hypot(s.seats[id].commander.x - x, s.seats[id].commander.z - z) > S.padRadiusFor(S.VERSION)) assert.equal(s.seats[id].spent, 0); }
     assert(first > 0); assert.equal(s.seats[id].gold + s.seats[id].spent, gold(s.tick)); assert.equal(+(await page.eval(`document.getElementById('gold').textContent`)), s.seats[id].gold);
     assert(Math.hypot(s.seats[id].commander.x - h.x, s.seats[id].commander.z - h.z) > 2);
-    await page.clickWorld(...S.toWorld(id, 0, 0, S.DIM)); await page.eval('__step(60)');
+    await page.clickWorld(...S.toWorld(id, 0, 2.4, S.DIM)); await page.eval('__step(60)'); // 回到開場位置（版本 7 中央是信標）
     const at = async () => { const c = (await page.snap()).seats[id].commander; return page.eval(`__dev02.screen(${c.x}, ${c.z})`); };
     for (const [k, ax, sign] of [['d', 0, 1], ['a', 0, -1], ['w', 1, -1], ['s', 1, 1]]) { const a = await at(); await page.down(k); await page.eval('__step(8)'); await page.up(k); await page.eval('__step(2)'); const b = await at(), d = [b[0] - a[0], b[1] - a[1]]; assert(d[ax] * sign > 5 && Math.abs(d[1 - ax]) < Math.abs(d[ax]), `${id} ${k} 移動 ${d}`); }
     for (const i of [1, 2]) { await page.down(String(i + 1)); await page.up(String(i + 1)); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, i); }
@@ -254,13 +254,13 @@ await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、�
   }
   assert(shifted.has('667E'), '667 寬東席核心應平移（原本被右緣裁切）'); return `平移：${[...shifted].join(' ')}`;
 });
-await test('飛螳、死靈戰機飛行（離地、有影子）；重騎兵、刺蛇地面；破壞能低空懸浮', async () => {
-  const page = await open('none', { seed: 11, quality: 'high' }); const seen = {}, want = ['dragoon', 'mutalisk', 'hydralisk', 'wraith', 'archon'];
+await test('飛螳、死靈戰機、戰鬥巡洋艦、斥候、自殺蟲飛行（離地、有影子）；重騎兵、刺蛇地面；破壞能低空懸浮', async () => {
+  const page = await open('none', { seed: 11, quality: 'high' }); const seen = {}, want = ['dragoon', 'mutalisk', 'hydralisk', 'wraith', 'archon', 'battlecruiser', 'scout', 'scourge'];
   for (let i = 0; i < 400 && !want.every(k => seen[k]); i++) {
-    await page.eval('__step(20)'); const [info, air] = await page.eval(`[__dev02.info(), __dev02.snapshot().units.filter(u => u.kind === 'mutalisk' || u.kind === 'wraith').length]`);
+    await page.eval('__step(20)'); const [info, air] = await page.eval(`[__dev02.info(), __dev02.snapshot().units.filter(u => ['mutalisk', 'wraith', 'battlecruiser', 'scout', 'scourge'].includes(u.kind)).length]`);
     assert.equal(info.shadows, air); for (const k of want) if (info.heights[k].length) seen[k] = k === 'archon' ? [Math.min(...info.heights[k]) >= .3 && Math.max(...info.heights[k]) <= .46] : info.heights[k];
   }
-  assert.deepEqual(seen, { dragoon: [.04], mutalisk: [1.74], hydralisk: [.04], wraith: [1.74], archon: [true] }); if (SHOTS) await page.shot(path.join(SHOTS, 'air-ground.png')); await page.done(); return JSON.stringify(seen);
+  assert.deepEqual(seen, { dragoon: [.04], mutalisk: [1.74], hydralisk: [.04], wraith: [1.74], archon: [true], battlecruiser: [1.74], scout: [1.74], scourge: [1.74] }); if (SHOTS) await page.shot(path.join(SHOTS, 'air-ground.png')); await page.done(); return JSON.stringify(seen);
 });
 await test('主城：血量數字與損壞階段隨本體血量、血條開關連動、純呈現不改模擬', async () => {
   const max = S.coreMax(S.VERSION), want = hp => [.75, .5, .25].filter(a => hp <= max * a).length;
@@ -277,14 +277,18 @@ await test('主城：血量數字與損壞階段隨本體血量、血條開關�
   const page = await open('W'); await page.eval('__step(30)'); assert.equal((await page.eval('__dev02.cores()')).N.label, String(max)); await page.clickOn('#opt-bars'); await page.eval('__step(2)'); assert((await page.eval('Object.values(__dev02.cores())')).every(c => c.label === null)); await page.clickOn('#opt-bars'); await page.eval('__step(2)'); assert.equal((await page.eval('__dev02.cores()')).W.label, String(max)); await page.done();
   return '四階段皆出現；數字與模擬血量一致';
 });
-await test('六信標：點展示模型走向該信標（不開單位介紹）、按鈕與數字鍵 1–6、橫式不被 HUD 遮住', async () => {
+await test('九信標：點展示模型走向該信標（不開單位介紹）、按鈕與數字鍵 1–9、購兵列不溢出、桌面與橫式不被 HUD 遮住', async () => {
   const out = [];
-  for (const [w, h] of [[1600, 900], [844, 390]]) for (const id of S.SEAT_IDS) {
+  for (const [w, h] of [[1600, 900], [1280, 720], [844, 390], [667, 375]]) for (const id of S.SEAT_IDS) {
+    if (w === 1280 || w === 667) { if (id !== 'S' && id !== 'E') continue; }
     const page = await open(id, { w, h });
-    assert.equal(await page.eval(`document.querySelectorAll('#shop button').length`), 6);
-    const models = await page.eval('__dev02.padModels()'); assert.equal(models.length, 24, '四席各六座展示模型');
+    assert.equal(await page.eval(`document.querySelectorAll('#shop button').length`), 9);
+    const shop = await page.eval(`(() => { const r = [...document.querySelectorAll('#shop button')].map(b => { const x = b.getBoundingClientRect(); return { l: x.left, r: x.right, t: x.top, b: x.bottom, over: b.scrollWidth > b.clientWidth + 1 }; }), box = id => { const x = document.getElementById(id).getBoundingClientRect(); return { l: x.left, r: x.right, t: x.top, b: x.bottom }; }; return { r, hud: [box('bar'), box('panel')].filter(x => x.r > x.l) }; })()`);
+    assert(shop.r.every(b => b.l >= 0 && b.r <= w && b.b <= h && b.t >= 0 && !b.over && !shop.hud.some(x => b.l < x.r - 1 && x.l < b.r - 1 && b.t < x.b - 1 && x.t < b.b - 1)), `${w}x${h} 購兵列 ${JSON.stringify(shop)}`);
+    assert(new Set(shop.r.map(b => Math.round(b.t))).size <= (w > h ? 2 : 3), `${w}x${h} 購兵列列數`);
+    const models = await page.eval('__dev02.padModels()'); assert.equal(models.length, 36, '四席各九座展示模型');
     for (const sid of S.SEAT_IDS) assert.deepEqual(models.filter(m => m.seat === sid).map(m => m.kind), S.PADS.map(p => p.kind), `${sid} 展示模型`);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 9; i++) {
       const at = await page.eval(`__dev02.padModel(${i})`); assert(at, `模型 ${i}`);
       const [x, y] = await page.eval(`__dev02.screen(${at[0]}, ${at[2]}, ${at[1]})`);
       assert(await page.eval(`document.elementFromPoint(${x}, ${y})?.id === 'stage'`), `${w}x${h} ${id} 模型 ${i + 1} 被遮`);
@@ -300,9 +304,10 @@ await test('六信標：點展示模型走向該信標（不開單位介紹）�
       }
     }
     await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51, text: '3' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51 }); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 2);
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: '9', code: 'Digit9', windowsVirtualKeyCode: 57, text: '9' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: '9', code: 'Digit9', windowsVirtualKeyCode: 57 }); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 8);
     await page.clickOn('#shop button[data-pad="5"]'); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 5);
     const kinds = new Set((await page.snap()).units.filter(u => u.seat === id).map(u => u.kind)); out.push(`${id}:${kinds.size}`);
-    if (SHOTS && id === 'S') await page.shot(path.join(SHOTS, `six-pads-${w}x${h}.png`));
+    if (SHOTS && (id === 'S' || id === 'E')) await page.shot(path.join(SHOTS, `nine-pads-${id}-${w}x${h}.png`));
     await page.done();
   }
   return out.join(' ');
@@ -311,7 +316,7 @@ await test('取景：桌面與橫式手機四席與隊伍視角皆在安全區�
   for (const [w, h] of [[1600, 900], [1280, 720], [844, 390]]) for (const id of S.SEAT_IDS) {
     const page = await open(id, { w, h });
     assert.equal(await page.eval('__dev02.framing()'), 'near');
-    for (const i of [0, 1, 2, 3, 4, 5]) {
+    for (const i of S.PADS.keys()) {
       if (i === 1) { await page.clickOn('#view'); await page.eval('__step(40)'); }
       const pad = S.padWorld(id, i, S.DIM);
       assert(await page.eval(`(() => { const [x,y] = __dev02.screen(${pad[0]}, ${pad[1]}); return document.elementFromPoint(x,y)?.id === 'stage'; })()`), `${w}x${h} ${id}, 近景信標 ${i + 1}`);
@@ -330,9 +335,9 @@ await test('即時模式 4 倍速：玩家不動至終局，重跑摘要一致',
   const page = await open('N', { seed: 5, stepped: false }); assert.equal(await page.eval("document.getElementById('speed').textContent"), '1×'); await page.clickOn('#speed'); assert.equal(await page.eval("document.getElementById('speed').textContent"), '2×');
   await page.until(`__dev02.mode() === 'end'`, 90000); assert.equal(await page.eval(`document.getElementById('result').textContent`), '敗北'); await same(page); const s = await page.snap(); await page.done(); return `${(s.tick / 30).toFixed(0)} 秒`;
 });
-await test('四席各買六兵種；模型、盾條、四種飛行中投射物可見；暫停凍結', async () => {
+await test('四席各買九兵種；模型、盾條、五種飛行中投射物可見；暫停凍結', async () => {
   const page = await open('none', { seed: 11 });
-  const seen = { dragoon: false, mutalisk: false, hydralisk: false, wraith: false }, bought = new Set(), KIND = Object.keys(S.padsFor(S.VERSION).reduce((a, p) => ({ ...a, [p.kind]: 1 }), {})); let frozen = false;
+  const seen = { dragoon: false, mutalisk: false, hydralisk: false, wraith: false, scout: false }, bought = new Set(), KIND = Object.keys(S.padsFor(S.VERSION).reduce((a, p) => ({ ...a, [p.kind]: 1 }), {})); let frozen = false;
   for (let i = 0; i < 4000 && await page.eval('__dev02.mode()') === 'play'; i++) {
     await page.eval('__step(4)');
     const [shots, drawn, units, info] = await page.eval(`[__dev02.mode() === 'end' ? [] : __dev02.snapshot().shots, __dev02.info().projectiles, __dev02.snapshot().units, __dev02.info().drawn]`);
@@ -345,16 +350,16 @@ await test('四席各買六兵種；模型、盾條、四種飛行中投射物�
       await page.clickOn('#pause'); await page.eval('__step(20)'); assert.notEqual(await page.eval('JSON.stringify(__dev02.snapshot().shots)'), a);
     }
   }
-  assert(frozen && Object.values(seen).every(Boolean), JSON.stringify(seen)); assert.equal(bought.size, 24, `四席六兵種 ${[...bought]}`); assert.equal(await page.eval('__dev02.mode()'), 'end'); await page.eval('__step(2)'); assert.deepEqual(await page.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0 }, '終局不留投射物'); await same(page); await page.done();
-  // seed 1 觀戰終局時仍有飛行中的投射物
-  const left = await open('none', { seed: 1 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0 }); await left.done();
+  assert(frozen && Object.values(seen).every(Boolean), JSON.stringify(seen)); assert.equal(bought.size, 36, `四席九兵種 ${[...bought]}`); assert.equal(await page.eval('__dev02.mode()'), 'end'); await page.eval('__step(2)'); assert.deepEqual(await page.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0, scout: 0 }, '終局不留投射物'); await same(page); await page.done();
+  // seed 3（版本 7）觀戰終局時仍有飛行中的投射物
+  const left = await open('none', { seed: 3 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0, scout: 0 }); await left.done();
   for (const quality of ['std', 'high']) {
     const card = await open('N', { quality });
-    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈戰機（Wraith）', '對地 8／對空 20']]) {
+    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈戰機（Wraith）', '對地 8／對空 20'], ['battlecruiser', '戰鬥巡洋艦（Battlecruiser）', '基礎護甲\n3'], ['scout', '斥候（Scout）', '對地 8／對空 14×2'], ['scourge', '自殺蟲（Scourge）', '110（自爆）']]) {
       await card.clickOn(`[data-profile="${kind}"]`); const text = await card.eval(`document.getElementById('dossier').innerText`); assert(text.includes(name) && text.includes(attack), text);
       if (SHOTS) await card.shot(path.join(SHOTS, `dossier-${quality}-${kind}.png`));
     }
-    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '刺蛇 Hydralisk', '破壞能 Archon', '死靈戰機 Wraith', '指揮官 Commander']);
+    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '刺蛇 Hydralisk', '破壞能 Archon', '死靈戰機 Wraith', '戰鬥巡洋艦 Battlecruiser', '斥候 Scout', '自殺蟲 Scourge', '指揮官 Commander']);
     await card.done();
   }
   for (const [w, h] of [[844, 390], [1600, 900]]) { const p = await open('S', { w, h, quality: 'high', seed: 11 }); await p.eval('__step(30)'); for (let i = 0; i < 22; i++) { await p.down('123456'[i % 6]); await p.up('123456'[i % 6]); await p.eval('__step(60)'); } if (SHOTS) await p.shot(path.join(SHOTS, `battle-${w}.png`));
@@ -427,7 +432,7 @@ await test('聲音背景與恢復：隱藏／暫停期間戰鬥續跑不發新�
     await page.until(`__dev02.audio().state === 'running'`); assert.equal((await A()).voices, 0, '恢復後無續播'); assert.deepEqual(await music(), [0], '音樂同一條、未停掉');
   }
   await battle(); await page.eval(`document.getElementById('again').click()`); assert.equal((await A()).voices, 0); await page.until(`__dev02.audio().state === 'running'`); await page.clickOn('[data-seat="N"]'); assert.equal((await A()).voices, 0);
-  await page.eval('__step(30)'); assert.deepEqual(await music(), [0]); assert.deepEqual(page.errors, []); await page.close();
+  await page.eval('__step(30)'); const m = await music(); assert(m.at(-1) === 0 && m.slice(0, -1).every(n => n === 1), `再開局：只剩一條音樂在播，其餘各停一次 ${m}`); assert.deepEqual(page.errors, []); await page.close(); // 版本 7 收入較快，再開局前可能已切到激戰曲
   // 真實背景：另開分頁蓋到前景
   const real = await browser.open(`${url}#seed=11`, { prelude: SPY }); await real.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await real.send('Emulation.setFocusEmulationEnabled', { enabled: false }); await real.clickOn('[data-seat="none"]'); await real.until(`__dev02.audio().voices > 0`, 30000);
   const cover = await browser.open('about:blank'); await cover.send('Page.bringToFront');
@@ -442,8 +447,8 @@ await test('聲音背景與恢復：隱藏／暫停期間戰鬥續跑不發新�
 });
 await test('終局與音樂階段：開場→激戰只切一次並維持到終局、曲名顯示；勝／敗立即停掉戰鬥音效且不再新啟動；只開音樂、只開音效、再來一局', async () => {
   const A = p => p.eval('__dev02.audio()'), total = v => Object.values(v.played).reduce((x, y) => x + y, 0), out = [];
-  for (const [seat, music, sfx, seed] of [['S', true, true, 11], ['N', true, false, 11], ['E', false, true, 3]]) { // 種子 3 東席閒置仍勝（Node 搜尋）
-    const page = await open(seat, { seed });
+  for (const [seat, music, sfx, seed, pad] of [['S', true, true, 11], ['N', true, false, 11], ['E', false, true, 3, 4]]) { // 版本 7：東席站破壞能信標、種子 3 會勝（Node 搜尋；閒置在 1–300 皆敗）
+    const page = await open(seat, { seed }); if (pad !== undefined) await page.clickOn(`#shop button[data-pad="${pad}"]`);
     if (!sfx) { await page.clickOn('#opt-sfx'); await page.clickOn('#opt-sfx'); } if (!music) { await page.clickOn('#opt-music'); await page.clickOn('#opt-music'); }
     let a = await A(page), busy = 0; const phases = [];
     if (music) { await page.until(`__dev02.audio().musicSource === 'track'`); a = await A(page); assert(TRACKS.some(t => t.id === a.track && t.phase === 'opening'), a.track); assert.equal(await page.eval(`document.getElementById('now-playing').hidden`), false); const label = await page.eval(`document.getElementById('now-playing').textContent`); assert(label.includes(TRACKS.find(t => t.id === a.track).title), label); }

@@ -30,13 +30,18 @@ SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`
 
 SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
 
-### 後續候選兵種（2026-11-27 名稱已確認；遊戲內實作採 BWAPI 原版值，見 [BC-SIX-UNITS](BC-SIX-UNITS.md)）
+### 後續候選兵種（2026-11-27／28 名稱已確認；遊戲內實作採 BWAPI 原版值，見 [BC-SIX-UNITS](BC-SIX-UNITS.md)、[BC-NINE-UNITS](BC-NINE-UNITS.md)）
 
 | 中文名 | 英文 | v2.91f 礦／計畫數 | v2.91f HP／盾 |
 |---|---|---|---|
 | 刺蛇 | Hydralisk | 150／15 | 485／0 |
 | 破壞能 | Archon | 300／12 | 1750／0 |
 | 死靈戰機 | Wraith | 300／8 | 800／0 |
+| 戰鬥巡洋艦 | Battlecruiser | 500／12（#58） | 2000／0 |
+| 斥候 | Scout | 300／8（#38） | 1000／0 |
+| 自殺蟲 | Scourge | 200／20（#104） | 1000／0 |
+
+2026-11-28 加入戰鬥巡洋艦、斥候、自殺蟲三列（中文名稱已定）。遊戲內採 BWAPI 原版值，SPEED 各版的扣款、英雄型與覆寫見 [BC-NINE-UNITS](BC-NINE-UNITS.md)。SPEED 的戰鬥巡洋艦只賣英雄 Hyperion（#55，500／10），上方主表未列。
 
 來源界線：礦／計畫數取自上表的 v2.91f Trigger 扣款與 Create Unit 合計；HP／盾是 v2.91f CHK `UNIx` 覆寫值，由本機讀取筆記整理（本機專用，未納入儲存庫，也不附地圖檔），與 QA2 初查一致；可從公開的 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)取得同一地圖自行核對，地圖雜湊見[樣本雜湊表](battle_craft-scx-checksums.csv)。兩者都只代表 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)這一版地圖，不是原作者首發檔，也不是 Blizzard 普通單位的原版數值；原版數值另以官方資料標示，本節未列。以上皆為對照資料，不是 BaattleCraft 的定案規格；新遊戲的價格、血量、攻擊與素材另行設計。
 

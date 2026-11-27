@@ -3,7 +3,7 @@ import { detailCommander, detailMaterials } from './detail-models.js';
 import { unitModels } from './unit-models.js';
 import { MAT, seatMats } from '../dev05-layout/world.js';
 import { HZ, RULES } from './sim.mjs';
-import { KINDS, ATTACKS, ARMORS, FRAME_MS } from './roster.mjs';
+import { KINDS, ATTACKS, ARMORS, FRAME_MS, PLATE } from './roster.mjs';
 
 const describe = {
   marine: ['地面步兵', '低價前線單位，即時射擊地面與空中目標。', [1.9, 1.9, 4.3], .92, 25],
@@ -12,12 +12,15 @@ const describe = {
   hydralisk: ['地面中型', '射出骨刺攻擊地面與空中，指向性爆炸對大型目標最有效。', [2.4, 2.0, 3.6], .8, 25],
   archon: ['地面懸浮', '近距靈能衝擊，主目標整發並濺射周圍敵軍與隊友單位（不傷己席）；幾乎全靠護盾承傷。', [3.2, 2.6, 4.0], 1.05, 26],
   wraith: ['飛行', '對地即時雷射（普通），對空發射飛彈（指向性爆炸）；隱形未實作。', [3.0, 2.6, 3.6], .4, 25],
+  battlecruiser: ['飛行重型', '主力艦，雷射砲台即時射擊地面與空中；基礎護甲 3，低傷害武器效果大減。大和砲未實作。', [4.4, 3.4, 5.2], .4, 26],
+  scout: ['飛行', '對地即時光子砲（普通）；對空一次發射兩枚反物質飛彈（指向性爆炸），擅長攔截大型飛行單位。', [3.4, 2.8, 4.0], .4, 25],
+  scourge: ['飛行小型', '只攻擊空中目標。貼近後自爆造成 110 點傷害，自己同時陣亡；不攻擊地面與核心。', [1.8, 1.6, 2.4], .5, 25],
 };
 const unitProfile = kind => {
   const k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
   return {
     name: k.name, english: k.source, role, description, camera, aim, fov,
-    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}` : k.damage], ['攻擊間隔', `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
+    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
     model: unitModels.high[kind], plain: unitModels.std[kind],
   };
 };

@@ -1,25 +1,26 @@
 // 版本 3 的部隊步進：索敵、移動、投射物、彈跳與回盾。傷害順序固定：先抵達的投射物（依編號），再即時攻擊（依射手編號）。
 import * as L from '../dev05-layout/layout.mjs';
-import { KINDS, CORE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
+import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
 export const armorOf = u => u.armor ?? KINDS[u.kind].armor;
 
 // 範圍傷害：以主目標位置為圓心，依部隊編號順序結算；主目標已吃整發不重複
-function splash(units, center, h, spec, killer) {
+function splash(units, center, h, spec, killer, plateOf) {
   const { radii, parts, spareSeat, spareTeam } = spec.splash;
   for (const o of units) {
     if (o === center || o.hp <= 0 || (spareSeat && o.seat === h.seat) || (spareTeam && o.team === h.team) || !canTarget(spec, KINDS[o.kind].air)) continue;
     const d = dist(center.x, center.z, o.x, o.z), ring = radii.findIndex(r => d <= r);
     if (ring < 0) continue;
     const body = { hp: o.hp, sh: o.sh, armor: armorOf(o) };
-    applyDamage(body, spec.damage * parts[ring], spec.attack); o.hp = body.hp; o.sh = body.sh;
+    applyDamage(body, spec.damage * parts[ring], spec.attack, 1, plateOf(o)); o.hp = body.hp; o.sh = body.sh;
     if (o.hp <= 0 && o.team !== h.team) killer.set(o.id, h.seat); // 誤傷隊友致死：計入該席損失，不算施放者擊殺
   }
 }
 
 export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) {
   const units = state.units, alive = new Map(units.map(u => [u.id, u])), frames = framesAt(state.tick) - framesAt(state.tick - 1);
+  const plateOf = state.version >= 7 ? u => PLATE[u.kind] : () => 0; // 基礎護甲自版本 7 起生效
   for (const u of units) {
     const max = KINDS[u.kind].shield;
     if (u.sh < max) u.sh = Math.min(max, u.sh + SHIELD_REGEN * frames / 256);
@@ -37,7 +38,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     else if (foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
     else if (u.target) {
       const [cx, cz] = L.corePos(u.target, dim);
-      if (dist(u.x, u.z, cx, cz) <= R.coreRadius + spec.range) p.core = u.target;
+      if (dist(u.x, u.z, cx, cz) <= R.coreRadius + spec.range) { if (canTarget(spec, false)) p.core = u.target; } // 只打空中者（自殺蟲）到核心旁待命
       else { const [wx, wz] = waypoint(u, dim); p.mx = wx - u.x; p.mz = wz - u.z; }
     }
     for (const o of units) { // 隊形分離只在同一高度層
@@ -73,6 +74,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       state.shots.push(shot); emit('launch', u.seat, { from: u.id, shot: shot.id, kind: u.kind }, true);
     } else {
       instant.push({ from: u.id, kind: u.kind, seat: u.seat, team: u.team, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0 });
+      if (spec.suicide) { u.hp = 0; u.boom = 1; } // 自殺蟲：出手即自爆，同步其他對它的攻擊落空；計入己席損失、不算對方擊殺
       emit('shot', u.seat, { from: u.id, x, z, ...(p.core ? { core: p.core } : { to: p.hit.id }) }, true);
     }
   });
@@ -87,9 +89,11 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       const t = alive.get(h.target);
       if (t && t.hp > 0) {
         const body = { hp: t.hp, sh: t.sh, armor: armorOf(t) };
-        dealt = applyDamage(body, spec.damage, spec.attack, divisor); t.hp = body.hp; t.sh = body.sh;
+        dealt = applyDamage(body, spec.damage, spec.attack, divisor, plateOf(t));
+        for (let k = 1; k < (spec.hits ?? 1); k++) { const d2 = applyDamage(body, spec.damage, spec.attack, divisor, plateOf(t)); dealt = { shield: dealt.shield + d2.shield, body: dealt.body + d2.body }; } // 斥候對空一次兩發，各自套盾與護甲
+        t.hp = body.hp; t.sh = body.sh;
         if (t.hp <= 0) killer.set(t.id, h.seat);
-        if (spec.splash) splash(units, t, h, spec, killer);
+        if (spec.splash) splash(units, t, h, spec, killer, plateOf);
       }
     }
     if (h.id) emit(dealt ? 'impact' : 'fizzle', h.seat, { shot: h.id, kind: h.kind, hop: h.hop, x: h.x, z: h.z, target: h.core || h.target, ...(dealt ?? {}) }, true);
@@ -128,7 +132,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     if (u.hp > 0) return true;
     const by = killer.get(u.id);
     state.seats[u.seat].lost++; if (by) state.seats[by].kills++;
-    emit('death', u.seat, { unit: u.id, kind: u.kind, x: u.x, z: u.z, by: by ? [by] : [] }); return false;
+    emit('death', u.seat, { unit: u.id, kind: u.kind, x: u.x, z: u.z, by: by ? [by] : [], ...(u.boom ? { boom: 1 } : {}) }); return false;
   });
   return coreDamage;
 }

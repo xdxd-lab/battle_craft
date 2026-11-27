@@ -9,11 +9,11 @@ import { TRACKS, PHASES, BATTLE_AT_SECONDS, battleDue } from './music-tracks.mjs
 const rows = [], test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
 const rms = d => Math.sqrt(d.reduce((a, v) => a + v * v, 0) / d.length), peak = d => d.reduce((a, v) => Math.max(a, Math.abs(v)), 0);
 const brightness = d => d.reduce((a, v, i) => a + (i && (v >= 0) !== (d[i - 1] >= 0) ? 1 : 0), 0) / (d.length / RATE) / 2; // 過零估計頻率
-test('六兵種各有一個音效：短、有聲、不削波、收尾歸零、可重現', () => {
+test(`${KIND_IDS.length} 兵種各有一個音效：短、有聲、不削波、收尾歸零、可重現`, () => {
   assert.deepEqual(Object.keys(SOUNDS), KIND_IDS);
   return KIND_IDS.map(k => { const d = renderSound(k); assert(d.length === Math.round(SOUNDS[k].seconds * RATE) && d.length < RATE * .6); assert(d.every(Number.isFinite)); assert(Math.abs(peak(d) - .9) < 1e-6 && rms(d) > .03, k); assert(Math.abs(d[0]) < .05 && Math.abs(d.at(-1)) < .05); assert.deepEqual(renderSound(k), d); return `${k} ${SOUNDS[k].seconds} 秒 RMS ${rms(d).toFixed(2)} 約 ${brightness(d).toFixed(0)} Hz`; }).join('；');
 });
-test('六個音效彼此可區分（亮度兩兩相差 8% 以上）', () => {
+test(`${KIND_IDS.length} 個音效彼此可區分（亮度兩兩相差 8% 以上）`, () => {
   const [a, b, c] = KIND_IDS.map(k => brightness(renderSound(k))); assert(a > c && c > b * 1.3, `${a} ${b} ${c}`);
   const all = KIND_IDS.map(k => brightness(renderSound(k))); for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) assert(Math.abs(all[i] / all[j] - 1) > .08, `${KIND_IDS[i]} ${KIND_IDS[j]} ${all[i]} ${all[j]}`);
   return KIND_IDS.map((k, i) => `${k} ${all[i].toFixed(0)}`).join('、');

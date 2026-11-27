@@ -1,12 +1,12 @@
-// BC01 兵種（模擬版本 3 起）、版本 4 道路寬、版本 5 經濟與版本 6 六兵種驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
+// BC01 兵種（模擬版本 3 起）、版本 4 道路寬、版本 5 經濟與版本 6 六兵種、版本 7 九兵種驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
 import assert from 'node:assert/strict';
 import * as L from '../dev05-layout/layout.mjs';
 import * as S from './sim.mjs';
-import { KINDS, CORE, ROSTER, SPLASH, applyDamage, canTarget, framesAt, unitStats, weaponOf } from './roster.mjs';
+import { KINDS, CORE, PLATE, ROSTER, SPLASH, applyDamage, canTarget, framesAt, unitStats, weaponOf } from './roster.mjs';
 import { ARENA, corePos } from './arena.mjs';
 
 const rows = [], test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
-const none = () => S.createSim({ bots: [] });
+const none = (version = 6) => S.createSim({ bots: [], version }); // 兵種機制案例預設鎖在版本 6（無護甲）；版本 7 案例明寫
 const unit = (st, seat, kind, x, z, more = {}) => { const u = { id: ++st.serial, seat, team: L.seatById(seat).team, x, z, cd: 0, lat: 0, target: S.targetOf(st, seat), foe: 0, dx: 0, dz: 0, ...unitStats(kind), ...more }; st.units.push(u); st.seats[seat].deployed++; return u; };
 const idle = { cd: 1e9 }; // 不開火的靶
 const run = (st, n, each) => { const log = []; for (let i = 0; i < n && st.mode === 'play'; i++) { const e = S.step(st); log.push(...e); each?.(e); } return log; };
@@ -87,6 +87,7 @@ test('彈跳：中間一跳目標死亡仍續跳；射手死亡後不續彈', ()
 });
 test('合法目標：三兵種可打地面與空中；僅對地規格會濾掉空中', () => {
   for (const a of Object.keys(KINDS)) for (const b of ['marine', 'mutalisk']) {
+    if (!canTarget(KINDS[a], KINDS[b].air)) { assert.equal(a, 'scourge'); continue; } // 只有自殺蟲不打地面
     const st = none(); unit(st, 'N', a, 0, -.5); const t = unit(st, 'S', b, 0, .5, idle); run(st, 12); assert(t.hp < KINDS[b].hp, `${a} → ${b}`);
   }
   assert.deepEqual([canTarget({ targets: ['ground'] }, true), canTarget({ targets: ['ground'] }, false)], [false, true]);
@@ -97,22 +98,23 @@ test('同 tick 多發打同一目標：只陣亡一次、擊殺不重複', () =>
   const log = S.step(st); assert.equal(log.filter(e => e.type === 'death').length, 1); assert.equal(st.seats.N.kills + st.seats.W.kills, 1);
 });
 test('核心：六兵種可攻擊，視為重裝甲', () => {
-  for (const kind of Object.keys(KINDS)) { const st = none(), [x, z] = corePos('S'), d = L.seatById('S').dir, r = S.RULES.coreRadius + KINDS[kind].range - .05; const a = unit(st, 'N', kind, x - d[0] * r, z - d[1] * r, { target: 'S' }); S.step(st); a.cd = 1e9; run(st, 20); assert.equal(CORE.hp - st.seats.S.hp, KINDS[kind].damage, kind); }
+  for (const kind of Object.keys(KINDS).filter(k => canTarget(KINDS[k], false))) { const st = none(), [x, z] = corePos('S'), d = L.seatById('S').dir, r = S.RULES.coreRadius + KINDS[kind].range - .05; const a = unit(st, 'N', kind, x - d[0] * r, z - d[1] * r, { target: 'S' }); S.step(st); a.cd = 1e9; run(st, 20); assert.equal(CORE.hp - st.seats.S.hp, KINDS[kind].damage, kind); }
 });
-test('四席信標：版本 5 三兵種＋未開放、版本 6 六兵種；扣款、兵種與數值正確', () => [5, 6].map(version => {
+test('四席信標：版本 5 三兵種＋未開放、版本 6 六兵種、版本 7 九兵種；扣款、兵種與數值正確；每次一隻', () => [5, 6, 7].map(version => {
   for (const id of S.SEAT_IDS) S.padsFor(version).forEach((p, i) => {
-    const st = S.createSim({ version, bots: [] }), [x, z] = S.padWorld(id, i, S.dimFor(version)); Object.assign(st.seats[id].commander, { x, z }); st.seats[id].gold = 30;
+    const st = S.createSim({ version, bots: [] }), [x, z] = S.padWorld(id, i, S.dimFor(version)); Object.assign(st.seats[id].commander, { x, z }); st.seats[id].gold = 50;
     const buy = S.step(st).find(e => e.type === 'buy');
     if (p.locked) return assert(!buy);
-    assert.deepEqual([buy.kind, st.seats[id].gold, st.units.length], [p.kind, 30 - p.cost, p.count]); assert.equal(st.units[0].sh, KINDS[p.kind].shield);
+    assert.deepEqual([buy.kind, st.seats[id].gold, st.units.length], [p.kind, 50 - p.cost, p.count]); assert.equal(st.units[0].sh, KINDS[p.kind].shield);
+    if (version >= 6) assert.equal(p.count, 1);
   });
-  assert.equal(S.padsFor(version).length, version === 6 ? 6 : 4);
+  assert.equal(S.padsFor(version).length, { 5: 4, 6: 6, 7: 9 }[version]);
   return `v${version} ` + S.padsFor(version).filter(p => !p.locked).map(p => `${p.label} ${p.cost}金`).join('、');
 }).join('；'));
-test('版本 6 全電腦 60 局：皆終局、帳目相符、六兵種都有購買與陣亡；固定摘要', () => {
+for (const [V, digest6] of [[6, 'c037ba37 6207bb5a'], [7, 'f358976c 172c0740']]) test(`版本 ${V} 全電腦 60 局：皆終局、帳目相符、${ROSTER[V].length} 兵種都有購買與陣亡；固定摘要`, () => {
   const win = {}, bought = {}, died = {}, secs = [];
   for (let seed = 1; seed <= 60; seed++) {
-    const st = S.createSim({ seed });
+    const st = S.createSim({ seed, version: V });
     while (st.mode === 'play') {
       for (const e of S.step(st)) { if (e.type === 'buy') bought[e.kind] = (bought[e.kind] || 0) + e.count; if (e.type === 'death') died[e.kind] = (died[e.kind] || 0) + 1; }
       if (st.tick % 30 === 0) { for (const id of S.SEAT_IDS) assert.equal(st.units.filter(u => u.seat === id).length, st.seats[id].deployed - st.seats[id].lost); for (const u of st.units) assert(u.hp > 0 && u.sh >= 0 && u.sh <= KINDS[u.kind].shield); for (const id of S.SEAT_IDS) for (const k of Object.keys(KINDS)) assert(st.units.filter(u => u.seat === id && u.kind === k).length < 128, '繪製上限'); }
@@ -120,9 +122,9 @@ test('版本 6 全電腦 60 局：皆終局、帳目相符、六兵種都有購�
     }
     win[st.winner] = (win[st.winner] || 0) + 1; secs.push(st.tick / 30);
   }
-  for (const k of Object.keys(KINDS)) assert(bought[k] > 0 && died[k] > 0, k);
-  const rec = { version: 6, seed: 20261126, bots: ['N', 'W', 'S', 'E'], commands: [] }, a = S.replay(rec); assert.equal(S.replay(rec).final, a.final);
-  if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, 'c037ba37 6207bb5a');
+  for (const k of ROSTER[V]) assert(bought[k] > 0 && died[k] > 0, k);
+  const rec = { version: V, seed: 20261126, bots: ['N', 'W', 'S', 'E'], commands: [] }, a = S.replay(rec); assert.equal(S.replay(rec).final, a.final);
+  if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, digest6);
   secs.sort((a, b) => a - b); return `勝場 ${JSON.stringify(win)}；${secs[0].toFixed(0)}／${secs[30].toFixed(0)}／${secs[59].toFixed(0)} 秒；購買 ${JSON.stringify(bought)}；${a.final} ${a.events}`;
 });
 test('可重現完整終局：固定種子加玩家指令，重跑與中途序列化一致', () => {
@@ -162,15 +164,15 @@ test('版本 4 全電腦 60 局：皆終局，部隊不出道路、交會區與�
   return `勝場 ${JSON.stringify(wins)}；最寬 ${widest.toFixed(2)}；${a.final} ${a.events}`;
 });
 test('版本 5 經濟：48 金起、每秒 2 金、陸戰隊 7.5；舊版維持 12／每秒 1／5', () => {
-  assert.equal(S.VERSION, 6); assert.deepEqual(S.ECONOMY, { startGold: 48, incomeEvery: 15, costs: { marine: 7.5 } });
-  for (const [version, start, perSecond, costs] of [[1, 12, 1, [5, 12]], [2, 12, 1, [5, 12]], [3, 12, 1, [5, 12, 14]], [4, 12, 1, [5, 12, 14]], [5, 48, 2, [7.5, 12, 14]], [6, 48, 2, [7.5, 12, 14, 9, 28, 17]]]) {
+  assert.equal(S.VERSION, 7); assert.deepEqual(S.ECONOMY, { startGold: 48, incomeEvery: 15, costs: { marine: 7.5 } });
+  for (const [version, start, perSecond, costs] of [[1, 12, 1, [5, 12]], [2, 12, 1, [5, 12]], [3, 12, 1, [5, 12, 14]], [4, 12, 1, [5, 12, 14]], [5, 48, 2, [7.5, 12, 14]], [6, 48, 2, [7.5, 12, 14, 9, 28, 17]], [7, 48, 6, [7.5, 12, 14, 9, 28, 17, 40, 24, 6]]]) {
     const st = S.createSim({ version, bots: [] }); assert(S.SEAT_IDS.every(id => st.seats[id].gold === start), `v${version}`);
-    run(st, 14); assert.equal(st.seats.N.gold, start); run(st, 1); assert.equal(st.seats.N.gold, version >= 5 ? start + 1 : start); run(st, 285); assert.equal(st.seats.N.gold, start + perSecond * 10);
+    run(st, 14); assert.equal(st.seats.N.gold, start); run(st, 1); assert.equal(st.seats.N.gold, version >= 7 ? start + 3 : version >= 5 ? start + 1 : start, `v${version} 每次收入`); run(st, 285); assert.equal(st.seats.N.gold, start + perSecond * 10);
     assert.deepEqual(S.padsFor(version).filter(p => !p.locked).map(p => p.cost), costs, `v${version}`);
   }
 });
 test('半金門檻：7 金不能買、湊到 7.5 以上才成交，餘額保留半金', () => {
-  const at = gold => { const st = none(), [x, z] = S.padWorld('S', 0, S.DIM); Object.assign(st.seats.S.commander, { x, z }); st.seats.S.gold = gold; return st; };
+  const at = gold => { const st = none(), [x, z] = S.padWorld('S', 0, S.dimFor(6)); Object.assign(st.seats.S.commander, { x, z }); st.seats.S.gold = gold; return st; };
   const short = at(7), e = S.step(short); assert(e.some(v => v.type === 'wait' && v.cost === 7.5) && !e.some(v => v.type === 'buy')); assert.equal(short.seats.S.gold, 7);
   const [buy] = until(short, 'buy'); assert.deepEqual([buy.tick, buy.cost, buy.gold], [15, 7.5, .5]);
   const exact = at(7.5); assert.equal(S.step(exact).find(v => v.type === 'buy').gold, 0);
@@ -230,14 +232,48 @@ test('破壞能：主目標整發，濺射 100／50／25% 依距離；不傷己�
   const deaths = S.step(k).filter(v => v.type === 'death'); assert.deepEqual(deaths.map(d => [d.seat, d.by]), [['W', []], ['E', ['N']]]); assert.deepEqual([k.seats.N.kills, k.seats.W.lost, k.seats.E.lost], [1, 1, 1]);
   return `半徑 ${SPLASH.archon.radii.map(r => r.toFixed(3)).join('／')}；隊友受 50%、己席 0`;
 });
-test('版本 6 購買區：六信標互不重疊、指揮官可走到、開場不在信標上', () => {
-  const P = S.SIX_PAD_POSITIONS, R = S.RULES;
-  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) assert(Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]) > 2 * R.padRadius, `${i}-${j}`);
+for (const [V, P] of [[6, S.SIX_PAD_POSITIONS], [7, S.NINE_PAD_POSITIONS]]) test(`版本 ${V} 購買區：${P.length} 信標互不重疊、不出購買區、指揮官可走到、開場不在信標上`, () => {
+  const r = S.padRadiusFor(V), D = S.dimFor(V); assert.equal(r, V >= 7 ? 1.35 : 1.6);
+  for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) assert(Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]) > 2 * r, `${i}-${j}`);
+  assert(P.every(([x, z]) => Math.abs(x) + r < ARENA.shopWidth / 2 && Math.abs(z) + r < ARENA.shopDepth / 2), '信標圈在購買區內');
   for (const id of S.SEAT_IDS) {
-    const st = S.createSim({ bots: [] }), c = st.seats[id].commander;
-    assert(P.every((_, i) => { const [x, z] = S.padWorld(id, i, S.DIM); return Math.hypot(x - c.x, z - c.z) > R.padRadius; }));
-    P.forEach((_, i) => { const [x, z] = S.padWorld(id, i, S.DIM); S.step(st, [{ seat: id, type: 'goal', x, z }]); for (let n = 0; n < 120 && st.seats[id].pad !== i; n++) S.step(st); assert.equal(st.seats[id].pad, i, `${id} ${i}`); });
+    const st = S.createSim({ bots: [], version: V }), c = st.seats[id].commander;
+    assert(P.every((_, i) => { const [x, z] = S.padWorld(id, i, D); return Math.hypot(x - c.x, z - c.z) > r; }));
+    P.forEach((_, i) => { const [x, z] = S.padWorld(id, i, D); S.step(st, [{ seat: id, type: 'goal', x, z }]); for (let n = 0; n < 120 && st.seats[id].pad !== i; n++) S.step(st); assert.equal(st.seats[id].pad, i, `${id} ${i}`); });
   }
+});
+test('版本 7 三新兵種：BWAPI 原版 hp／盾／護甲／傷害／冷卻／射程 px 與層別；每次一隻', () => {
+  const px = v => Math.round(v * 1.62 / 128 * 1e9) / 1e9;
+  for (const [k, hp, sh, plate, armor, attack, damage, cooldown, range, targets] of [['battlecruiser', 500, 0, 3, 'heavy', 'N', 25, 30, 192, ['ground', 'air']], ['scout', 150, 100, 0, 'heavy', 'N', 8, 30, 128, ['ground', 'air']], ['scourge', 25, 0, 0, 'light', 'N', 110, 0, null, ['air']]])
+    assert.deepEqual([KINDS[k].hp, KINDS[k].shield, PLATE[k], KINDS[k].armor, KINDS[k].attack, KINDS[k].damage, KINDS[k].cooldown, range === null ? null : KINDS[k].range, KINDS[k].targets, KINDS[k].air, KINDS[k].count], [hp, sh, plate, armor, attack, damage, cooldown, range === null ? null : px(range), targets, true, 1], k);
+  assert.deepEqual(['attack', 'damage', 'hits', 'cooldown', 'range'].map(f => weaponOf('scout', true)[f]), ['E', 14, 2, 22, px(128)]);
+  assert.deepEqual(PLATE, { marine: 0, dragoon: 1, mutalisk: 0, hydralisk: 0, archon: 0, wraith: 0, battlecruiser: 3, scout: 0, scourge: 0 });
+  assert.deepEqual(ROSTER[7].slice(6), ['battlecruiser', 'scout', 'scourge']);
+});
+test('基礎護甲：版本 7 才生效；先扣盾、再扣護甲、再乘體型，下限 0.5', () => {
+  const hpAfter = (version, kind, target, more) => { const st = none(version); unit(st, 'N', kind, 0, 0); const t = near(st, 'S', target, 1.5, 0, more); for (let i = 0; i < 40 && t.hp === KINDS[target].hp; i++) S.step(st); return KINDS[target].hp - t.hp; };
+  assert.deepEqual([hpAfter(6, 'marine', 'battlecruiser'), hpAfter(7, 'marine', 'battlecruiser')], [6, 3], '陸戰隊 6 打護甲 3');
+  assert.deepEqual([hpAfter(6, 'hydralisk', 'dragoon', { sh: 0 }), hpAfter(7, 'hydralisk', 'dragoon', { sh: 0 })], [10, 9], '刺蛇 E10 打重騎兵本體（護甲 1）');
+  const t = { hp: 500, sh: 0, armor: 'light' }; applyDamage(t, 2, 'N', 1, 3); assert.equal(t.hp, 499.5, '扣到 0 仍有 0.5');
+  const u = { hp: 500, sh: 4, armor: 'heavy' }; applyDamage(u, 10, 'N', 1, 3); assert.deepEqual([u.sh, u.hp], [0, 497], '盾吸收 4、剩 6 扣護甲 3');
+  return '陸戰隊→戰鬥巡洋艦 6→3；刺蛇→重騎兵 10→9';
+});
+test('斥候：對地即時 N 8；對空投射物 E 14×2（打輕甲 7＋7），冷卻依武器', () => {
+  const g = none(7), a = unit(g, 'N', 'scout', 0, 0), m = near(g, 'S', 'marine', 1.2, 0); const e = S.step(g);
+  assert(e.some(v => v.type === 'shot') && !e.some(v => v.type === 'launch')); assert.deepEqual([m.hp, a.cd], [32, 30]);
+  const f = none(7), b = unit(f, 'N', 'scout', 0, 0), mu = near(f, 'S', 'mutalisk', 1.2, 0); assert(S.step(f).some(v => v.type === 'launch')); assert.equal(b.cd, 22);
+  const [hit] = until(f, 'impact'); assert.deepEqual([mu.hp, hit.body], [106, 14]);
+  const w = none(7); unit(w, 'N', 'scout', 0, 0); const bc = near(w, 'S', 'battlecruiser', 1.2, 0); until(w, 'impact'); assert.equal(bc.hp, 500 - 2 * (14 - 3), '兩發各自扣護甲 3');
+  return '打陸戰隊 8、打飛螳 14、打戰鬥巡洋艦 22';
+});
+test('自殺蟲：只打空中、接觸自爆（自己陣亡、不算對方擊殺、攻擊者得擊殺）；不攻擊核心與地面', () => {
+  const st = none(7), sc = unit(st, 'N', 'scourge', 0, 0), w = near(st, 'S', 'wraith', 1.2, 0), m = near(st, 'S', 'marine', .3, .3);
+  const log = run(st, 40); const boom = log.find(e => e.type === 'death' && e.kind === 'scourge');
+  assert(boom && boom.boom === 1 && boom.by.length === 0, JSON.stringify(boom)); assert.deepEqual([w.hp, m.hp, st.seats.N.lost, st.seats.S.kills], [10, 40, 1, 0]);
+  const k = none(7); unit(k, 'N', 'scourge', 0, 0); near(k, 'S', 'mutalisk', .4, 0, { hp: 100 }); const d = run(k, 5).filter(e => e.type === 'death').map(e => [e.kind, e.by]); assert.deepEqual(d, [['scourge', []], ['mutalisk', ['N']]]); assert.deepEqual([k.seats.N.kills, k.seats.N.lost], [1, 1]);
+  const c = none(7), [x, z] = corePos('S'), dir = L.seatById('S').dir, r = S.RULES.coreRadius + .2, s2 = unit(c, 'N', 'scourge', x - dir[0] * r, z - dir[1] * r, { target: 'S' }); run(c, 60);
+  assert.deepEqual([c.seats.S.hp, s2.hp], [CORE.hp, 25], '核心不受傷、自殺蟲待命');
+  return '打死靈戰機 110（剩 10）、殘血飛螳擊殺計自殺蟲席';
 });
 test('玩家全程不動也會終局', () => S.SEAT_IDS.map(id => { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); run(st, 30 * 60 * 13); assert.equal(st.mode, 'end'); return (st.tick / 30).toFixed(0); }).join('、') + ' 秒');
 console.table(rows); console.log('BC01 roster QA: OK');

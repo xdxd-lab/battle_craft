@@ -8,6 +8,9 @@ export const SOUNDS = {
   hydralisk: { name: '刺蛇：濕性噴刺聲', seconds: .18, gain: .5 },
   archon: { name: '破壞能：靈能電弧爆裂', seconds: .4, gain: .6 },
   wraith: { name: '死靈戰機：三連短雷射', seconds: .22, gain: .45 },
+  battlecruiser: { name: '戰鬥巡洋艦：低頻重砲台雙響', seconds: .42, gain: .7 },
+  scout: { name: '斥候：雙發光子短脈衝', seconds: .2, gain: .45 },
+  scourge: { name: '自殺蟲：濕性爆裂', seconds: .32, gain: .65 },
 };
 const TAU = Math.PI * 2;
 const noise = seed => { let v = seed >>> 0 || 1; return () => { v ^= v << 13; v ^= v >>> 17; v ^= v << 5; return (v >>> 0) / 2147483648 - 1; }; };
@@ -33,6 +36,17 @@ const voices = {
     let crack = 0, phase = 0;
     return t => { phase += TAU * (260 + 120 * Math.sin(TAU * 9 * t)) / RATE; if (rnd() > .97) crack = 1; crack *= .93;
       return (Math.sin(phase) * Math.sin(TAU * 760 * t) + .5 * Math.sin(phase * .5)) * Math.exp(-t * 6) + .8 * crack * rnd() * Math.exp(-t * 4); };
+  },
+  battlecruiser(rnd) { // 兩記低頻砲擊，各帶短促金屬泛音與雜訊尾
+    let low = 0;
+    return t => { let out = 0; for (const at of [0, .14]) { const u = t - at; if (u < 0) continue; low += (rnd() - low) * .08; out += (Math.sin(TAU * (90 * u + 160 * (1 - Math.exp(-u * 20)) / 20)) + .4 * Math.sin(TAU * 1240 * u) * Math.exp(-u * 30) + 1.2 * low) * Math.exp(-u * 9); } return out; };
+  },
+  scout() { // 兩記上滑的明亮短脈衝
+    return t => { let out = 0; for (const at of [0, .08]) { const u = t - at; if (u < 0 || u > .09) continue; out += Math.sin(TAU * (2600 * u + 6000 * u * u)) * Math.exp(-u * 40) * Math.min(1, u / .002, (.09 - u) / .004); } return out; };
+  },
+  scourge(rnd) { // 低通雜訊爆裂＋快速下滑的濕性尾音
+    let a = 0;
+    return t => { a += (rnd() - a) * .2; return 1.8 * a * Math.exp(-t * 12) + .6 * Math.sin(TAU * (300 * t - 380 * t * t)) * Math.exp(-t * 10); };
   },
   wraith() { // 三發等距高頻雷射，各自快速下滑
     return t => { let out = 0; for (let k = 0; k < 3; k++) { const u = t - k * .065; if (u < 0 || u > .07) continue; out += Math.sin(TAU * (1900 * u - 9000 * u * u)) * Math.exp(-u * 45) * Math.min(1, u / .002, (.07 - u) / .004); } return out; };

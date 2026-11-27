@@ -22,7 +22,7 @@ button[aria-pressed=true],button.go{background:#e9edf0;color:#0a0f14;font-weight
 #msg{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:3px 12px;font-size:13px;text-align:center;max-width:calc(100% - 24px);pointer-events:none}
 #msg[data-level=warn]{border-color:var(--hot)}#msg[data-level=critical]{border-color:#ff6bf0;color:#ffd9fb}
 .compass{position:fixed;left:max(16px,env(safe-area-inset-left));bottom:14px;width:56px;height:56px;border:1px solid var(--line);border-radius:50%;background:var(--panel);display:grid;place-items:center}#needle{width:42px;height:42px}
-#panel{position:fixed;right:max(12px,env(safe-area-inset-right));top:12px;width:280px;max-height:calc(100% - 100px);overflow:auto;background:var(--panel);border:1px solid var(--line)}#panel:not([open]){width:auto}summary{padding:7px 12px;cursor:pointer;font-weight:700}
+#panel{position:fixed;right:max(12px,env(safe-area-inset-right));top:12px;width:280px;max-height:calc(100% - 112px);overflow:auto;background:var(--panel);border:1px solid var(--line)}#panel:not([open]){width:auto}summary{padding:7px 12px;cursor:pointer;font-weight:700}
 #panel>div{padding:0 12px 12px}#log{max-height:min(46vh,420px);overflow:auto;font-size:12px;display:grid;gap:2px}.log{display:grid;grid-template-columns:38px 46px 1fr;gap:5px;border-top:1px solid #2a343b;padding:2px 0}.log time{color:var(--muted)}.log.warn{background:#3a30121f}.log.critical{font-weight:700;background:#4a123f3d}
 body.no-bars .core .hp{visibility:hidden}body.no-log #log{display:none}
 #opt-bars,#opt-log,#opt-engineering,#opt-quality,#opt-music,#opt-sfx{font-size:12px}#now-playing{font-size:11px;line-height:1.3;color:#c3ced6;overflow-wrap:anywhere}@media(max-height:400px){#now-playing{font-size:10px;line-height:1.2}}button[id^=opt-][aria-pressed=false]{color:#d5dde2;background:#161d22;border:1px dashed #8a979f}
@@ -45,10 +45,11 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
 @media(max-height:400px){h1 small{display:none}#bar{top:4px;gap:3px}.box{padding:3px 5px;gap:3px}button{min-height:26px;line-height:1.2}#cores{gap:2px}.core b{width:15px;height:15px;border-width:1px}.core{line-height:1.25}}
 @media(orientation:landscape){
   #shop,#msg{left:auto;right:max(12px,env(safe-area-inset-right));transform:none}
+  #shop{grid-template-columns:repeat(5,minmax(0,1fr))}
   #msg{max-width:min(340px,35vw)}
 }
 @media(orientation:landscape) and (max-height:560px){
-  #shop{grid-template-columns:repeat(6,auto);gap:3px}#shop button{min-width:0;min-height:30px;padding:1px 6px;display:flex;gap:5px;align-items:baseline;white-space:nowrap}#shop small{display:inline}#shop i{display:none}
+  #shop{grid-template-columns:repeat(5,auto);gap:3px}#shop button{min-width:0;min-height:30px;padding:1px 6px;display:flex;gap:5px;align-items:baseline;white-space:nowrap}#shop small{display:inline}#shop i{display:none}
   #panel[open]{width:150px;max-height:calc(100% - 104px)}
   #panel>#dossier{padding-top:7px}
   #dossier nav{gap:4px}#dossier nav button{min-height:28px;font-size:11px;line-height:1.1}#dossier nav small{font-size:9px}
@@ -64,7 +65,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
 <body>
 <canvas id="stage" tabindex="0" aria-label="四席十字戰場。點購買區地面或用方向鍵移動指揮官，站上信標自動購兵"></canvas>
 <div id="bar">
-  <h1>BaattleCraft DEV02<small>2v2 六兵種 · 數值暫定</small></h1>
+  <h1>BaattleCraft DEV02<small>2v2 九兵種 · 數值暫定</small></h1>
   <div class="box"><div class="row"><div><small>時間</small><span id="clock">00:00</span></div><div><small id="gold-label">金幣</small><span id="gold">48</span></div></div></div>
   <div class="box" id="cores" aria-label="四席核心血量"></div>
   <div class="box"><div class="row"><button id="pause">暫停</button><button id="speed" aria-label="遊戲速度 1×，切換速度">1×</button></div><div class="row"><button id="framing" title="在近景與四席全景間切換">切全景</button><button id="opt-bars" aria-pressed="true">血條</button></div><div class="row"><button id="view">隊伍視角</button><button id="again">重新選席</button></div></div>
@@ -79,6 +80,9 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
     <button data-profile="hydralisk" aria-pressed="false">刺蛇</button>
     <button data-profile="archon" aria-pressed="false">破壞能</button>
     <button data-profile="wraith" aria-pressed="false">死靈戰機</button>
+    <button data-profile="battlecruiser" aria-pressed="false">戰鬥巡洋艦</button>
+    <button data-profile="scout" aria-pressed="false">斥候</button>
+    <button data-profile="scourge" aria-pressed="false">自殺蟲</button>
     <button data-profile="commander" aria-pressed="false">指揮官</button>
   </nav>
   <img width="480" height="240" alt="">

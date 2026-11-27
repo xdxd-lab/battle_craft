@@ -33,7 +33,17 @@ export const KINDS = {
   // 死靈戰機對地 Burst Lasers（N，即時）、對空 Gemini Missiles（E，投射物）；隱形未實作
   wraith: { name: '死靈戰機', source: 'Wraith', armor: 'heavy', attack: 'N', hp: 120, shield: 0, damage: 8, cooldown: 30, range: 2.025, air: true, targets: ['ground', 'air'], projectile: 0, bounces: 0, cost: 17, count: 1,
     vsAir: { attack: 'E', damage: 20, cooldown: 22, range: 2.025, projectile: .25 } },
+  // 以下三種自模擬版本 7 起開放。hp／shield／plate／damage／cooldown／射程 px 取 BWAPI 原版預設；cost、projectile、自殺蟲接觸距離為暫定。見 ../research/BC-NINE-UNITS.md
+  // 戰鬥巡洋艦 ATS／ASS Laser Battery：對地對空同為 N 25、冷卻 30、192 px，即時；Yamato 未實作
+  battlecruiser: { name: '戰鬥巡洋艦', source: 'Battlecruiser', armor: 'heavy', attack: 'N', hp: 500, shield: 0, damage: 25, cooldown: 30, range: 2.43, air: true, targets: ['ground', 'air'], projectile: 0, bounces: 0, cost: 40, count: 1 },
+  // 斥候對地 Dual Photon Blasters（N 8、冷卻 30、即時）；對空 Anti-Matter Missiles（E 14×2 發、冷卻 22、投射物）
+  scout: { name: '斥候', source: 'Scout', armor: 'heavy', attack: 'N', hp: 150, shield: 100, damage: 8, cooldown: 30, range: 1.62, air: true, targets: ['ground', 'air'], projectile: 0, bounces: 0, cost: 24, count: 1,
+    vsAir: { attack: 'E', damage: 14, hits: 2, cooldown: 22, range: 1.62, projectile: .25 } },
+  // 自殺蟲 Suicide Scourge：只打空中，N 110，接觸即自爆（自己陣亡、不算對方擊殺）；原版一次孵化 2 隻，本作每次 1 隻（暫定）
+  scourge: { name: '自殺蟲', source: 'Scourge', armor: 'light', attack: 'N', hp: 25, shield: 0, damage: 110, cooldown: 0, range: .5, air: true, targets: ['air'], projectile: 0, bounces: 0, cost: 6, count: 1, suicide: true },
 };
+// 基礎護甲（BWAPI defaultArmor），只在模擬版本 7 起生效；版本 3–6 不扣護甲以保持重播
+export const PLATE = { marine: 0, dragoon: 1, mutalisk: 0, hydralisk: 0, archon: 0, wraith: 0, battlecruiser: 3, scout: 0, scourge: 0 };
 export const KIND_IDS = Object.keys(KINDS);
 export const canTarget = (spec, air) => spec.targets.includes(air ? 'air' : 'ground');
 // 依目標所在高度層選武器；沒有 vsAir 的兵種一律用本體數值（版本 3–5 行為不變）
@@ -45,14 +55,16 @@ export const weaponOf = (kind, air) => {
 };
 // 各模擬版本開放的兵種（購兵區順序）
 export const ROSTER = { 3: ['marine', 'dragoon', 'mutalisk'], 6: ['marine', 'dragoon', 'mutalisk', 'hydralisk', 'archon', 'wraith'] };
-export const rosterFor = version => version >= 6 ? ROSTER[6] : ROSTER[3];
+ROSTER[7] = [...ROSTER[6], 'battlecruiser', 'scout', 'scourge'];
+export const rosterFor = version => version >= 7 ? ROSTER[7] : version >= 6 ? ROSTER[6] : ROSTER[3];
 
 // 一發傷害，依原版引擎順序；內部全用 1/256 定點整數。target 的 hp、sh 是 1/256 的整數倍。
-// 彈跳除數 → 整發下限 0.5 → 盾 ≥ 1 才吸收原始傷害 → 剩餘乘本體倍率（捨去）→ 完全沒扣到盾時本體下限 0.5
-export function applyDamage(target, damage, attack, divisor = 1) {
+// 彈跳除數 → 整發下限 0.5 → 盾 ≥ 1 才吸收原始傷害 → 剩餘扣基礎護甲 plate（版本 7 起）→ 乘本體倍率（捨去）→ 完全沒扣到盾時本體下限 0.5
+export function applyDamage(target, damage, attack, divisor = 1, plate = 0) {
   let raw = Math.max(128, Math.floor(damage * 256 / divisor)), shield = 0;
   const sh = Math.round((target.sh || 0) * 256);
   if (sh >= 256) { shield = Math.min(raw, sh); raw -= shield; target.sh = (sh - shield) / 256; }
+  if (plate && raw > 0) raw = Math.max(0, raw - plate * 256);
   let body = Math.floor(raw * ATTACKS[attack].mult[target.armor] / 256);
   if (!shield && body < 128) body = 128;
   target.hp -= body / 256;

@@ -6,7 +6,7 @@ import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
 
 export const HZ = 30;
-export const VERSION = 6; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標（舊版保留供重播）
+export const VERSION = 7; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
   startGold: 12, incomeEvery: 30, purchaseGap: 15, // v5：12 金起始、每秒 1 金、兩次購買至少 0.5 秒
@@ -30,18 +30,23 @@ const PADS_V2 = place([
 ]);
 // 版本 5 經濟：以版本 3、4 的值乘上倍率。7.5 金不取整；金幣只會是 0.5 的倍數，二進位浮點可精確表示。
 export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.incomeEvery / 2, costs: { marine: KINDS.marine.cost * 1.5 } };
-export const economyFor = version => version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+const ECONOMY_V7 = { ...ECONOMY, income: 3 }; // 版本 7：每次發放金額×3（間隔、起始金幣不變）
+export const economyFor = version => version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+export const padRadiusFor = version => version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
 const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name });
 // 版本 6：購買區 9×15 內兩欄三列，信標中心相距 4.4／4.8（大於兩倍 padRadius），皆在指揮官可走範圍內（暫定）
 export const SIX_PAD_POSITIONS = [[2.2, 4.8], [-2.2, 4.8], [2.2, 0], [-2.2, 0], [2.2, -4.8], [-2.2, -4.8]];
-const rosterPads = version => version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
+// 版本 7：三欄三列，欄 x＝3／0／−3、列 z＝4.8／0／−4.8（由上而下、由左而右），中心相距 3／4.8（暫定）
+export const NINE_PAD_POSITIONS = [4.8, 0, -4.8].flatMap(z => [3, 0, -3].map(x => [x, z]));
+const rosterPads = version => version >= 7 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), NINE_PAD_POSITIONS)
+  : version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
   : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
-const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6);
-export const padsFor = version => version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7);
+export const padsFor = version => version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 3 ? CORE.hp : RULES.coreHp;
-const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }; // 版本 6 置中，避開中列信標
-const homeFor = version => version >= 6 ? HOME_V6 : HOME_V2;
+const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
+const homeFor = version => version >= 7 ? HOME_V7 : version >= 6 ? HOME_V6 : HOME_V2;
 const GEOMETRY = {
   1: { dim: L.DIM, shopBounds: [-4, 5.8, -4.2, 4.2] },
   2: { dim: ARENA, shopBounds: [
@@ -53,6 +58,7 @@ GEOMETRY[3] = GEOMETRY[2];
 GEOMETRY[4] = { ...GEOMETRY[2], dim: { ...ARENA, laneHalf: RULES.laneHalf * 1.1 } };
 GEOMETRY[5] = GEOMETRY[4];
 GEOMETRY[6] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: SIX_PAD_POSITIONS } };
+GEOMETRY[7] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: NINE_PAD_POSITIONS } };
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -102,6 +108,8 @@ function apply(state, c, geometry) {
 // 電腦只決定走向哪座信標，購兵走同一套規則；只看自己的資料
 // 版本 6 電腦選信標的累計機率（%，暫定）：陸戰隊 26、重騎兵 16、飛螳 14、刺蛇 20、破壞能 10、死靈戰機 14
 const BOT_V6 = [26, 42, 56, 76, 86, 100];
+// 版本 7（暫定）：陸戰隊 18、重騎兵 12、飛螳 10、刺蛇 14、破壞能 8、死靈戰機 10、戰鬥巡洋艦 6、斥候 10、自殺蟲 12
+const BOT_V7 = [18, 30, 40, 54, 62, 72, 78, 88, 100];
 function botCommands(state, dim) {
   const out = [];
   for (const id of SEAT_IDS) {
@@ -114,7 +122,7 @@ function botCommands(state, dim) {
       b.pad = -1; b.until = state.tick + roll(60);
       const home = homeFor(state.version), [x, z] = toWorld(id, home.x, home.z, dim); out.push({ seat: id, type: 'goal', x, z });
     } else if (state.tick >= b.until) {
-      if (state.version >= 6) { const n = roll(100); b.pad = BOT_V6.findIndex(c => n < c); b.left = b.pad ? 1 : 1 + roll(3); }
+      if (state.version >= 6) { const n = roll(100); b.pad = (state.version >= 7 ? BOT_V7 : BOT_V6).findIndex(c => n < c); b.left = b.pad ? 1 : 1 + roll(3); }
       else if (state.version >= 3) { const n = roll(100); b.pad = n < 45 ? 0 : n < 73 ? 1 : 2; b.left = b.pad ? 1 : 1 + roll(3); }
       else { b.pad = roll(100) < 35 ? 0 : 1; b.left = b.pad ? 1 + roll(2) : 1 + roll(3); }
       b.seen = s.buys;
@@ -143,12 +151,12 @@ function recruit(state, s, p, emit, dim) {
   emit('buy', s.id, { cost: p.cost, count: p.count, gold: s.gold, label: p.label, units: ids, ...(p.kind ? { kind: p.kind } : {}) });
   return true;
 }
-function padAt(s, PADS, dim) {
-  for (let i = 0; i < PADS.length; i++) { if (PADS[i].locked) continue; const [x, z] = padWorld(s.id, i, dim); if (dist(x, z, s.commander.x, s.commander.z) <= RULES.padRadius) return i; }
+function padAt(s, PADS, dim, r) {
+  for (let i = 0; i < PADS.length; i++) { if (PADS[i].locked) continue; const [x, z] = padWorld(s.id, i, dim); if (dist(x, z, s.commander.x, s.commander.z) <= r) return i; }
   return -1;
 }
 function checkBeacon(state, s, emit, dim) {
-  const PADS = padsFor(state.version), i = padAt(s, PADS, dim);
+  const PADS = padsFor(state.version), i = padAt(s, PADS, dim, padRadiusFor(state.version));
   if (i !== s.pad) {
     if (s.pad >= 0) emit('leave', s.id, { label: PADS[s.pad].label });
     s.pad = i; s.nextBuy = state.tick; s.waiting = false;
@@ -278,7 +286,8 @@ export function step(state, commands = []) {
   for (const c of botCommands(state, dim)) apply(state, c, geometry);
   const live = SEAT_IDS.map(id => state.seats[id]).filter(s => s.alive);
   live.forEach(s => moveCommander(s, geometry));
-  if (state.tick % economyFor(state.version).incomeEvery === 0) for (const s of live) s.gold++;
+  const econ = economyFor(state.version);
+  if (state.tick % econ.incomeEvery === 0) for (const s of live) s.gold += econ.income ?? 1;
   for (const s of live) checkBeacon(state, s, emit, dim);
   if (state.version >= 3) stepCores(state, stepRoster(state, emit, dim, { RULES, waypoint, clampWalk }), emit);
   else stepUnits(state, emit, dim);

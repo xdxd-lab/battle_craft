@@ -29,9 +29,10 @@ scene.add(markerGroup, padGroup, fallGroup, padModels);
 const LOOK = {
   marine: { pick: [.9, 1.3], top: 2.15, puff: [1.1, .3] }, dragoon: { pick: [.9, 1.8], top: 2.25, puff: [1.1, .55] }, mutalisk: { pick: [.58, 1.8], top: 1.75, puff: [1.8, .3] },
   hydralisk: { pick: [.8, 1.3], top: 1.95, puff: [1.1, .3] }, archon: { pick: [1.05, 1.5], top: 2.45, puff: [1.1, .9] }, wraith: { pick: [.4, 1.6], top: 1.2, puff: [FLY_HEIGHT + .4, .45] },
+  battlecruiser: { pick: [.4, 2.1], top: 1.55, puff: [FLY_HEIGHT + .4, .5] }, scout: { pick: [.4, 1.5], top: 1.1, puff: [FLY_HEIGHT + .4, .45] }, scourge: { pick: [.45, 1.0], top: 1.0, puff: [FLY_HEIGHT + .4, .3] },
 };
 const liftOf = (spec, t = 0, id = 0) => spec.air ? FLY_HEIGHT : spec.hover ? HOVER_HEIGHT + Math.sin(t * .12 + id) * .06 : 0;
-let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, glaives, darts, missiles, shadows;
+let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, glaives, darts, missiles, bolts, shadows;
 const inst = (geo, mat, n = MAX) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; m.count = 0; scene.add(m); return m; };
 let bodyTriangles;
 const looks = {};
@@ -65,6 +66,7 @@ function buildActors() {
   glaives = inst(new THREE.OctahedronGeometry(.34).scale(1, .35, 1), new THREE.MeshBasicMaterial({ toneMapped: false }), 128);
   darts = inst(new THREE.ConeGeometry(.07, .5, 5).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 刺蛇骨刺
   missiles = inst(new THREE.BoxGeometry(.1, .1, .55), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 死靈戰機對空飛彈
+  bolts = inst(new THREE.CapsuleGeometry(.09, .3, 3, 8).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 斥候對空反物質飛彈（一次兩發，畫成一枚）
   shadows = inst(new THREE.CircleGeometry(.55, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x02060a, transparent: true, opacity: .42, depthWrite: false }), 256);
 }
 const relOf = id => L.relation(view.kind === 'plan' || !seat ? view : { kind: 'seat', id: seat }, id);
@@ -87,7 +89,7 @@ function buildPads() {
   if (!seat) return;
   S.PADS.forEach((p, i) => {
     const [x, z] = S.padWorld(seat, i, S.DIM);
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(R.padRadius, .09, 6, 32), new THREE.MeshBasicMaterial({ color: p.locked ? 0x6a747c : 0xffe9a8, toneMapped: false })); ring.rotation.x = Math.PI / 2; ring.position.set(x, .42, z); ring.userData.pad = i; padGroup.add(ring);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(S.padRadiusFor(S.VERSION), .09, 6, 32), new THREE.MeshBasicMaterial({ color: p.locked ? 0x6a747c : 0xffe9a8, toneMapped: false })); ring.rotation.x = Math.PI / 2; ring.position.set(x, .42, z); ring.userData.pad = i; padGroup.add(ring);
     const t = W.label(compactPadLabels ? 108 : 300, 108, (g, w, h) => {
       g.fillStyle = 'rgba(7,11,15,.84)'; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 14); g.fill(); g.lineWidth = 5; g.strokeStyle = p.locked ? '#6a747c' : '#ffe9a8'; g.stroke();
       const lines = compactPadLabels ? [p.locked ? '—' : String(i + 1)]
@@ -96,10 +98,10 @@ function buildPads() {
       g.font = `800 ${compactPadLabels ? 76 : 42}px ${W.FONT}`;
       lines.forEach((line, n) => g.fillText(line, w / 2, h / 2 + 2 + (n - (lines.length - 1) / 2) * 46));
     });
-    const six = S.PADS.length > 4; // 六信標排三列：標籤放低、縮小，避免蓋住上一列與展示模型
+    const six = S.PADS.length > 4, nine = S.PADS.length > 6; // 六信標排三列：標籤放低、縮小；九信標三欄欄距 3，標籤再縮到 2.76 寬，左右不重疊
     t.position.set(x, six ? 2.8 : 3.4, z);
-    if (compactPadLabels) t.scale.set(2.65, 2.55, 1).multiplyScalar(six ? .7 : 1);
-    else t.scale.set(p.locked ? 2.9 : 4.6, p.locked ? 1.05 : 1.66, 1).multiplyScalar(six ? .8 : 1);
+    if (compactPadLabels) t.scale.set(2.65, 2.55, 1).multiplyScalar(nine ? .62 : six ? .7 : 1);
+    else t.scale.set(p.locked ? 2.9 : 4.6, p.locked ? 1.05 : 1.66, 1).multiplyScalar(nine ? .6 : six ? .8 : 1);
     padGroup.add(t);
   });
 }
@@ -171,7 +173,7 @@ function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
   const compact = h <= 560;
   if (compact !== compactPadLabels) { compactPadLabels = compact; buildPads(); }
-  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portrait ? 120 : h > 560 ? 108 : 90; // 橫式矮螢幕保留購兵列與訊息列，六信標最下列不被遮
+  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portrait ? 170 : h > 560 ? 116 : 90; // 保留購兵列與訊息列，最下列信標不被遮（九鈕：直式三列、橫式兩列）
   let l = portrait ? 0 : bar.right + 8, r = portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 : 0;
   if (!portrait && w - 2 * Math.max(l, r) > h * 1.25) l = r = Math.max(l, r);
   safe = { l, t, w: Math.max(80, w - l - r), h: Math.max(80, h - t - bottom) };
@@ -346,7 +348,7 @@ function tick() {
       if (KINDS[u.kind].splash && !e.core) puffs.live.push({ x: e.x, z: e.z, y: heightOf(before.get(e.to)), size: LOOK[u.kind].puff[1], life: .3, color: L.seatById(e.seat).secondary }); } continue; }
     if (e.type === 'impact') { puffs.live.push({ x: e.x, z: e.z, y: LOOK[e.kind].puff[0], size: LOOK[e.kind].puff[1], life: .25, color: L.seatById(e.seat).secondary }); continue; }
     if (e.transient) continue;
-    if (e.type === 'death') puffs.live.push({ x: e.x, z: e.z, y: .9, size: 1, life: .4, color: L.seatById(e.seat).primary });
+    if (e.type === 'death') puffs.live.push(e.boom ? { x: e.x, z: e.z, y: FLY_HEIGHT + .4, size: 1.5, life: .45, color: L.seatById(e.seat).secondary } : { x: e.x, z: e.z, y: .9, size: 1, life: .4, color: L.seatById(e.seat).primary }); // 自殺蟲自爆：空中較大的爆團
     if (e.type === 'fall') markFallen(e.seat);
     logRows.push(e); write(e);
   }
@@ -362,7 +364,7 @@ function finish() {
 }
 function menu() {
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。六座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按 1／2／3 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
@@ -489,11 +491,11 @@ function draw(dt, k) {
     bar(...coreStatus.barAt(s.id), 6, .55, v.hp / CORE_MAX, relColor(s.id));
   }
   shadows.count = shade; shadows.instanceMatrix.needsUpdate = true;
-  const PROJ = { dragoon: [orbs, 1.3], mutalisk: [glaives, FLY_HEIGHT + .5], hydralisk: [darts, 1.2], wraith: [missiles, FLY_HEIGHT + .3] }, flying = { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0 };
+  const PROJ = { dragoon: [orbs, 1.3], mutalisk: [glaives, FLY_HEIGHT + .5], hydralisk: [darts, 1.2], wraith: [missiles, FLY_HEIGHT + .3], scout: [bolts, FLY_HEIGHT + .3] }, flying = { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0, scout: 0 };
   for (const s of mode === 'end' ? [] : state?.shots ?? []) { // 終局後模擬停止，飛行中的投射物不再畫出
     const [mesh, y] = PROJ[s.kind], i = flying[s.kind]; if (i >= 128) continue; flying[s.kind]++;
     const p = prevShots.get(s.id) ?? [s.x, s.z], x = p[0] + (s.x - p[0]) * k, z = p[1] + (s.z - p[1]) * k;
-    dummy.position.set(x, y, z); dummy.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, mesh === darts || mesh === missiles ? Math.atan2(s.tx - s.x, s.tz - s.z) : (state.tick + k) * .7); dummy.scale.setScalar(s.hop ? 1 - s.hop * .22 : 1); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, color.set(L.seatById(s.seat).secondary));
+    dummy.position.set(x, y, z); dummy.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, mesh === darts || mesh === missiles || mesh === bolts ? Math.atan2(s.tx - s.x, s.tz - s.z) : (state.tick + k) * .7); dummy.scale.setScalar(s.hop ? 1 - s.hop * .22 : 1); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, color.set(L.seatById(s.seat).secondary));
   }
   for (const [kind, [mesh]] of Object.entries(PROJ)) { const n = flying[kind]; mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
   for (const m of [barBack, barFill]) { m.count = bars; m.instanceMatrix.needsUpdate = true; } if (barFill.instanceColor) barFill.instanceColor.needsUpdate = true;
@@ -538,7 +540,7 @@ $('view').onclick = () => { nextView(); canvas.focus(); };
 $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(); };
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
-$('rules').innerHTML = [`起始 ${S.ECONOMY.startGold} 金、每 ${S.ECONOMY.incomeEvery / S.HZ} 秒 1 金、陸戰隊 ${S.ECONOMY.costs.marine} 金（版本 5：原 12 金／每秒 1 金／5 金）；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈戰機對地普通、對空指向性爆炸，隱形未實作。', `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
+$('rules').innerHTML = [`起始 ${S.ECONOMY.startGold} 金、每 ${S.ECONOMY.incomeEvery / S.HZ} 秒 ${S.economyFor(S.VERSION).income ?? 1} 金、陸戰隊 ${S.ECONOMY.costs.marine} 金（版本 7 每次收入×3；版本 5、6 每次 1 金；版本 5 前：12 金／每秒 1 金／5 金）；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。價格與每次一隻為暫定。', `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: S.DIM })); buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;
@@ -549,5 +551,5 @@ try {
   shopUi(); setView(view, true); resize(); menu(); hud(); requestAnimationFrame(frame);
 } catch (err) { console.error(err); $('card').innerHTML = '<h3>無法啟動 3D</h3><p>此裝置或瀏覽器無法使用 WebGL，這一版沒有 2D 備援。</p>'; }
 // 供自動核對：唯讀快照
-window.__dev02 = { audio: () => audio.info(), wings: wingTilts, cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count, hydralisk: darts.count, wraith: missiles.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
+window.__dev02 = { audio: () => audio.info(), wings: wingTilts, cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count, hydralisk: darts.count, wraith: missiles.count, scout: bolts.count }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
   screen: (x, z, y = .1) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * canvas.clientWidth, (1 - v.y) / 2 * canvas.clientHeight]; }, pad: i => S.padWorld(seat, i, S.DIM), padModels: () => padModels.children.map(g => ({ seat: g.userData.seat, pad: g.userData.pad, kind: S.PADS[g.userData.pad].kind, visible: g.visible })), padModel: i => { const m = padModels.children.find(o => o.userData.pad === i && o.userData.seat === seat); return m && [m.position.x, m.position.y + .8, m.position.z]; }, inside: () => { pose(); const b = [1e9, 1e9, -1e9, -1e9]; for (const p of L.framePoints(view, ARENA)) { const [x, y] = window.__dev02.screen(p[0], p[2], p[1]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b[0] >= safe.l - 1 && b[1] >= safe.t - 1 && b[2] <= safe.l + safe.w + 1 && b[3] <= safe.t + safe.h + 1; } };
