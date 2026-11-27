@@ -5,6 +5,9 @@ export const SOUNDS = {
   marine: { name: '陸戰隊：雙發短促步槍聲', seconds: .16, gain: .5 },
   dragoon: { name: '重騎兵：低沉能量砲', seconds: .45, gain: .75 },
   mutalisk: { name: '飛螳：顫音拋射聲', seconds: .24, gain: .55 },
+  hydralisk: { name: '刺蛇：濕性噴刺聲', seconds: .18, gain: .5 },
+  archon: { name: '破壞能：靈能電弧爆裂', seconds: .4, gain: .6 },
+  wraith: { name: '死靈戰機：三連短雷射', seconds: .22, gain: .45 },
 };
 const TAU = Math.PI * 2;
 const noise = seed => { let v = seed >>> 0 || 1; return () => { v ^= v << 13; v ^= v >>> 17; v ^= v << 5; return (v >>> 0) / 2147483648 - 1; }; };
@@ -21,6 +24,18 @@ const voices = {
   mutalisk(rnd) {
     let low = 0, phase = 0;
     return t => { phase += TAU * (230 + 520 * Math.exp(-t * 13) + 150 * Math.sin(TAU * 46 * t)) / RATE; low += (rnd() - low) * .4; return (Math.sin(phase + 1.6 * Math.sin(phase * .5)) + .5 * low * Math.sin(TAU * 28 * t)) * Math.exp(-t * 14); };
+  },
+  hydralisk(rnd) { // 帶通雜訊「嘶」＋快速下滑的短促彈射音
+    let a = 0, b = 0;
+    return t => { const n = rnd(); a += (n - a) * .55; b += (a - b) * .3; return 1.6 * (a - b) * Math.exp(-t * 30) + .7 * Math.sin(TAU * (520 * t - 900 * t * t)) * Math.exp(-t * 28); };
+  },
+  archon(rnd) { // 環形調變的明亮電弧，夾雜隨機爆裂
+    let crack = 0, phase = 0;
+    return t => { phase += TAU * (260 + 120 * Math.sin(TAU * 9 * t)) / RATE; if (rnd() > .97) crack = 1; crack *= .93;
+      return (Math.sin(phase) * Math.sin(TAU * 760 * t) + .5 * Math.sin(phase * .5)) * Math.exp(-t * 6) + .8 * crack * rnd() * Math.exp(-t * 4); };
+  },
+  wraith() { // 三發等距高頻雷射，各自快速下滑
+    return t => { let out = 0; for (let k = 0; k < 3; k++) { const u = t - k * .065; if (u < 0 || u > .07) continue; out += Math.sin(TAU * (1900 * u - 9000 * u * u)) * Math.exp(-u * 45) * Math.min(1, u / .002, (.07 - u) / .004); } return out; };
   },
 };
 export function renderSound(kind) {

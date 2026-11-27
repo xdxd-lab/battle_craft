@@ -1,9 +1,22 @@
 // 版本 3 的部隊步進：索敵、移動、投射物、彈跳與回盾。傷害順序固定：先抵達的投射物（依編號），再即時攻擊（依射手編號）。
 import * as L from '../dev05-layout/layout.mjs';
-import { KINDS, CORE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage } from './roster.mjs';
+import { KINDS, CORE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
 export const armorOf = u => u.armor ?? KINDS[u.kind].armor;
+
+// 範圍傷害：以主目標位置為圓心，依部隊編號順序結算；主目標已吃整發不重複
+function splash(units, center, h, spec, killer) {
+  const { radii, parts, spareSeat, spareTeam } = spec.splash;
+  for (const o of units) {
+    if (o === center || o.hp <= 0 || (spareSeat && o.seat === h.seat) || (spareTeam && o.team === h.team) || !canTarget(spec, KINDS[o.kind].air)) continue;
+    const d = dist(center.x, center.z, o.x, o.z), ring = radii.findIndex(r => d <= r);
+    if (ring < 0) continue;
+    const body = { hp: o.hp, sh: o.sh, armor: armorOf(o) };
+    applyDamage(body, spec.damage * parts[ring], spec.attack); o.hp = body.hp; o.sh = body.sh;
+    if (o.hp <= 0) killer.set(o.id, h.seat);
+  }
+}
 
 export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) {
   const units = state.units, alive = new Map(units.map(u => [u.id, u])), frames = framesAt(state.tick) - framesAt(state.tick - 1);
@@ -20,7 +33,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     if (best > R.aggro) foe = null;
     const p = { mx: 0, mz: 0, sx: 0, sz: 0, hit: null, core: null };
     u.foe = foe ? foe.id : 0;
-    if (foe && best <= spec.range) p.hit = foe;
+    if (foe && best <= weaponOf(u.kind, KINDS[foe.kind].air).range) p.hit = foe;
     else if (foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
     else if (u.target) {
       const [cx, cz] = L.corePos(u.target, dim);
@@ -40,7 +53,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   for (const s of state.shots) {
     const foe = s.core ? null : alive.get(s.target);
     if (foe) { s.tx = foe.x; s.tz = foe.z; }
-    const speed = KINDS[s.kind].projectile, d = dist(s.x, s.z, s.tx, s.tz), left = d - (s.core ? R.coreRadius : 0);
+    const speed = weaponOf(s.kind, !!s.w).projectile, d = dist(s.x, s.z, s.tx, s.tz), left = d - (s.core ? R.coreRadius : 0);
     if (left <= speed) {
       if (d > 0 && left > 0) { s.x += (s.tx - s.x) / d * left; s.z += (s.tz - s.z) / d * left; }
       arrived.push(s);
@@ -50,22 +63,23 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   // 第三階段：開火
   const instant = [];
   units.forEach((u, i) => {
-    const p = plan[i], spec = KINDS[u.kind];
+    const p = plan[i];
     if ((!p.hit && !p.core) || u.cd) return;
+    const vsAir = !p.core && !!KINDS[u.kind].vsAir && KINDS[p.hit.kind].air, spec = weaponOf(u.kind, vsAir);
     u.cd = spec.cooldown;
     const [x, z] = p.core ? L.corePos(p.core, dim) : [p.hit.x, p.hit.z];
     if (spec.projectile) {
-      const shot = { id: ++state.shotSerial, kind: u.kind, seat: u.seat, team: u.team, from: u.id, x: u.x, z: u.z, tx: x, tz: z, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0, prev: null };
+      const shot = { id: ++state.shotSerial, kind: u.kind, seat: u.seat, team: u.team, from: u.id, x: u.x, z: u.z, tx: x, tz: z, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0, prev: null, ...(vsAir ? { w: 1 } : {}) };
       state.shots.push(shot); emit('launch', u.seat, { from: u.id, shot: shot.id, kind: u.kind }, true);
     } else {
-      instant.push({ from: u.id, kind: u.kind, seat: u.seat, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0 });
+      instant.push({ from: u.id, kind: u.kind, seat: u.seat, team: u.team, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0 });
       emit('shot', u.seat, { from: u.id, x, z, ...(p.core ? { core: p.core } : { to: p.hit.id }) }, true);
     }
   });
   // 第四階段：依固定順序結算傷害
   const coreDamage = {}, killer = new Map();
   for (const h of [...arrived, ...instant.sort((a, b) => a.from - b.from)]) {
-    const spec = KINDS[h.kind], divisor = 3 ** h.hop;
+    const spec = weaponOf(h.kind, !!h.w), divisor = 3 ** h.hop;
     let dealt = null;
     if (h.core) {
       if (state.seats[h.core].alive) { const body = { hp: 0, sh: 0, armor: CORE.armor }; dealt = applyDamage(body, spec.damage, spec.attack, divisor); coreDamage[h.core] = (coreDamage[h.core] || 0) + dealt.body; }
@@ -75,6 +89,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
         const body = { hp: t.hp, sh: t.sh, armor: armorOf(t) };
         dealt = applyDamage(body, spec.damage, spec.attack, divisor); t.hp = body.hp; t.sh = body.sh;
         if (t.hp <= 0) killer.set(t.id, h.seat);
+        if (spec.splash) splash(units, t, h, spec, killer);
       }
     }
     if (h.id) emit(dealt ? 'impact' : 'fizzle', h.seat, { shot: h.id, kind: h.kind, hop: h.hop, x: h.x, z: h.z, target: h.core || h.target, ...(dealt ?? {}) }, true);

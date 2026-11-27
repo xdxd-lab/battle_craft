@@ -2,11 +2,11 @@
 // 同一組設定與指令在任何地方重跑都得到相同狀態；呈現層只讀不寫。
 import * as L from '../dev05-layout/layout.mjs';
 import { ARENA } from './arena.mjs';
-import { KINDS, KIND_IDS, CORE, unitStats } from './roster.mjs';
+import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
 
 export const HZ = 30;
-export const VERSION = 5; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5（舊版保留供重播）
+export const VERSION = 6; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
   startGold: 12, incomeEvery: 30, purchaseGap: 15, // v5：12 金起始、每秒 1 金、兩次購買至少 0.5 秒
@@ -18,8 +18,8 @@ export const RULES = {
   coreRadius: 4.6, spawnRadial: ARENA.spawnRadial, laneHalf: 3.6, junction: 8.2, platform: ARENA.platformWalkRadius,
 };
 // 信標位置以北席本地座標相對購買區中心
-const place = pads => pads.map((pad, i) => {
-  const [x, z] = ARENA.shopPadPositions[i];
+const place = (pads, positions = ARENA.shopPadPositions) => pads.map((pad, i) => {
+  const [x, z] = positions[i];
   return { ...pad, x, z };
 });
 const PADS_V2 = place([
@@ -31,12 +31,17 @@ const PADS_V2 = place([
 // 版本 5 經濟：以版本 3、4 的值乘上倍率。7.5 金不取整；金幣只會是 0.5 的倍數，二進位浮點可精確表示。
 export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.incomeEvery / 2, costs: { marine: KINDS.marine.cost * 1.5 } };
 export const economyFor = version => version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
-const rosterPads = version => place([...KIND_IDS.map(kind => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name })), { locked: true, label: '未開放' }]);
-const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5);
-export const padsFor = version => version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name });
+// 版本 6：購買區 9×15 內兩欄三列，信標中心相距 4.4／4.8（大於兩倍 padRadius），皆在指揮官可走範圍內（暫定）
+export const SIX_PAD_POSITIONS = [[2.2, 4.8], [-2.2, 4.8], [2.2, 0], [-2.2, 0], [2.2, -4.8], [-2.2, -4.8]];
+const rosterPads = version => version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
+  : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
+const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6);
+export const padsFor = version => version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 3 ? CORE.hp : RULES.coreHp;
-const HOME = { x: .9, z: 0 };
+const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }; // 版本 6 置中，避開中列信標
+const homeFor = version => version >= 6 ? HOME_V6 : HOME_V2;
 const GEOMETRY = {
   1: { dim: L.DIM, shopBounds: [-4, 5.8, -4.2, 4.2] },
   2: { dim: ARENA, shopBounds: [
@@ -47,6 +52,9 @@ const GEOMETRY = {
 GEOMETRY[3] = GEOMETRY[2];
 GEOMETRY[4] = { ...GEOMETRY[2], dim: { ...ARENA, laneHalf: RULES.laneHalf * 1.1 } };
 GEOMETRY[5] = GEOMETRY[4];
+GEOMETRY[6] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: SIX_PAD_POSITIONS } };
+export const dimFor = version => GEOMETRY[version].dim;
+export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
 
 // 北席本地座標 ⇄ 世界座標（90° 旋轉，浮點無誤差）
@@ -72,7 +80,7 @@ export function createSim({ seed = 1, bots = SEAT_IDS, version = VERSION } = {})
   const { dim } = GEOMETRY[version];
   const state = { version, seed: seed >>> 0, tick: 0, mode: 'play', winner: null, serial: 0, units: [], seats: {}, bots: {} };
   for (const s of L.SEATS) {
-    const [x, z] = toWorld(s.id, HOME.x, HOME.z, dim);
+    const home = homeFor(version), [x, z] = toWorld(s.id, home.x, home.z, dim);
     state.seats[s.id] = { id: s.id, team: s.team, alive: true, gold: economyFor(version).startGold, hp: coreMax(version), commander: { x, z, dx: 0, dz: 0 }, goal: null, dir: null, pad: -1, nextBuy: 0, waiting: false, buys: 0, spent: 0, deployed: 0, lost: 0, kills: 0 };
   }
   if (version >= 3) Object.assign(state, { shots: [], shotSerial: 0 });
@@ -92,6 +100,8 @@ function apply(state, c, geometry) {
 }
 
 // 電腦只決定走向哪座信標，購兵走同一套規則；只看自己的資料
+// 版本 6 電腦選信標的累計機率（%，暫定）：陸戰隊 26、重騎兵 16、飛螳 14、刺蛇 20、破壞能 10、死靈戰機 14
+const BOT_V6 = [26, 42, 56, 76, 86, 100];
 function botCommands(state, dim) {
   const out = [];
   for (const id of SEAT_IDS) {
@@ -102,9 +112,10 @@ function botCommands(state, dim) {
     if (b.pad >= 0) {
       if (s.buys - b.seen < b.left) continue;
       b.pad = -1; b.until = state.tick + roll(60);
-      const [x, z] = toWorld(id, HOME.x, HOME.z, dim); out.push({ seat: id, type: 'goal', x, z });
+      const home = homeFor(state.version), [x, z] = toWorld(id, home.x, home.z, dim); out.push({ seat: id, type: 'goal', x, z });
     } else if (state.tick >= b.until) {
-      if (state.version >= 3) { const n = roll(100); b.pad = n < 45 ? 0 : n < 73 ? 1 : 2; b.left = b.pad ? 1 : 1 + roll(3); }
+      if (state.version >= 6) { const n = roll(100); b.pad = BOT_V6.findIndex(c => n < c); b.left = b.pad ? 1 : 1 + roll(3); }
+      else if (state.version >= 3) { const n = roll(100); b.pad = n < 45 ? 0 : n < 73 ? 1 : 2; b.left = b.pad ? 1 : 1 + roll(3); }
       else { b.pad = roll(100) < 35 ? 0 : 1; b.left = b.pad ? 1 + roll(2) : 1 + roll(3); }
       b.seen = s.buys;
       const [x, z] = padWorld(id, b.pad, dim); out.push({ seat: id, type: 'goal', x, z });
