@@ -432,6 +432,7 @@ await test('終局：勝／敗皆立即停掉戰鬥音效且不再新啟動；�
     let a = await A(page), busy = 0;
     for (let i = 0; i < 3000 && await page.eval('__dev02.mode()') === 'play'; i++) { await page.eval('__step(15)'); if (sfx && i % 10 === 0) { a = await A(page); busy = Math.max(busy, a.voices); } }
     assert.equal(await page.eval('__dev02.mode()'), 'end'); a = await A(page);
+    const rec = await page.eval('__dev02.record()'); assert.equal(rec.digest, await page.eval('__dev02.digest()'), '終局紀錄應寫入摘要'); assert.equal(rec.ticks, (await page.snap()).tick); assert.match(rec.digest, /^[0-9a-f]{8}$/);
     assert.equal(a.voices, 0, `${seat} 終局仍有 ${a.voices} 個音效`); const played = total(a); if (sfx) assert(played > 0 && busy > 0); else assert.equal(played, 0, '只開音樂不得有音效');
     await page.eval('__step(90)'); await sleep(400); a = await A(page); assert.equal(total(a), played, '終局後不得新啟動音效'); assert.equal(a.voices, 0);
     assert(music ? a.musicStarted && a.music > 0 : a.music === 0, `音樂照設定 ${JSON.stringify(a)}`); if (music) assert.equal(a.state, 'running', '終局後音樂續播');

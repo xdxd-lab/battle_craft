@@ -352,7 +352,7 @@ function tick() {
   if (state.mode === 'end') finish();
 }
 function finish() {
-  mode = 'end'; keys.clear(); audio.stopEffects(); record.ticks = state.tick; // 終局立即停掉殘留戰鬥音效；模擬已停，不再觸發新音效，音樂照設定續播 record.digest = S.digest(state);
+  mode = 'end'; keys.clear(); audio.stopEffects(); record.ticks = state.tick; record.digest = S.digest(state); // 終局立即停掉殘留戰鬥音效；模擬已停，不再觸發新音效，音樂照設定續播
   const won = state.winner === 'draw' ? '平手' : !seat ? `${L.TEAMS[state.winner].name}獲勝` : L.seatById(seat).team === state.winner ? '勝利' : '敗北';
   $('card').innerHTML = `<h3 id="result">${won}</h3><p>${time(state.tick)}　種子 ${state.seed}</p><table><tr><th>席位</th><th>核心</th><th>購買</th><th>花費</th><th>部署</th><th>損失</th><th>擊破</th></tr>${L.SEATS.map(s => { const v = state.seats[s.id]; return `<tr><td>${s.name}席（${relName(s.id)}）</td><td>${v.alive ? Math.ceil(v.hp) : '失守'}</td><td>${v.buys}</td><td>${v.spent}</td><td>${v.deployed}</td><td>${v.lost}</td><td>${v.kills}</td></tr>`; }).join('')}</table><div class="row"><button class="go" id="restart">再來一局</button><button id="look">查看戰場</button></div>`;
   $('restart').onclick = menu; $('look').onclick = () => { $('cover').hidden = true; }; $('cover').hidden = false;
