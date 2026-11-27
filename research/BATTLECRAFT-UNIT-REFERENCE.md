@@ -38,7 +38,7 @@ SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成�
 | 破壞能 | Archon | 300／12 | 1750／0 |
 | 死靈戰機 | Wraith | 300／8 | 800／0 |
 
-來源界線：礦／計畫數取自上表的 v2.91f Trigger 扣款與 Create Unit 合計；HP／盾取自本機 `BATTLECRAFT-FASTBLACK-V291F-ROSTER.md`（尚未納入儲存庫；v2.91f `UNIx` 覆寫值，與 QA2 初查一致）。兩者都只代表 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)這一版地圖，不是原作者首發檔，也不是 Blizzard 普通單位的原版數值；原版數值另以官方資料標示，本節未列。以上皆為對照資料，不是 BaattleCraft 的定案規格；新遊戲的價格、血量、攻擊與素材另行設計。
+來源界線：礦／計畫數取自上表的 v2.91f Trigger 扣款與 Create Unit 合計；HP／盾是 v2.91f CHK `UNIx` 覆寫值，由本機讀取筆記整理（本機專用，未納入儲存庫，也不附地圖檔），與 QA2 初查一致；可從公開的 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)取得同一地圖自行核對，地圖雜湊見[樣本雜湊表](battle_craft-scx-checksums.csv)。兩者都只代表 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)這一版地圖，不是原作者首發檔，也不是 Blizzard 普通單位的原版數值；原版數值另以官方資料標示，本節未列。以上皆為對照資料，不是 BaattleCraft 的定案規格；新遊戲的價格、血量、攻擊與素材另行設計。
 
 ## UNIx、UNIS 與引擎預設的界線
 
