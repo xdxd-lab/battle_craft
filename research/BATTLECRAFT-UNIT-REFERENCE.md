@@ -30,6 +30,16 @@ SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`
 
 SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
 
+### 後續候選兵種（2026-11-27 名稱已確認，未實作）
+
+| 中文名 | 英文 | v2.91f 礦／計畫數 | v2.91f HP／盾 |
+|---|---|---|---|
+| 刺蛇 | Hydralisk | 150／15 | 485／0 |
+| 破壞能 | Archon | 300／12 | 1750／0 |
+| 死靈戰機 | Wraith | 300／8 | 800／0 |
+
+來源界線：礦／計畫數取自上表的 v2.91f Trigger 扣款與 Create Unit 合計；HP／盾取自本機 `BATTLECRAFT-FASTBLACK-V291F-ROSTER.md`（尚未納入儲存庫；v2.91f `UNIx` 覆寫值，與 QA2 初查一致）。兩者都只代表 [SCMSCX 鏡像](https://scmscx.com/map/7zGY2kzG)這一版地圖，不是原作者首發檔，也不是 Blizzard 普通單位的原版數值；原版數值另以官方資料標示，本節未列。以上皆為對照資料，不是 BaattleCraft 的定案規格；新遊戲的價格、血量、攻擊與素材另行設計。
+
 ## UNIx、UNIS 與引擎預設的界線
 
 兩個本機 CHK 均為 VER 205，含一個 4168-byte `UNIx`，本次找到的完整 UNIx 位於 SPEED offset 356479、v2.91f offset 375108；SPEED 檔案正常結束，v2.91f 後續 WAV 長度異常。依 [scmJS UNIx 格式](https://docs.scmjs.dev/chk/unix/)及[載入順序](https://docs.scmjs.dev/chk/how-the-game-loads-a-map/)，Brood War UMS 讀 UNIx；不要因為有 UNIS 就假設會覆蓋該版本 UNIx。每個類型的 flag 為 0 才套用該表對應單位 HP、盾、護甲、名稱等；非零使用既有／引擎值。重複 settings section 依條目合併，非簡單最後整段取代。以上表列類型逐一讀得 flag 均為 0，因此護甲是地圖自訂值，即使數字偶爾與預設相同。
