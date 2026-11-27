@@ -353,7 +353,7 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   const page = await browser.open(`${url}#seed=11`, { stepped: true, prelude: `if (!sessionStorage.k) { localStorage.clear(); sessionStorage.k = 1 }` });
   await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)');
   assert.deepEqual([(await A(page)).state, (await A(page)).musicStarted], ['locked', false], '互動前不建立 AudioContext');
-  await page.clickOn('[data-seat="none"]'); await running(page); let a = await A(page); assert(a.musicStarted && a.music > 0 && a.sfx > 0);
+  await page.clickOn('[data-seat="none"]'); await running(page); await page.until(`__dev02.audio().musicSource === 'track' && __dev02.audio().musicStarted`); let a = await A(page); // 內嵌 CC0 曲檔實際解碼 assert(a.musicStarted && a.music > 0 && a.sfx > 0);
   for (let i = 0; i < 600 && !(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped) && await page.eval('__dev02.mode()') === 'play'; i++) { await page.eval('__step(6)'); await sleep(8); a = await A(page); assert(a.voices <= 6, `聲部 ${a.voices}`); }
   assert(a.played.marine && a.played.dragoon && a.played.mutalisk && a.dropped > 0 && a.peak >= 2 && a.peak <= 6, JSON.stringify(a));
   await sleep(700); assert.equal((await A(page)).voices, 0, '播完釋放聲部'); const total = v => Object.values(v.played).reduce((x, y) => x + y, 0), first = total(await A(page));
@@ -367,7 +367,7 @@ await test('聲音：互動後啟動、分開調整與關閉、保存、限制�
   await page.clickOn('#opt-sfx'); await page.clickOn('#opt-sfx'); const mute = (await A(page)).played; await page.eval('__step(200)'); assert.deepEqual((await A(page)).played, mute, '音效關閉不播放'); assert((await A(page)).music > 0, '音樂獨立'); await running(page);
   await page.clickOn('#opt-music'); await page.clickOn('#opt-music'); assert.equal(await label('opt-music'), '音樂：關'); await stopped(page); assert.equal((await A(page)).music, 0);
   await page.reload(); await page.until(`!!window.__dev02 && !!document.querySelector('[data-seat]')`); await page.eval('__step(2)'); assert.deepEqual([await label('opt-music'), await label('opt-sfx')], ['音樂：關', '音效：關']);
-  await page.clickOn('[data-seat="N"]'); assert.equal((await A(page)).state, 'locked', '全關時不建立'); await page.clickOn('#opt-music'); await running(page); assert.deepEqual([await label('opt-music'), (await A(page)).musicStarted], ['音樂：小', true]);
+  await page.clickOn('[data-seat="N"]'); assert.equal((await A(page)).state, 'locked', '全關時不建立'); await page.clickOn('#opt-music'); await running(page); await page.until(`__dev02.audio().musicStarted`); assert.deepEqual([await label('opt-music'), (await A(page)).musicSource], ['音樂：小', 'track'], '音樂關閉時延後解碼，打開後才播放曲檔');
   await page.eval(`localStorage.setItem('battle_craft.dev02.display', '{"music":9,"sfx":"x"}')`); await page.reload(); await page.until(`!!window.__dev02`); assert.deepEqual([await label('opt-music'), await label('opt-sfx')], ['音樂：中', '音效：中']); assert.deepEqual(page.errors, []); await page.close();
   const mutedRun = await open('N', { seed: 21 }), loudRun = await open('N', { seed: 21 });
   for (const id of ['#opt-music', '#opt-music', '#opt-sfx', '#opt-sfx']) await mutedRun.clickOn(id);

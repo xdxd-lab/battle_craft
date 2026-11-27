@@ -71,4 +71,26 @@ await test('系統自行恢復（沒有輸入、不呼叫 unlock／sync）：舊
 await test('漏掉中斷事件時，輸入恢復前的 sync 仍清掉舊音效', async () => {
   fire(); const old = effects().slice(-3); made.state = 'interrupted'; audio.unlock(); await settle(); assert.equal(audio.info().state, 'running'); silenced(old);
 });
+// 曲檔：以假的離線 context 控制解碼成功或失敗；開場 200 毫秒後才解碼
+const wait = ms => new Promise(done => setTimeout(done, ms));
+const fakeTrack = (frames = 44100) => { const ch = [new Float32Array(frames), new Float32Array(frames)]; ch[0].fill(.3, 1000, frames - 500); return { numberOfChannels: 2, sampleRate: 44100, duration: frames / 44100, getChannelData: i => ch[i] }; };
+let decodes = 0, decodeResult;
+window.OfflineAudioContext = class { decodeAudioData(bytes) { decodes++; assert(bytes instanceof ArrayBuffer && bytes.byteLength > 0); return decodeResult(); } };
+const fresh = async (lv, ok) => {
+  decodeResult = ok ? () => Promise.resolve(fakeTrack()) : () => Promise.reject(new Error('壞檔')); const warn = console.warn; console.warn = () => {};
+  const before = sources.length, a = createAudio(lv, { track: btoa('ID3fake') }); a.unlock(); await settle(); await wait(250); await settle(); console.warn = warn;
+  return { a, mine: () => sources.slice(before).filter(s => s.loop) };
+};
+await test('曲檔解碼成功：播放曲檔、略過頭尾補零設循環區間、從循環起點開始、只有一條', async () => {
+  const n = decodes, { a, mine } = await fresh({ music: 2, sfx: 2 }, true); assert.equal(decodes, n + 1); assert.equal(a.info().musicSource, 'track'); assert(a.info().musicStarted);
+  const [m] = mine(); assert.equal(mine().length, 1); assert.equal(m.loopStart, 1000 / 44100); assert.equal(m.loopEnd, (44100 - 500) / 44100); assert.equal(m.started, 1);
+  a.sync(); await settle(); assert.equal(mine().length, 1, 'sync 不重啟');
+});
+await test('曲檔解碼失敗：退回合成音樂，仍只有一條', async () => {
+  const { a, mine } = await fresh({ music: 2, sfx: 2 }, false); assert.equal(a.info().musicSource, 'synth'); assert.equal(mine().length, 1); assert(a.info().musicStarted);
+});
+await test('音樂關閉時不解碼；打開後才解碼並播放', async () => {
+  const lv = { music: 0, sfx: 2 }, n = decodes, { a, mine } = await fresh(lv, true); assert.equal(decodes, n); assert.equal(a.info().musicSource, 'idle'); assert.equal(mine().length, 0);
+  lv.music = 2; a.sync(); await settle(); assert.equal(decodes, n + 1); assert.equal(a.info().musicSource, 'track'); assert.equal(mine().length, 1);
+});
 console.table(rows); console.log('audio playback QA: OK');

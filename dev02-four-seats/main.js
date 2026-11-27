@@ -9,6 +9,7 @@ import { createDossier } from './dossier.js';
 import { detailCommander, detailMaterials, triangles } from './detail-models.js';
 import { unitModels, FLY_HEIGHT, WING_HINGE, HOVER_HEIGHT } from './unit-models.js';
 import { createAudio, LEVEL_NAMES } from './audio.js';
+import MUSIC_TRACK from './music-data.generated.js';
 import { KINDS, KIND_IDS, ATTACKS, CORE } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
@@ -390,7 +391,7 @@ for (const k of ['bars', 'log']) display[k] = display[k] !== false;
 display.engineering = display.engineering === true;
 for (const k of ['music', 'sfx']) if (![0, 1, 2, 3].includes(display[k])) display[k] = 2;
 // 聲音：瀏覽器要求互動後才能出聲，第一次點擊或按鍵才建立 AudioContext
-const audio = createAudio(display);
+const audio = createAudio(display, { track: hash.get('music') === 'synth' ? null : MUSIC_TRACK }); // #music=synth 只在本次改用合成音樂對照
 for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, () => audio.unlock(), true);
 function applyDisplay(save) {
   document.body.classList.toggle('no-bars', !display.bars); document.body.classList.toggle('no-log', !display.log);

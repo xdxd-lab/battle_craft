@@ -30,7 +30,7 @@
 | 陸戰隊攻擊 | `renderSound('marine')` | 雙發雜訊脈衝＋短促低頻 | 0.16 秒 |
 | 重騎兵攻擊 | `renderSound('dragoon')` | 下滑低頻砲聲＋環調泛音 | 0.45 秒 |
 | 飛螳攻擊 | `renderSound('mutalisk')` | 顫音下滑調頻＋濕濁雜訊 | 0.24 秒 |
-| 背景音樂 | `renderMusic()` | 80 BPM、8 小節 D 小調工業氛圍循環 | 24 秒 |
+| 背景音樂（2026-11-27 起為備援，預設曲見 [BC-MUSIC](BC-MUSIC.md)） | `renderMusic()` | 80 BPM、8 小節 D 小調工業氛圍循環 | 24 秒 |
 
 QA2 提供的 CC0 候選（[Kenney Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds)、[Dark Sci-Fi Audio Pack](https://opengameart.org/content/dark-sci-fi-audio-pack)）本輪**未下載、未採用**，授權與內容皆未由 DEV 核對：DEV 無法試聽，改用原創合成可免除授權追蹤與檔案增量。若試聽後認為合成音色不足，可另案替換。
 

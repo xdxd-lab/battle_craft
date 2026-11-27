@@ -1,8 +1,9 @@
-// 合成音訊驗收（純 Node）：長度、音量範圍、彼此可區分、背景音樂循環接點；不引入任何音檔。
+// 合成音訊驗收（純 Node）：長度、音量範圍、彼此可區分、背景音樂循環接點；合成器不引入音檔，播放端只解碼內嵌的 CC0 曲檔。
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { RATE, SOUNDS, MUSIC, renderSound, renderMusic } from './audio-synth.mjs';
 import { KIND_IDS } from './roster.mjs';
+import { loopRange, TRIM_LIMIT } from './audio.js';
 
 const rows = [], test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
 const rms = d => Math.sqrt(d.reduce((a, v) => a + v * v, 0) / d.length), peak = d => d.reduce((a, v) => Math.max(a, Math.abs(v)), 0);
@@ -24,7 +25,20 @@ test('背景音樂：24 秒循環、不削波、接點無跳變、各小節皆�
   const bars = Array.from({ length: 8 }, (_, i) => rms(d.subarray(i * bar, (i + 1) * bar))); assert(Math.min(...bars) > .05, String(bars));
   return `${(d.length / RATE).toFixed(0)} 秒，小節 RMS ${Math.min(...bars).toFixed(2)}～${Math.max(...bars).toFixed(2)}`;
 });
-test('原始碼不載入任何音檔', () => {
-  for (const f of ['audio.js', 'audio-synth.mjs']) assert(!/fetch\(|new Audio|\.(mp3|ogg|wav|m4a)|data:audio|decodeAudioData/i.test(fs.readFileSync(new URL(f, import.meta.url), 'utf8')), f);
+test('不從網路或外部路徑載入音檔：合成器不碰音檔；播放端只解碼呼叫端傳入的內嵌曲檔', () => {
+  const src = f => fs.readFileSync(new URL(f, import.meta.url), 'utf8');
+  assert(!/fetch\(|new Audio|\.(mp3|ogg|wav|m4a)|data:audio|decodeAudioData/i.test(src('audio-synth.mjs')), 'audio-synth.mjs');
+  assert(!/fetch\(|new Audio|\.(mp3|ogg|wav|m4a)|data:audio|XMLHttpRequest/i.test(src('audio.js')), 'audio.js');
+  assert.equal(src('audio.js').match(/decodeAudioData/g).length, 1, '只有一處解碼');
+});
+test('單檔 HTML 內嵌的曲檔與 assets/music/pulse-loop.mp3 位元相同', () => { // 讀已追蹤的輸出，不需先建置
+  const file = fs.readFileSync(new URL('../assets/music/pulse-loop.mp3', import.meta.url));
+  assert(fs.readFileSync(new URL('battle_craft-dev02.html', import.meta.url), 'utf8').includes(`"${file.toString('base64')}"`)); return `${file.length} B`;
+});
+test('循環區間：略過頭尾補零（上限 TRIM_LIMIT），兩聲道取有聲者', () => {
+  const ch = n => new Float32Array(n), a = ch(10000), b = ch(10000); a.fill(.5, 300, 9000); b.fill(.5, 200, 8000);
+  assert.deepEqual(loopRange([a, b]), [200, 9000]);
+  const z = ch(10000); assert.deepEqual(loopRange([z]), [TRIM_LIMIT, 10000 - TRIM_LIMIT], '全靜音最多各略過上限');
+  const c = ch(100); c[0] = c[99] = 1; assert.deepEqual(loopRange([c]), [0, 100]);
 });
 console.table(rows); console.log('audio QA: OK');
