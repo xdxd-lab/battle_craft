@@ -17,8 +17,8 @@ button[aria-pressed=true],button.go{background:#e9edf0;color:#0a0f14;font-weight
 #clock{font:700 26px/1 ui-monospace,Menlo,monospace}#gold{font-weight:800;font-size:26px;line-height:1;color:var(--hot)}.row small{display:block;color:var(--muted);font-size:11px}
 #cores{display:grid;gap:5px}.core{display:grid;grid-template-columns:24px 1fr auto;gap:6px;align-items:center;font-size:12px}.core b{width:24px;height:24px;display:grid;place-items:center;border:2px solid;font-size:13px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
 .core .hp{height:8px;background:#05080b;border:1px solid #44505a}.core .hp i{display:block;height:100%;background:currentColor}.core.down{opacity:.45;text-decoration:line-through}.core span{min-width:66px;text-align:right}
-#shop{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;gap:8px;align-items:stretch;max-width:calc(100% - 24px)}
-#shop button{min-width:128px;line-height:1.25;background:var(--panel)}#shop button.on{border-color:var(--hot);box-shadow:inset 0 0 0 2px var(--hot)}#shop small{display:block;color:var(--muted)}
+#shop{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:stretch;max-width:calc(100% - 24px)}
+#shop button{min-width:112px;line-height:1.25;background:var(--panel)}#shop button.on{border-color:var(--hot);box-shadow:inset 0 0 0 2px var(--hot)}#shop small{display:block;color:var(--muted)}#shop i{font-style:normal}
 #msg{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:3px 12px;font-size:13px;text-align:center;max-width:calc(100% - 24px);pointer-events:none}
 #msg[data-level=warn]{border-color:var(--hot)}#msg[data-level=critical]{border-color:#ff6bf0;color:#ffd9fb}
 .compass{position:fixed;left:max(16px,env(safe-area-inset-left));bottom:14px;width:56px;height:56px;border:1px solid var(--line);border-radius:50%;background:var(--panel);display:grid;place-items:center}#needle{width:42px;height:42px}
@@ -41,12 +41,14 @@ h2{font-size:12px;color:var(--hot);margin:12px 0 4px}#panel p,#panel li{font-siz
 #pick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}#pick button{display:grid;gap:2px;justify-items:center;padding:8px 4px}#pick i{width:30px;height:30px;border:4px solid}#pick small{color:inherit;opacity:.8;font-size:11px}
 table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px solid #2a343b;padding:3px 6px;text-align:right}td:first-child,th:first-child{text-align:left}
 @media(max-height:560px){#bar{top:6px;gap:4px;width:150px}h1{font-size:13px}h1 small{font-size:10px}.box{padding:5px;gap:4px}button{min-height:30px;font-size:12px;padding:2px 6px}#clock,#gold{font-size:18px}.core{font-size:10px;grid-template-columns:18px 1fr auto;gap:4px}.core b{width:18px;height:18px;font-size:10px}.core span{min-width:52px}#shop button{min-width:96px}#shop{bottom:4px}#msg{bottom:44px;font-size:11px;max-width:46%}.compass{display:none}#panel{top:6px;width:250px;max-height:calc(100% - 60px)}.card{padding:10px 14px;gap:6px}.card h3{font-size:17px}}
+@media(max-height:560px){#shop{gap:4px}#shop button{min-width:92px;padding:2px 5px}#shop small{font-size:10px}}
 @media(max-height:400px){h1 small{display:none}#bar{top:4px;gap:3px}.box{padding:3px 5px;gap:3px}button{min-height:26px;line-height:1.2}#cores{gap:2px}.core b{width:15px;height:15px;border-width:1px}.core{line-height:1.25}}
 @media(orientation:landscape){
   #shop,#msg{left:auto;right:max(12px,env(safe-area-inset-right));transform:none}
   #msg{max-width:min(340px,35vw)}
 }
 @media(orientation:landscape) and (max-height:560px){
+  #shop{grid-template-columns:repeat(6,auto);gap:3px}#shop button{min-width:0;min-height:30px;padding:1px 6px;display:flex;gap:5px;align-items:baseline;white-space:nowrap}#shop small{display:inline}#shop i{display:none}
   #panel[open]{width:150px;max-height:calc(100% - 104px)}
   #panel>#dossier{padding-top:7px}
   #dossier nav{gap:4px}#dossier nav button{min-height:28px;font-size:11px;line-height:1.1}#dossier nav small{font-size:9px}
@@ -62,7 +64,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
 <body>
 <canvas id="stage" tabindex="0" aria-label="四席十字戰場。點購買區地面或用方向鍵移動指揮官，站上信標自動購兵"></canvas>
 <div id="bar">
-  <h1>BaattleCraft DEV02<small>2v2 三兵種 · 數值暫定</small></h1>
+  <h1>BaattleCraft DEV02<small>2v2 六兵種 · 數值暫定</small></h1>
   <div class="box"><div class="row"><div><small>時間</small><span id="clock">00:00</span></div><div><small id="gold-label">金幣</small><span id="gold">48</span></div></div></div>
   <div class="box" id="cores" aria-label="四席核心血量"></div>
   <div class="box"><div class="row"><button id="pause">暫停</button><button id="speed" aria-label="遊戲速度 1×，切換速度">1×</button></div><div class="row"><button id="framing" title="在近景與四席全景間切換">切全景</button><button id="opt-bars" aria-pressed="true">血條</button></div><div class="row"><button id="view">隊伍視角</button><button id="again">重新選席</button></div></div>
@@ -74,6 +76,9 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
     <button data-profile="marine" aria-pressed="true">陸戰隊</button>
     <button data-profile="dragoon" aria-pressed="false">重騎兵</button>
     <button data-profile="mutalisk" aria-pressed="false">飛螳</button>
+    <button data-profile="hydralisk" aria-pressed="false">刺蛇</button>
+    <button data-profile="archon" aria-pressed="false">破壞能</button>
+    <button data-profile="wraith" aria-pressed="false">死靈戰機</button>
     <button data-profile="commander" aria-pressed="false">指揮官</button>
   </nav>
   <img width="480" height="240" alt="">

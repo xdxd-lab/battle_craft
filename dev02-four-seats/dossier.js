@@ -9,17 +9,20 @@ const describe = {
   marine: ['地面步兵', '低價前線單位，即時射擊地面與空中目標。', [1.9, 1.9, 4.3], .92, 25],
   dragoon: ['地面重型', '發射慢速光球，延後命中單一目標；護盾持續緩慢回復。', [4.2, 3.2, 4.6], .85, 22],
   mutalisk: ['飛行', '飛行單位。首擊後最多再彈跳兩次，傷害依序為 1/3、1/9。', [3.6, 3.6, 4.2], .5, 24],
+  hydralisk: ['地面中型', '射出骨刺攻擊地面與空中，指向性爆炸對大型目標最有效。', [2.4, 2.0, 3.6], .8, 25],
+  archon: ['地面懸浮', '近距靈能衝擊，主目標整發並濺射周圍敵軍與隊友單位（不傷己席）；幾乎全靠護盾承傷。', [3.2, 2.6, 4.0], 1.05, 26],
+  wraith: ['飛行', '對地即時雷射（普通），對空發射飛彈（指向性爆炸）；隱形未實作。', [3.0, 2.6, 3.6], .4, 25],
 };
 const unitProfile = kind => {
   const k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
   return {
     name: k.name, english: k.source, role, description, camera, aim, fov,
-    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['單次傷害', k.damage], ['攻擊間隔', `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒`]],
+    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}` : k.damage], ['攻擊間隔', `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
     model: unitModels.high[kind], plain: unitModels.std[kind],
   };
 };
 const profiles = {
-  marine: unitProfile('marine'), dragoon: unitProfile('dragoon'), mutalisk: unitProfile('mutalisk'),
+  ...Object.fromEntries(Object.keys(describe).map(k => [k, unitProfile(k)])),
   commander: {
     name: '指揮官', english: 'Commander', role: '購買區操作',
     description: '在自己的購買區移動，站上信標即可持續用金幣部署部隊。',

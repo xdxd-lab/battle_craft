@@ -1,4 +1,5 @@
-// BC01 三兵種的原創程序模型（+z 為車頭／頭部方向）。陸戰隊為太空裝甲人形步兵；重騎兵為四足重型機，飛螳為展翼飛行體。
+// 六兵種的原創程序模型（+z 為車頭／頭部方向）。陸戰隊為太空裝甲人形步兵；重騎兵為四足重型機，飛螳為展翼飛行體；
+// 刺蛇為直立節肢生物，破壞能為懸浮能量核心，死靈戰機為前掠翼雙尾撐戰機（版本 6 起）。
 // 部件鍵：材質[:L|:R]。帶 L／R 的是翅膀，呈現層繞翅根拍動；標準與高細節的鍵必須一致。
 import * as THREE from 'three';
 import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
@@ -67,8 +68,58 @@ function highMutalisk() {
       dark: [box(1.35, .08, .1, s * .9, .64, -.12, 0, s * .27)], lamp: [box(.1, .05, .1, s * 1.55, .62, -.18)] })), true);
 }
 
+// 刺蛇：盤捲尾節撐起前傾軀幹，背脊棘板、雙前肢刃、頭冠與發光眼縫
+function plainHydralisk() {
+  const hull = [tube(.42, .5, .3, 8, 0, .15, -.15), tube(.3, .4, .42, 8, 0, .5, -.05), tube(.24, .3, .4, 8, 0, .9, .08), cone(.2, .55, 6, 0, 1.22, .42)];
+  const dark = [box(.62, .34, .1, 0, 1.25, .02), box(.12, .3, .5, 0, .78, -.34, 0), box(.1, .24, .4, 0, .4, -.52)];
+  for (const s of [-1, 1]) dark.push(box(.08, .08, .7, s * .32, 1.0, .42, s * .25, -s * .2), box(.24, .06, .3, s * .3, 1.28, -.04, s * .4));
+  return { hull: group(hull), dark: group(dark), lamp: group([box(.3, .05, .05, 0, 1.28, .62), box(.1, .1, .1, 0, .62, .3)]) };
+}
+function highHydralisk() {
+  const hull = [armor(oct, 0, .08, -.18, .62, .76, .2, .05), armor(oct, 0, .38, -.06, .5, .62, .28, .05), armor(oct, 0, .74, .06, .4, .5, .3, .04),
+    cone(.2, .6, 10, 0, 1.2, .44), armor(hex, 0, 1.0, .12, .36, .4, .16, .03)];
+  const dark = [];
+  for (let i = 0; i < 5; i++) dark.push(armor(hex, 0, .32 + i * .2, -.34 - (i < 2 ? .14 - i * .07 : 0), .1, .3, .3 - i * .03, .02));
+  for (const s of [-1, 1]) dark.push(box(.07, .07, .78, s * .33, 1.02, .46, s * .25, -s * .2), box(.04, .12, .3, s * .4, .9, .86, s * .25, -s * .2),
+    armor(hex, s * .3, 1.24, -.06, .22, .4, .06, .02), tube(.06, .08, .3, 6, s * .28, .86, .14));
+  const lamp = [box(.3, .05, .05, 0, 1.28, .64), box(.07, .07, .07, -.1, 1.33, .58), box(.07, .07, .07, .1, 1.33, .58), new THREE.IcosahedronGeometry(.09, 0).translate(0, .64, .36)];
+  return { hull: edged(group(hull)), dark: edged(group(dark)), lamp: group(lamp) };
+}
+// 破壞能：懸浮能量核心（呈現層另加懸浮高度），外繞斜置護環與三支約束支架
+function plainArchon() {
+  const hull = [tube(.82, .82, .14, 10, 0, 1.05, 0), tube(.7, .7, .12, 10, 0, 0, 0).rotateX(.9).translate(0, 1.05, 0)];
+  const dark = [];
+  for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3; dark.push(box(.12, 1.1, .12, Math.sin(a) * .78, 1.05, Math.cos(a) * .78)); }
+  return { hull: group(hull), dark: group(dark), lamp: group([new THREE.IcosahedronGeometry(.56, 1).translate(0, 1.05, 0)]) };
+}
+function highArchon() {
+  const hull = [tube(.86, .86, .12, 16, 0, 1.05, 0), tube(.72, .72, .1, 16, 0, 0, 0).rotateX(.9).translate(0, 1.05, 0), tube(.64, .64, .08, 16, 0, 0, 0).rotateZ(1.1).translate(0, 1.05, 0)];
+  const dark = [];
+  for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3, x = Math.sin(a), z = Math.cos(a);
+    dark.push(armor(hex, x * .84, .5, z * .84, .16, .2, 1.1, .02), tube(.09, .14, .16, 8, x * .84, .42, z * .84), tube(.14, .09, .16, 8, x * .84, 1.7, z * .84)); }
+  return { hull: edged(group(hull)), dark: edged(group(dark)), lamp: group([new THREE.IcosahedronGeometry(.56, 2).translate(0, 1.05, 0), new THREE.IcosahedronGeometry(.16, 1).translate(0, 1.92, 0)]) };
+}
+// 死靈戰機：前掠主翼、雙尾撐與垂直尾翼、前置座艙
+const fore = [[0, -.4], [.95, .1], [.9, .32], [.2, .2], [0, .45]];
+function plainWraith() {
+  const hull = [cone(.22, 1.3, 6, 0, .4, .35), armor(side(fore, -1), -.12, .32, -.1, 1, .9, .05, .01), armor(fore, .12, .32, -.1, 1, .9, .05, .01)];
+  const dark = [tube(.18, .2, .5, 6, 0, 0, 0).rotateX(Math.PI / 2).translate(0, .4, -.5)];
+  for (const s of [-1, 1]) dark.push(box(.12, .12, 1.2, s * .5, .38, -.55), box(.05, .4, .3, s * .5, .6, -1.05));
+  return { hull: group(hull), dark: group(dark), lamp: group([box(.16, .1, .32, 0, .52, .62), box(.2, .12, .06, 0, .4, -.78)]) };
+}
+function highWraith() {
+  const hull = [cone(.22, 1.4, 10, 0, .4, .38), armor(side(fore, -1), -.12, .32, -.1, 1.05, .95, .04, .015), armor(fore, .12, .32, -.1, 1.05, .95, .04, .015), armor(hex, 0, .3, -.3, .5, .9, .16, .03)];
+  const dark = [tube(.17, .21, .55, 10, 0, 0, 0).rotateX(Math.PI / 2).translate(0, .4, -.55)];
+  for (const s of [-1, 1]) dark.push(tube(.07, .07, 1.25, 8, 0, 0, 0).rotateX(Math.PI / 2).translate(s * .5, .38, -.56), armor(hex, s * .5, .45, -1.05, .06, .32, .42, .01),
+    box(.04, .08, .5, s * .7, .3, .1, 0, s * .4), box(.24, .03, .26, s * .5, .62, -1.16));
+  const lamp = [box(.15, .1, .34, 0, .52, .66), box(.18, .1, .05, 0, .4, -.84)];
+  for (const s of [-1, 1]) lamp.push(box(.07, .07, .05, s * .5, .38, -1.2), box(.05, .03, .05, s * .92, .32, .2));
+  return { hull: edged(group(hull)), dark: edged(group(dark)), lamp: group(lamp) };
+}
+
 export const unitModels = {
-  std: { marine: plainMarine, dragoon: plainDragoon, mutalisk: plainMutalisk },
-  high: { marine: highMarine, dragoon: highDragoon, mutalisk: highMutalisk },
+  std: { marine: plainMarine, dragoon: plainDragoon, mutalisk: plainMutalisk, hydralisk: plainHydralisk, archon: plainArchon, wraith: plainWraith },
+  high: { marine: highMarine, dragoon: highDragoon, mutalisk: highMutalisk, hydralisk: highHydralisk, archon: highArchon, wraith: highWraith },
 };
+export const HOVER_HEIGHT = .35; // 破壞能懸浮（純視覺，模擬上屬地面層）
 export const FLY_HEIGHT = 1.7;

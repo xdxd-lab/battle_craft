@@ -173,8 +173,8 @@ function buildSeat(s, { commander = true, dim: D = L.DIM } = {}) {
     b.ring(M.glow, D.padRadius, .11, x, .38, z, 6); b.cyl(M.glow, .3, .3, .3, x, .5, z, 12);
   }
   const supplyX = sx - w / 2 + 1.4, supplyZ = D.shopSupplyRadial;
-  for (const k of [-1, 1]) { b.cyl(MAT.steel, .95, .95, 2.4, supplyX, 1.3, sz + k * supplyZ, 18); b.cyl(M.paint, 1, 1, .5, supplyX, 1.6, sz + k * supplyZ, 18); b.cyl(MAT.dark, .5, .95, .4, supplyX, 2.7, sz + k * supplyZ, 18); }
-  b.box(M.paint, 1.7, 1.5, 2.8, supplyX, .85, sz); b.box(MAT.dark, 1.8, .2, 2.9, supplyX, 1.6, sz);
+  if (D.shopPadPositions.length <= 4) for (const k of [-1, 1]) { b.cyl(MAT.steel, .95, .95, 2.4, supplyX, 1.3, sz + k * supplyZ, 18); b.cyl(M.paint, 1, 1, .5, supplyX, 1.6, sz + k * supplyZ, 18); b.cyl(MAT.dark, .5, .95, .4, supplyX, 2.7, sz + k * supplyZ, 18); }
+  if (D.shopPadPositions.length <= 4) { b.box(M.paint, 1.7, 1.5, 2.8, supplyX, .85, sz); b.box(MAT.dark, 1.8, .2, 2.9, supplyX, 1.6, sz); } // 六信標版面：補給設備讓位給信標
   b.box(MAT.dark, .6, 4, .6, sx + w / 2 - .7, 2, sz - d / 2 + .8); b.box(M.glow, .9, .5, .9, sx + w / 2 - .7, 4, sz - d / 2 + .8);
   // 歸屬管線：購買區 → 自己的核心平台（不可通行）
   for (const k of [-.5, .5]) b.pipe(k < 0 ? M.paint : MAT.steel, .28, [sx + w / 2 - .5, -.5, sz - 2.6 + k], [-cr + .8, -.5, -R + 2 + k]);

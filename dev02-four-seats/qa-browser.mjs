@@ -7,7 +7,7 @@ import * as S from './sim.mjs';
 import * as L from '../dev05-layout/layout.mjs';
 
 // 三兵種本體三角面
-const stdTri = { marine: 192, dragoon: 148, mutalisk: 160 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436 };
+const stdTri = { marine: 192, dragoon: 148, mutalisk: 160, hydralisk: 216, archon: 196, wraith: 180 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436, hydralisk: 704, archon: 776, wraith: 448 };
 const gold = tick => S.ECONOMY.startGold + Math.floor(tick / S.ECONOMY.incomeEvery);
 const here = path.dirname(fileURLToPath(import.meta.url)), SHOTS = process.env.SHOTS;
 const url = pathToFileURL(path.join(here, 'battle_craft-dev02.html')).href;
@@ -29,14 +29,14 @@ const same = async page => { const rec = await page.eval('__dev02.record()'), r 
 
 await test('四席：點信標購兵、HUD 與帳目相符、WASD 依鏡頭方向、數字鍵', async () => {
   for (const id of S.SEAT_IDS) {
-    const page = await open(id); const [x, z] = S.padWorld(id, 0);
+    const page = await open(id); const [x, z] = S.padWorld(id, 0, S.DIM);
     assert.equal(await page.eval('__dev02.view()'), 'seat:' + id);
     let s = await page.snap(); const h = s.seats[id].commander;
     await page.clickWorld(x, z, 12); let first = 0;
     for (let i = 0; i < 90; i++) { await page.eval('__step(1)'); s = await page.snap(); if (!first && s.seats[id].buys) first = s.tick; if (Math.hypot(s.seats[id].commander.x - x, s.seats[id].commander.z - z) > S.RULES.padRadius) assert.equal(s.seats[id].spent, 0); }
     assert(first > 0); assert.equal(s.seats[id].gold + s.seats[id].spent, gold(s.tick)); assert.equal(+(await page.eval(`document.getElementById('gold').textContent`)), s.seats[id].gold);
     assert(Math.hypot(s.seats[id].commander.x - h.x, s.seats[id].commander.z - h.z) > 2);
-    await page.clickWorld(...S.toWorld(id, .9, 0)); await page.eval('__step(60)');
+    await page.clickWorld(...S.toWorld(id, 0, 0, S.DIM)); await page.eval('__step(60)');
     const at = async () => { const c = (await page.snap()).seats[id].commander; return page.eval(`__dev02.screen(${c.x}, ${c.z})`); };
     for (const [k, ax, sign] of [['d', 0, 1], ['a', 0, -1], ['w', 1, -1], ['s', 1, 1]]) { const a = await at(); await page.down(k); await page.eval('__step(8)'); await page.up(k); await page.eval('__step(2)'); const b = await at(), d = [b[0] - a[0], b[1] - a[1]]; assert(d[ax] * sign > 5 && Math.abs(d[1 - ax]) < Math.abs(d[ax]), `${id} ${k} 移動 ${d}`); }
     for (const i of [1, 2]) { await page.down(String(i + 1)); await page.up(String(i + 1)); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, i); }
@@ -96,7 +96,7 @@ await test('一般模式失焦：丟掉待處理輸入，停止方向移動，�
   assert.equal((await page.snap()).tick, beforeBlur + 5);
   assert.equal(await page.eval('__dev02.mode()'), 'play');
 
-  const pad = S.padWorld('N', 0);
+  const pad = S.padWorld('N', 0, S.DIM);
   await page.clickWorld(...pad); await blur(); await page.eval('__step(5)');
   assert.deepEqual(await pos(), moved, '丟掉尚未生效的點擊');
   await page.clickWorld(...pad); await page.eval('__step(1)');
@@ -140,7 +140,7 @@ await test('顯示設定：血條與事件紀錄獨立切換、重開可見近�
   await page.clickOn('#opt-log'); d = await D(page); assert(!d.bars && !d.log && !d.logShown); assert.equal(await page.eval(`document.getElementById('panel-title').textContent`), '暫定規則');
   await page.clickOn('#opt-bars'); await page.eval('__step(1)'); d = await D(page); assert(d.bars && !d.log && d.barsDrawn > 4 && !d.logShown, '血條與紀錄應各自獨立');
   await page.clickOn('#opt-engineering');
-  const rows = d.logRows, msg = await page.eval(`document.getElementById('msg').textContent`); await page.clickWorld(...S.padWorld('W', 0)); await page.eval('__step(900)');
+  const rows = d.logRows, msg = await page.eval(`document.getElementById('msg').textContent`); await page.clickWorld(...S.padWorld('W', 0, S.DIM)); await page.eval('__step(900)');
   assert.notEqual(await page.eval(`document.getElementById('msg').textContent`), msg, '即時提示應保留'); assert(await page.eval('__dev02.log().length') > rows);
   await page.clickOn('#opt-engineering'); await page.clickOn('#opt-log'); d = await D(page); assert(d.log && d.logShown && d.logRows > rows, '重開應看到關閉期間的事件');
   const first = await page.eval(`document.querySelector('#log .log time').textContent`), clock = await page.eval(`document.getElementById('clock').textContent`); assert(first <= clock && first >= '00:20', `最近一列 ${first}`);
@@ -234,13 +234,13 @@ await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、�
     if (SHOTS) await page.shot(path.join(SHOTS, `hud-${w}-${quality}.png`)); await page.done();
   }
 });
-await test('飛螳飛行（離地、有影子）、重騎兵地面', async () => {
-  const page = await open('none', { seed: 11, quality: 'high' }); const seen = {};
-  for (let i = 0; i < 400 && !(seen.mutalisk && seen.dragoon); i++) {
-    await page.eval('__step(20)'); const [info, air] = await page.eval(`[__dev02.info(), __dev02.snapshot().units.filter(u => u.kind === 'mutalisk').length]`);
-    assert.equal(info.shadows, air); for (const k of ['dragoon', 'mutalisk']) if (info.heights[k].length) seen[k] = info.heights[k];
+await test('飛螳、死靈戰機飛行（離地、有影子）；重騎兵、刺蛇地面；破壞能低空懸浮', async () => {
+  const page = await open('none', { seed: 11, quality: 'high' }); const seen = {}, want = ['dragoon', 'mutalisk', 'hydralisk', 'wraith', 'archon'];
+  for (let i = 0; i < 400 && !want.every(k => seen[k]); i++) {
+    await page.eval('__step(20)'); const [info, air] = await page.eval(`[__dev02.info(), __dev02.snapshot().units.filter(u => u.kind === 'mutalisk' || u.kind === 'wraith').length]`);
+    assert.equal(info.shadows, air); for (const k of want) if (info.heights[k].length) seen[k] = k === 'archon' ? [Math.min(...info.heights[k]) >= .3 && Math.max(...info.heights[k]) <= .46] : info.heights[k];
   }
-  assert.deepEqual(seen, { dragoon: [.04], mutalisk: [1.74] }); if (SHOTS) await page.shot(path.join(SHOTS, 'air-ground.png')); await page.done(); return JSON.stringify(seen);
+  assert.deepEqual(seen, { dragoon: [.04], mutalisk: [1.74], hydralisk: [.04], wraith: [1.74], archon: [true] }); if (SHOTS) await page.shot(path.join(SHOTS, 'air-ground.png')); await page.done(); return JSON.stringify(seen);
 });
 await test('主城：血量數字與損壞階段隨本體血量、血條開關連動、純呈現不改模擬', async () => {
   const max = S.coreMax(S.VERSION), want = hp => [.75, .5, .25].filter(a => hp <= max * a).length;
@@ -257,13 +257,35 @@ await test('主城：血量數字與損壞階段隨本體血量、血條開關�
   const page = await open('W'); await page.eval('__step(30)'); assert.equal((await page.eval('__dev02.cores()')).N.label, String(max)); await page.clickOn('#opt-bars'); await page.eval('__step(2)'); assert((await page.eval('Object.values(__dev02.cores())')).every(c => c.label === null)); await page.clickOn('#opt-bars'); await page.eval('__step(2)'); assert.equal((await page.eval('__dev02.cores()')).W.label, String(max)); await page.done();
   return '四階段皆出現；數字與模擬血量一致';
 });
+await test('六信標：點展示模型走向該信標（不開單位介紹）、按鈕與數字鍵 1–6、橫式不被 HUD 遮住', async () => {
+  const out = [];
+  for (const [w, h] of [[1600, 900], [844, 390]]) for (const id of S.SEAT_IDS) {
+    const page = await open(id, { w, h });
+    assert.equal(await page.eval(`document.querySelectorAll('#shop button').length`), 6);
+    for (let i = 0; i < 6; i++) {
+      const at = await page.eval(`__dev02.padModel(${i})`); assert(at, `模型 ${i}`);
+      const [x, y] = await page.eval(`__dev02.screen(${at[0]}, ${at[2]}, ${at[1]})`);
+      assert(await page.eval(`document.elementFromPoint(${x}, ${y})?.id === 'stage'`), `${w}x${h} ${id} 模型 ${i + 1} 被遮`);
+      const before = await page.eval(`document.getElementById('profile-name').textContent`);
+      await page.click(x, y); await page.eval('__step(70)');
+      assert.equal((await page.snap()).seats[id].pad, i, `${w}x${h} ${id} 點模型 ${i + 1}`);
+      assert.equal(await page.eval(`document.getElementById('profile-name').textContent`), before);
+    }
+    await page.send('Input.dispatchKeyEvent', { type: 'keyDown', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51, text: '3' }); await page.send('Input.dispatchKeyEvent', { type: 'keyUp', key: '3', code: 'Digit3', windowsVirtualKeyCode: 51 }); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 2);
+    await page.clickOn('#shop button[data-pad="5"]'); await page.eval('__step(70)'); assert.equal((await page.snap()).seats[id].pad, 5);
+    const kinds = new Set((await page.snap()).units.filter(u => u.seat === id).map(u => u.kind)); out.push(`${id}:${kinds.size}`);
+    if (SHOTS && id === 'S') await page.shot(path.join(SHOTS, `six-pads-${w}x${h}.png`));
+    await page.done();
+  }
+  return out.join(' ');
+});
 await test('取景：桌面與橫式手機四席與隊伍視角皆在安全區內', async () => {
   for (const [w, h] of [[1600, 900], [1280, 720], [844, 390]]) for (const id of S.SEAT_IDS) {
     const page = await open(id, { w, h });
     assert.equal(await page.eval('__dev02.framing()'), 'near');
-    for (const i of [0, 1, 2]) {
+    for (const i of [0, 1, 2, 3, 4, 5]) {
       if (i === 1) { await page.clickOn('#view'); await page.eval('__step(40)'); }
-      const pad = S.padWorld(id, i);
+      const pad = S.padWorld(id, i, S.DIM);
       assert(await page.eval(`(() => { const [x,y] = __dev02.screen(${pad[0]}, ${pad[1]}); return document.elementFromPoint(x,y)?.id === 'stage'; })()`), `${w}x${h} ${id}, 近景信標 ${i + 1}`);
       await page.clickWorld(...pad); await page.eval('__step(60)');
       assert.equal((await page.snap()).seats[id].pad, i);
@@ -280,36 +302,36 @@ await test('即時模式 4 倍速：玩家不動至終局，重跑摘要一致',
   const page = await open('N', { seed: 5, stepped: false }); assert.equal(await page.eval("document.getElementById('speed').textContent"), '1×'); await page.clickOn('#speed'); assert.equal(await page.eval("document.getElementById('speed').textContent"), '2×');
   await page.until(`__dev02.mode() === 'end'`, 90000); assert.equal(await page.eval(`document.getElementById('result').textContent`), '敗北'); await same(page); const s = await page.snap(); await page.done(); return `${(s.tick / 30).toFixed(0)} 秒`;
 });
-await test('BC01：四席各買三兵種；模型、盾條、飛行中光球與彈體可見；暫停凍結；圖卡三兵種', async () => {
+await test('四席各買六兵種；模型、盾條、四種飛行中投射物可見；暫停凍結', async () => {
   const page = await open('none', { seed: 11 });
-  const seen = { dragoon: false, mutalisk: false }, bought = new Set(); let frozen = false;
+  const seen = { dragoon: false, mutalisk: false, hydralisk: false, wraith: false }, bought = new Set(), KIND = Object.keys(S.padsFor(S.VERSION).reduce((a, p) => ({ ...a, [p.kind]: 1 }), {})); let frozen = false;
   for (let i = 0; i < 4000 && await page.eval('__dev02.mode()') === 'play'; i++) {
     await page.eval('__step(4)');
     const [shots, drawn, units, info] = await page.eval(`[__dev02.mode() === 'end' ? [] : __dev02.snapshot().shots, __dev02.info().projectiles, __dev02.snapshot().units, __dev02.info().drawn]`);
     for (const u of units) bought.add(u.seat + u.kind);
-    for (const k of ['marine', 'dragoon', 'mutalisk']) assert.equal(info[k], units.filter(u => u.kind === k).length, `${k} 繪製數`);
-    for (const k of ['dragoon', 'mutalisk']) { assert.equal(drawn[k], shots.filter(s => s.kind === k).length, `${k} 投射物`); if (drawn[k]) seen[k] = true; }
+    for (const k of KIND) assert.equal(info[k], units.filter(u => u.kind === k).length, `${k} 繪製數`);
+    for (const k of Object.keys(seen)) { assert.equal(drawn[k], shots.filter(s => s.kind === k).length, `${k} 投射物`); if (drawn[k]) seen[k] = true; }
     if (!frozen && drawn.dragoon && drawn.mutalisk) {
       frozen = true; if (SHOTS) await page.shot(path.join(SHOTS, 'projectiles.png'));
       await page.clickOn('#pause'); const a = await page.eval('JSON.stringify(__dev02.snapshot().shots)'); await page.eval('__step(40)'); assert.equal(await page.eval('JSON.stringify(__dev02.snapshot().shots)'), a); assert.equal((await page.eval('__dev02.info().projectiles')).dragoon, drawn.dragoon);
       await page.clickOn('#pause'); await page.eval('__step(20)'); assert.notEqual(await page.eval('JSON.stringify(__dev02.snapshot().shots)'), a);
     }
   }
-  assert(frozen && seen.dragoon && seen.mutalisk); assert.equal(bought.size, 12, `四席三兵種 ${[...bought]}`); assert.equal(await page.eval('__dev02.mode()'), 'end'); await page.eval('__step(2)'); assert.deepEqual(await page.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0 }, '終局不留投射物'); await same(page); await page.done();
+  assert(frozen && Object.values(seen).every(Boolean), JSON.stringify(seen)); assert.equal(bought.size, 24, `四席六兵種 ${[...bought]}`); assert.equal(await page.eval('__dev02.mode()'), 'end'); await page.eval('__step(2)'); assert.deepEqual(await page.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0 }, '終局不留投射物'); await same(page); await page.done();
   // seed 1 觀戰終局時仍有飛行中的投射物
-  const left = await open('none', { seed: 1 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0 }); await left.done();
+  const left = await open('none', { seed: 1 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0 }); await left.done();
   for (const quality of ['std', 'high']) {
     const card = await open('N', { quality });
-    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳']]) {
+    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈戰機（Wraith）', '對地 8／對空 20']]) {
       await card.clickOn(`[data-profile="${kind}"]`); const text = await card.eval(`document.getElementById('dossier').innerText`); assert(text.includes(name) && text.includes(attack), text);
       if (SHOTS) await card.shot(path.join(SHOTS, `dossier-${quality}-${kind}.png`));
     }
-    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '指揮官 Commander']);
+    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '刺蛇 Hydralisk', '破壞能 Archon', '死靈戰機 Wraith', '指揮官 Commander']);
     await card.done();
   }
-  for (const [w, h] of [[844, 390], [1600, 900]]) { const p = await open('S', { w, h, quality: 'high', seed: 11 }); await p.eval('__step(30)'); for (let i = 0; i < 22; i++) { await p.down('123'[i % 3]); await p.up('123'[i % 3]); await p.eval('__step(60)'); } if (SHOTS) await p.shot(path.join(SHOTS, `battle-${w}.png`));
+  for (const [w, h] of [[844, 390], [1600, 900]]) { const p = await open('S', { w, h, quality: 'high', seed: 11 }); await p.eval('__step(30)'); for (let i = 0; i < 22; i++) { await p.down('123456'[i % 6]); await p.up('123456'[i % 6]); await p.eval('__step(60)'); } if (SHOTS) await p.shot(path.join(SHOTS, `battle-${w}.png`));
     assert(await p.eval(`(() => { const r = e => e.getBoundingClientRect(); return [...document.querySelectorAll('#shop button, #dossier nav button')].filter(b => r(b).width).every(b => r(b).left >= 0 && r(b).right <= innerWidth && r(b).bottom <= innerHeight); })()`), `${w} 按鈕在視窗內`); await p.done(); }
-  return '12 組席位×兵種；投射物數與狀態一致';
+  return `${bought.size} 組席位×兵種；投射物數與狀態一致`;
 });
 await test('半金：價格、扣款與 HUD 顯示 7.5 金', async () => {
   const page = await open('S'); assert.match(await page.eval(`document.querySelector('#shop button').textContent`), /7\.5 金/); assert.equal(await page.eval(`document.getElementById('gold').textContent`), String(gold((await page.snap()).tick)));

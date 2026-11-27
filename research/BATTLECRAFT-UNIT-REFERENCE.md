@@ -30,7 +30,7 @@ SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`
 
 SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
 
-### 後續候選兵種（2026-11-27 名稱已確認，未實作）
+### 後續候選兵種（2026-11-27 名稱已確認；遊戲內實作採 BWAPI 原版值，見 [BC-SIX-UNITS](BC-SIX-UNITS.md)）
 
 | 中文名 | 英文 | v2.91f 礦／計畫數 | v2.91f HP／盾 |
 |---|---|---|---|
