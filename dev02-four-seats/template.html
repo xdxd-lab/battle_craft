@@ -59,6 +59,12 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px so
   #dossier p,#dossier dl{line-height:1.35}
   .log{grid-template-columns:auto 1fr}.log span{grid-column:1 / -1}
 }
+@media(orientation:landscape) and (max-width:700px) and (max-height:560px){
+  #shop{width:calc(100% - 186px);grid-template-columns:repeat(5,minmax(0,1fr))}
+  #shop button{min-height:38px;display:block;padding:2px;line-height:1.1;font-size:11px;white-space:normal}
+  #shop small{display:block;font-size:9px;white-space:nowrap}
+  #msg{bottom:90px}
+}
 @media(orientation:portrait) and (max-width:700px){#bar{width:calc(100% - 24px)}#cores{grid-template-columns:1fr 1fr}#panel{top:auto;bottom:118px;max-height:40%}.compass{display:none}#pick{grid-template-columns:1fr 1fr}}
 </style>
 </head>
