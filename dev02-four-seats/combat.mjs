@@ -14,7 +14,7 @@ function splash(units, center, h, spec, killer) {
     if (ring < 0) continue;
     const body = { hp: o.hp, sh: o.sh, armor: armorOf(o) };
     applyDamage(body, spec.damage * parts[ring], spec.attack); o.hp = body.hp; o.sh = body.sh;
-    if (o.hp <= 0) killer.set(o.id, h.seat);
+    if (o.hp <= 0 && o.team !== h.team) killer.set(o.id, h.seat); // 誤傷隊友致死：計入該席損失，不算施放者擊殺
   }
 }
 

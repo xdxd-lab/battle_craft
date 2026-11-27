@@ -95,13 +95,13 @@ function buildPads() {
       const M = W.seatMats[seat], g = new THREE.Group(), [lx, lz] = S.DIM.shopPadPositions[i], spec = KINDS[p.kind];
       for (const [part, geo] of Object.entries(looks.std[p.kind])) { const m = new THREE.Mesh(geo, { hull: M.paint, dark: W.MAT.black, lamp: M.glow }[part.split(':')[0]]); m.castShadow = true; m.userData.pad = i; g.add(m); }
       const [wx, wz] = S.toWorld(seat, lx, lz, S.DIM), home = L.seatById(seat).dir;
-      g.position.set(wx, .42 + (spec.air ? .5 : spec.hover ? .2 : 0), wz); g.scale.setScalar(.8); g.rotation.y = Math.atan2(-home[0], -home[1]);
+      g.position.set(wx, .42 + (spec.air ? .5 : spec.hover ? .2 : 0), wz); g.scale.setScalar(compactPadLabels ? 1.25 : .8); g.userData.facing = Math.atan2(-home[0], -home[1]); // 橫式矮螢幕放大，維持可辨
       g.userData.pad = i; padModels.add(g);
     }
   });
 }
 function padModelAt(e) {
-  pointRay(e); picks.length = 0; ray.intersectObjects(padModels.children, true, picks);
+  pointRay(e); picks.length = 0; ray.intersectObjects(padModels.children.filter(g => g.visible), true, picks);
   return picks.length ? picks[0].object.userData.pad : -1;
 }
 function markFallen(id) {
@@ -495,7 +495,7 @@ function draw(dt, k) {
   fx(shots, e => { const d = new THREE.Vector3(...e.b).sub(new THREE.Vector3(...e.a)), n = d.length() || 1; dummy.position.set(...e.a).addScaledVector(d, .5); dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.divideScalar(n)); dummy.scale.set(.1, .1, n); });
   fx(puffs, e => { dummy.position.set(e.x, e.y, e.z); dummy.quaternion.identity(); dummy.scale.setScalar((.6 + Math.max(0, .4 - e.life) * 5) * e.size); });
   for (const o of padGroup.children) if (!o.isSprite) o.scale.setScalar(state?.seats[seat]?.pad === o.userData.pad ? 1.12 : 1);
-  for (const g of padModels.children) { g.rotation.y += dt * .5; g.visible = state?.seats[seat]?.pad !== g.userData.pad; } // 展示模型緩慢自轉，方便辨認
+  for (const g of padModels.children) { g.rotation.y = g.userData.facing + ((state?.tick ?? 0) + k) * .017; g.visible = state?.seats[seat]?.pad !== g.userData.pad; } // 展示模型隨模擬 tick 緩慢自轉（暫停即停）
   renderer.render(scene, camera);
 }
 function advance(dt) {

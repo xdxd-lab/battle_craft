@@ -122,7 +122,7 @@ test('版本 6 全電腦 60 局：皆終局、帳目相符、六兵種都有購�
   }
   for (const k of Object.keys(KINDS)) assert(bought[k] > 0 && died[k] > 0, k);
   const rec = { version: 6, seed: 20261126, bots: ['N', 'W', 'S', 'E'], commands: [] }, a = S.replay(rec); assert.equal(S.replay(rec).final, a.final);
-  if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, 'd41895fa 757e13f6');
+  if (!process.env.UPDATE) assert.equal(`${a.final} ${a.events}`, 'c037ba37 6207bb5a');
   secs.sort((a, b) => a - b); return `勝場 ${JSON.stringify(win)}；${secs[0].toFixed(0)}／${secs[30].toFixed(0)}／${secs[59].toFixed(0)} 秒；購買 ${JSON.stringify(bought)}；${a.final} ${a.events}`;
 });
 test('可重現完整終局：固定種子加玩家指令，重跑與中途序列化一致', () => {
@@ -226,6 +226,8 @@ test('破壞能：主目標整發，濺射 100／50／25% 依距離；不傷己�
   const e = S.step(st); assert(e.some(v => v.type === 'shot'));
   assert.deepEqual([t.hp, inner.hp, mid.hp, outer.hp, far.hp, own.hp, mate.hp, air.hp], [70, 10, 25, 32.5, 40, 40, 25, 105]);
   const z = none(); unit(z, 'N', 'hydralisk', 0, 0); const ar = near(z, 'S', 'archon', 1, 0); until(z, 'impact'); assert.deepEqual([ar.hp, ar.sh], [10, 340]);
+  const k = none(); unit(k, 'N', 'archon', 0, 0); near(k, 'S', 'dragoon', .8, 0, { sh: 0 }); near(k, 'W', 'marine', .8, .3, { hp: 5 }); near(k, 'E', 'marine', .8, -.3, { hp: 5 });
+  const deaths = S.step(k).filter(v => v.type === 'death'); assert.deepEqual(deaths.map(d => [d.seat, d.by]), [['W', []], ['E', ['N']]]); assert.deepEqual([k.seats.N.kills, k.seats.W.lost, k.seats.E.lost], [1, 1, 1]);
   return `半徑 ${SPLASH.archon.radii.map(r => r.toFixed(3)).join('／')}；隊友受 50%、己席 0`;
 });
 test('版本 6 購買區：六信標互不重疊、指揮官可走到、開場不在信標上', () => {
