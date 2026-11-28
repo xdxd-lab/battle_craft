@@ -111,8 +111,7 @@ export function createSpecialPowerUi({towerButton,costs,zone,context,targets,cas
     const a=availability(power);
     armed=a.allowed?power:null;
     setText(status,a.allowed?'請再次確認；只按選擇不會發動或扣礦。':a.text);
-    update();
-    if(armed)confirm.focus();
+    update(); // Leave focus on the chosen card; held Enter must not activate confirm.
   }
   function open(power=null) {
     const ctx=context();
@@ -126,7 +125,12 @@ export function createSpecialPowerUi({towerButton,costs,zone,context,targets,cas
       dialog.showModal();
     }
     armed=null;setText(status,'');update();
-    if(names.includes(power))choose(power);else close.focus();
+    // A map tap may focus its card, but cannot arm it. A second tap or a
+    // double-click at the original map position must never buy a power.
+    if(names.includes(power)){
+      setText(status,`已開啟${SPECIAL_POWER_LABELS[power]}信標。請選擇招式後再確認。`);
+      actions[power].focus();
+    } else close.focus();
     return true;
   }
   confirm.onclick=()=>{
