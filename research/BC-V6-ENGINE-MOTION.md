@@ -48,3 +48,9 @@ units.dat SHA-256 `da2ee6f116b77329048ec6be9e02721a527fde23d4b05b1b1336e634490ab
 1. 在合法取得的來源中備好 patch_rt.mpq、BrooDat.mpq、StarDat.mpq（研究程式讀當前目錄的 StarEdit/ 並依此順序）。使用固定版 OpenBW `4b046d5f65302b10cb0a745f0fecd37ec85b20a8`，不需安裝 UI。以 scmJS 0.18.0 執行 `scmjs map new motion-lab.scx --name badlands --size 64x64 --tileset badlands --players 2`（測圖 SHA-256 `bee65dab73e545d857ad463cbca4a0f2e6986dc8b1cbcf1141b2be39d6801fbd`）。
 2. `g++ -std=c++17 -O1 -I/path/to/openbw research/tools/openbw-motion-probe.cpp -o motion-probe`；從含測圖和 StarEdit/ 的工作目錄執行，例 `/path/to/motion-probe 66 attack > dragoon-attack.csv`，情境 `stop`／`turn90`／`turn180`／`arrival`／`attack`。地面靶為 Medic，自殺蟲空中靶為 Science Vessel。資料在每次 next_frame 前採樣，是離散觀察。
 3. 原生版下一步：用合法安裝的固定遊戲版和原生 BWAPI 或可逐幀觀察的重播，固定同版地圖、速度、升級、朝向；先同樣的單兵案例，再跑原 SPEED AttackMove 與波次。捕捉命令發出和生效、位置差、速度、機頭、飛彈和目標生命。沒有本輪能用的原生客戶端；StarEdit ZIP 只有編輯器與資料，不等於原生遊戲實測。[AAAI 既有原生運動實測](https://cdn.aaai.org/ojs/12811/12811-52-16328-1-2-20201228.pdf)也把命令延遲、移動與攻擊分開，不能把該研究的常數當本專案預設。
+
+#### 原生版量測注意（2026-11-28，台灣；未執行）
+
+[BWAPI 的延遲補償](https://bwapi.github.io/class_b_w_a_p_i_1_1_game.html)預設會先反映指令的預期結果，不等於引擎已收到或執行。固定原生遊戲與 BWAPI 版本後，關閉量測端的預測（`setLatCom(false)` 並以 `isLatComEnabled()` 確認）；分開記錄邏輯幀、送出指令的幀、當時回報的剩餘延遲，以及初次觀測到的 order／移動目標轉換。不靠減去固定延遲來推定生效幀；Stop 或同一 order 內的變化需連同目標、位置與速度序列判讀。OpenBW 探針是直接設內部命令且在 next_frame 前抽樣，不拿兩邊原始列號直接相減。
+
+比較兩套引擎的位移曲線時，對齊可觀測的指令生效點；研究家門口攔截時另保留從發令到停住、首彈與首次扣血的完整時間。每幀同時記位置差、速度向量、面向、來源／目標彈體 ID、目標血與盾；保持雙方和彈體可見，不能把彈體從 API 消失當成已命中。先重跑自殺蟲、戰巡的 Stop／90°，再量重騎兵首次開火。這是原生驗證計畫，不是原生結果。
