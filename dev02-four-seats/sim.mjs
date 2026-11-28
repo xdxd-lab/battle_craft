@@ -4,6 +4,7 @@ import * as L from '../dev05-layout/layout.mjs';
 import { ARENA, ARENA_V8 } from './arena.mjs';
 import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
+import { createGroundOccupancy } from './ground-occupancy.mjs';
 
 export const HZ = 30;
 export const VERSION = 8; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3（舊版保留供重播）
@@ -62,6 +63,7 @@ GEOMETRY[5] = GEOMETRY[4];
 GEOMETRY[6] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: SIX_PAD_POSITIONS } };
 GEOMETRY[7] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: NINE_PAD_POSITIONS } };
 GEOMETRY[8] = { ...GEOMETRY[7], dim: { ...GEOMETRY[7].dim, ...ARENA_V8, shopPadPositions: NINE_PAD_POSITIONS } };
+GEOMETRY[9] = GEOMETRY[8]; // development-only combat candidate; NEW MATCH keeps 8 until the candidate is released
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -143,11 +145,22 @@ export function targetOf(state, seat) { // 對側核心；失守後改為另一�
 }
 function recruit(state, s, p, emit, dim) {
   if (s.gold < p.cost) return false;
+  const ids = [], target = targetOf(state,s.id), index = L.seatIndex(s.id);
+  let spots = null;
+  if (state.version >= 9 && !KINDS[p.kind].air) {
+    const drafts = Array.from({length:p.count}, (_,i) => {
+      const [x,z] = turn([((s.deployed+i)%5-2)*1.25, -dim.spawnRadial-i*.4],index);
+      return {id:state.serial+i+1,seat:s.id,kind:p.kind,x,z};
+    });
+    // Do not spend, increment serials or start the cooldown when the whole wave
+    // cannot fit. Since seats are visited in order, earlier successful waves reserve their own space.
+    spots = createGroundOccupancy(state.units,dim,RULES).reserveWave(drafts);
+    if (!spots) return false;
+  }
   s.gold -= p.cost; s.spent += p.cost; s.buys++;
-  const ids = [], target = targetOf(state, s.id), index = L.seatIndex(s.id);
   for (let i = 0; i < p.count; i++) {
     const id = ++state.serial, lat = (s.deployed % 5 - 2) * 1.25; s.deployed++;
-    const [x, z] = turn([lat, -dim.spawnRadial - i * .4], index);
+    const [x, z] = spots ? [spots[i].x,spots[i].z] : turn([lat, -dim.spawnRadial - i * .4], index);
     state.units.push({ id, seat: s.id, team: s.team, x, z, hp: RULES.unitHp, cd: 0, lat, target, foe: 0, dx: 0, dz: 0, ...(p.kind ? unitStats(p.kind) : {}) });
     ids.push(id);
   }

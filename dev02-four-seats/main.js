@@ -11,12 +11,15 @@ import { unitModels, FLY_HEIGHT, WING_HINGE, HOVER_HEIGHT } from './unit-models.
 import { createAudio, LEVEL_NAMES } from './audio.js';
 import MUSIC_DATA from './music-data.generated.js';
 import { TRACKS, PHASE_NAMES, MUSIC_CREDITS, CREDIT_LINKS, battleDue } from './music-tracks.mjs';
-import { KINDS, KIND_IDS, ATTACKS, CORE } from './roster.mjs';
+import { KINDS, KIND_IDS, ATTACKS, CORE, FRAME_MS } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
+import { attackPose } from './combat-phases.mjs';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
+// A local opt-in until v9 is ready. Production defaults to the published v6-0 simulation.
+const MATCH_VERSION = hash.get('preview') === 'combat' ? 9 : S.VERSION;
 const SPEEDS = [1, 2, 4], DEFAULT_SPEED = 1;
 let inBattle = false, state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
 let renderer, camera, dossier, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
@@ -333,7 +336,7 @@ function write(e) {
 // ---------- 對局 ----------
 function start(id, seed = (Date.now() ^ (Math.random() * 2 ** 32)) >>> 0) {
   seat = L.seatById(id) ? id : null;
-  record = { version: S.VERSION, seed, bots: S.SEAT_IDS.filter(x => x !== seat), commands: [] };
+  record = { version: MATCH_VERSION, seed, bots: S.SEAT_IDS.filter(x => x !== seat), commands: [] };
   state = S.createSim(record); queue = []; keys.clear(); accumulator = 0; mode = 'play'; speed = DEFAULT_SPEED; logRows = [];
   inBattle = false; audio.setPhase('opening', true); // 每局重新隨機選開場曲
   mouse = null; dossier.reset();
@@ -352,7 +355,7 @@ function tick() {
   prevShots = new Map(state.shots.map(s => [s.id, [s.x, s.z]]));
   const before = new Map(state.units.map(u => [u.id, u]));
   for (const e of S.step(state, now)) {
-    if (e.type === 'launch') audio.play(e.kind);
+    if (e.type === 'launch' && !e.secondary) audio.play(e.kind);
     if (e.type === 'shot') { const u = before.get(e.from); if (u) { audio.play(u.kind); shots.live.push({ a: [u.x, heightOf(u), u.z], b: [e.x, e.core ? 2.5 : heightOf(before.get(e.to)), e.z], life: .12, color: L.seatById(e.seat).secondary });
       if (KINDS[u.kind].splash && !e.core) puffs.live.push({ x: e.x, z: e.z, y: heightOf(before.get(e.to)), size: LOOK[u.kind].puff[1], life: .3, color: L.seatById(e.seat).secondary }); } continue; }
     if (e.type === 'impact') { puffs.live.push({ x: e.x, z: e.z, y: LOOK[e.kind].puff[0], size: LOOK[e.kind].puff[1], life: .25, color: L.seatById(e.seat).secondary }); continue; }
@@ -494,7 +497,9 @@ function draw(dt, k) {
     const p = prevPos.get(u.id) ?? [u.x, u.z], x = p[0] + (u.x - p[0]) * k, z = p[1] + (u.z - p[1]) * k, i = counts[u.seat][u.kind]++;
     const home = L.seatById(u.seat).dir, dx = u.dx || u.dz ? u.dx : -home[0], dz = u.dx || u.dz ? u.dz : -home[1];
     if (spec.air && shade < 256) { dummy.position.set(x, .12, z); dummy.quaternion.identity(); dummy.scale.setScalar(1); dummy.updateMatrix(); shadows.setMatrixAt(shade++, dummy.matrix); }
-    dummy.position.set(x, .04 + lift, z); dummy.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.atan2(dx, dz)); dummy.scale.setScalar(1); dummy.updateMatrix();
+    const recoil = state.version >= 9 ? attackPose(u, (state.tick + k) * 1000 / (S.HZ * FRAME_MS)) : 0;
+    dummy.position.set(x - dx * recoil, .04 + lift, z - dz * recoil);
+    dummy.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP, Math.atan2(dx, dz)); dummy.scale.setScalar(1); dummy.updateMatrix();
     // 拍翅取模擬 tick（暫停即停），以單位編號錯開相位
     const flap = Math.sin(((state.tick + k) * .5 + u.id * 1.7)) * .5;
     for (const m of squads[u.seat][u.kind]) m.setMatrixAt(i, m.userData.side ? wingMatrix.multiplyMatrices(dummy.matrix, hinge(m.userData.side, flap)) : dummy.matrix);
