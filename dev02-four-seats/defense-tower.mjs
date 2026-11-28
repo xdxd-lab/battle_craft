@@ -4,6 +4,7 @@ import { KINDS, PLATE, applyDamage } from './roster.mjs';
 
 export const DEFENSE_VERSION = 11;
 export const VISIBILITY_VERSION = 12;
+export const DEFENSE_TUNING_VERSION = 13;
 export const TOWER = Object.freeze({ cost: 70, hp: 180, range: 3.2, hitRadius: .50, damage: 55, period: 34, plate: 1 });
 
 export function towerPosition(id, dim) {

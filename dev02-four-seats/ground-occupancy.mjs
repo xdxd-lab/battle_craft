@@ -20,7 +20,9 @@ const shapeOf = u => groundExtents(u.kind);
 // Visible spacing in the movement solver only. Weapons continue using DAT
 // dimensions (groundExtents, groundGap), and old records retain the prior solver.
 const DRAGOON_LANE_EXTENTS=Object.freeze(shapes.dragoon.map(v=>v * (.89 / (32 * WORLD_PER_PX))));
-export const movementExtents = (kind,dim) => dim?.dragoonLaneClearance && kind==='dragoon' ? DRAGOON_LANE_EXTENTS : groundExtents(kind);
+const WIDER_DRAGOON_EXTENTS = Object.freeze(DRAGOON_LANE_EXTENTS.map(v=>v*1.2));
+export const movementExtents = (kind,dim) => dim?.dragoonLaneClearance && kind==='dragoon'
+  ? (dim.dragoonClearanceScale===1.2 ? WIDER_DRAGOON_EXTENTS : DRAGOON_LANE_EXTENTS) : groundExtents(kind);
 const alive = u => u.hp === undefined || u.hp > 0;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
 const sq = v => v * v;
@@ -98,7 +100,7 @@ const STEER = [
 export function createGroundOccupancy(units, dim, rules) {
   const terrain = createGroundTerrain(dim,rules), cells = new Map(), bodies = new Map();
   const usedShape = u => movementExtents(u.kind,dim);
-  const maxExtent = dim.dragoonLaneClearance ? Math.max(MAX_EXTENT,...DRAGOON_LANE_EXTENTS) : MAX_EXTENT;
+  const maxExtent = dim.dragoonLaneClearance ? Math.max(MAX_EXTENT,...movementExtents('dragoon',dim)) : MAX_EXTENT;
   const key = (cx,cz) => `${cx},${cz}`;
   const at = (x,z) => key(Math.floor(x/CELL),Math.floor(z/CELL));
   function put(u) {
@@ -200,7 +202,7 @@ export function createGroundOccupancy(units, dim, rules) {
         if (!dir) return rollback();
         const [rx,rz] = dir, sx=-rz, sz=rx;
         let found = null;
-        const stride=dim.dragoonLaneClearance && d.kind==='dragoon' ? .46 : .43;
+        const stride=dim.dragoonLaneClearance && d.kind==='dragoon' ? .46*(dim.dragoonClearanceScale??1) : .43;
         // Row-major, centre-out. Rows alternate away from and towards the arena.
         // Bounded to ~3 world units around the requested entrance, not a teleport.
         for (let i=0; i<=14 && !found; i++) {

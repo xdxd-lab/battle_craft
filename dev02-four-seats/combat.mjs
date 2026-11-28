@@ -11,6 +11,8 @@ import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, a
 import { DEFENSE_VERSION, TOWER, hitTower, fireTowers } from './defense-tower.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
+const DRAGOON_EDGE_RANGE_FROM = 13;
+const inDragoonRange = (u, o, gap = unitGap(u,o)) => gap <= weaponOf(u.kind,KINDS[o.kind].air).range + 1e-9;
 export const armorOf = u => u.armor ?? KINDS[u.kind].armor;
 
 // 範圍傷害：以主目標位置為圓心，依部隊編號順序結算；主目標已吃整發不重複
@@ -37,18 +39,36 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   // 第一階段：全部依同一份位置決定目標與移動
   const plan = units.map(u => {
     const spec = KINDS[u.kind];
-    let foe = null, best = Infinity;
-    for (const o of units) { if (o.team === u.team || !canTarget(spec, KINDS[o.kind].air)) continue; const d = dist(u.x, u.z, o.x, o.z); if (d < best || (d === best && o.id < foe.id)) { best = d; foe = o; } }
+    const edgeRange = state.version >= DRAGOON_EDGE_RANGE_FROM && u.kind === 'dragoon';
+    let foe = null, best = Infinity, reachable = null, reachableGap = Infinity, reachableCenter = Infinity;
+    for (const o of units) {
+      if (o.team === u.team || !canTarget(spec,KINDS[o.kind].air)) continue;
+      const d = dist(u.x,u.z,o.x,o.z);
+      if (d < best || (d === best && o.id < foe.id)) { best = d; foe = o; }
+      if (!edgeRange || d > R.aggro || o.hp <= 0) continue;
+      // Movement reserves a separate, larger footprint. Only DAT weapon boxes
+      // decide whether to halt and aim, so a crowd cannot force aimless chasing.
+      const gap = unitGap(u,o);
+      if (inDragoonRange(u,o,gap) && (gap < reachableGap || (gap === reachableGap &&
+        (d < reachableCenter || (d === reachableCenter && o.id < reachable.id))))) {
+        reachable = o; reachableGap = gap; reachableCenter = d;
+      }
+    }
     if (best > R.aggro) foe = null;
+    if (edgeRange && reachable) { foe = reachable; best = reachableCenter; }
     const locked = experimental && typeof u.fight?.target === 'number' ? alive.get(u.fight.target) : null;
     if (locked && locked.team !== u.team && canTarget(spec, KINDS[locked.kind].air)) {
       const d = dist(u.x, u.z, locked.x, locked.z);
-      if (d <= weaponOf(u.kind, KINDS[locked.kind].air).range) { foe = locked; best = d; }
+      // A still-reachable wind-up is not cancelled just because a different
+      // enemy passes in front. Outside true weapon range it cannot release.
+      if (edgeRange ? locked.hp > 0 && d <= R.aggro && inDragoonRange(u,locked) : d <= weaponOf(u.kind,KINDS[locked.kind].air).range) {
+        foe = locked; best = d;
+      }
     }
     const p = { mx: 0, mz: 0, sx: 0, sz: 0, hit: null, core: null };
     u.foe = foe ? foe.id : 0;
     const contact=faithful && spec.suicide;
-    const inReach=foe && (contact ? unitGap(u,foe)<=SCOURGE_CONTACT : best<=weaponOf(u.kind,KINDS[foe.kind].air).range);
+    const inReach=foe && (contact ? unitGap(u,foe)<=SCOURGE_CONTACT : edgeRange ? inDragoonRange(u,foe) : best<=weaponOf(u.kind,KINDS[foe.kind].air).range);
     if (inReach) { p.hit=foe; if(experimental && !contact)p.hitRange=weaponOf(u.kind,KINDS[foe.kind].air).range; }
     else if (foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
     else if (u.target) {

@@ -17,17 +17,19 @@ import { KINDS, KIND_IDS, ATTACKS, CORE, FRAME_MS } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
 import { attackPose } from './combat-phases.mjs';
-import { DEFENSE_VERSION, VISIBILITY_VERSION, TOWER } from './defense-tower.mjs';
+import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER } from './defense-tower.mjs';
 import { towerModels } from './defense-tower-view.js';
 import { buildSpecialZones } from './special-zone.js';
 import { fitSpecialZoneCamera, specialZoneFor } from './special-zone-layout.mjs';
+import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog } from './portrait-overview.js';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
 // Preserve the old Pages and offline entry points as simulation 8.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
 const DEFENSE_LAB = MATCH_VERSION >= DEFENSE_VERSION;
+const DRAGOON_FX = MATCH_VERSION >= DEFENSE_TUNING_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
 const MATCH_DIM = S.dimFor(MATCH_VERSION);
 const TOWER_MUZZLE = MATCH_DIM.visibleTower ? 1.54 : 1.25;
@@ -48,7 +50,7 @@ const LOOK = {
   battlecruiser: { pick: [.4, 2.1], top: 1.55, puff: [FLY_HEIGHT + .4, .5] }, scout: { pick: [.4, 1.5], top: 1.1, puff: [FLY_HEIGHT + .4, .45] }, scourge: { pick: [.45, 1.0], top: 1.0, puff: [FLY_HEIGHT + .4, .3] },
 };
 const liftOf = (spec, t = 0, id = 0) => spec.air ? FLY_HEIGHT : spec.hover ? HOVER_HEIGHT + Math.sin(t * .12 + id) * .06 : 0;
-let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, glaives, darts, missiles, bolts, cruiserPulse, shadows;
+let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, orbGlow, glaives, darts, missiles, bolts, cruiserPulse, shadows;
 const inst = (geo, mat, n = MAX) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; m.count = 0; scene.add(m); return m; };
 let bodyTriangles;
 const looks = {};
@@ -80,6 +82,11 @@ function buildActors() {
   shots.live = []; puffs.live = [];
   // 投射物：重騎兵光球與飛螳彈體，位置完全取自模擬狀態
   orbs = inst(new THREE.IcosahedronGeometry(.34, 2), new THREE.MeshBasicMaterial({ toneMapped: false }), 128);
+  if (DRAGOON_FX) {
+    orbGlow=inst(new THREE.SphereGeometry(.51,12,8), new THREE.MeshBasicMaterial({
+      color:0x55cbff,transparent:true,opacity:.24,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false
+    }),128);
+  }
   glaives = inst(new THREE.OctahedronGeometry(.34).scale(1, .35, 1), new THREE.MeshBasicMaterial({ toneMapped: false }), 128);
   darts = inst(new THREE.ConeGeometry(.07, .5, 5).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 刺蛇骨刺
   missiles = inst(new THREE.BoxGeometry(.1, .1, .55), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 死靈式戰機對空飛彈
@@ -134,7 +141,7 @@ function markFallen(id) {
 }
 
 // ---------- 鏡頭 ----------
-let fittedView, fittedSafe, overview = false;
+let fittedView, fittedSafe, overview = false, portraitAtlas = false;
 const markerProjection = new THREE.Vector3(), markerTop = new THREE.Vector3();
 function keepMarkersReadable() {
   const { clientWidth: w, clientHeight: h } = canvas;
@@ -179,7 +186,7 @@ function pose() {
   const to = L.viewAngles(view), k = anim * anim * (3 - 2 * anim);
   if (from && anim < 1) { const turn = Math.atan2(Math.sin(to.az - from.az), Math.cos(to.az - from.az)); angles = { az: from.az + turn * k, el: from.el + (to.el - from.el) * k }; } else angles = to;
   const base=overview?fitArenaCamera:(a,aspect)=>fitNearCamera(a,aspect,seat);
-  W.poseCamera(camera,angles,safe,(a,aspect)=>{
+  W.poseCamera(camera,portraitAtlas?overviewAngles(angles):angles,safe,(a,aspect)=>{
     const fit=base(a,aspect);
     return SPECIAL_LAB ? fitSpecialZoneCamera(fit,a,aspect,MATCH_DIM,{seat,overview}) : fit;
   }); camera.updateMatrixWorld();
@@ -190,6 +197,7 @@ function setFraming(full) {
   overview = full;
   fittedView = null;
   $('framing').textContent = full ? '切近景' : '切全景';
+  if (renderer && MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION && isNarrowPortrait(canvas.clientWidth, canvas.clientHeight)) resize();
 }
 // 訊息列一律貼在購兵列上緣之上（九鈕兩列、三列高度隨畫面變），不壓到按鈕文字
 function placeMsg() {
@@ -200,16 +208,21 @@ function placeMsg() {
 }
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+  if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) {
+    portraitAtlas = syncPortraitOverview(overview,w,h);
+    setPortraitOverviewFog(scene.fog,portraitAtlas);
+  }
   const shopH = placeMsg();
-  const compact = h <= 560;
+  if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) setPortraitOverviewActionInset(portraitAtlas,shopH);
+  const compact = h <= 560 || portraitAtlas;
   if (compact !== compactPadLabels) { compactPadLabels = compact; buildPads(); }
-  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + (SPECIAL_LAB && portrait ? 72 : 34)); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
-  let l = portrait ? 0 : bar.right + 8, r = portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 : 0;
+  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portraitAtlas ? shopH + 42 : Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + (SPECIAL_LAB && portrait ? 72 : 34)); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
+  let l = portraitAtlas ? 7 : portrait ? 0 : bar.right + 8, r = portraitAtlas ? 7 : portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 : 0;
   if (!portrait && w - 2 * Math.max(l, r) > h * 1.25) l = r = Math.max(l, r);
   safe = { l, t, w: Math.max(80, w - l - r), h: Math.max(80, h - t - bottom) };
   renderer.setPixelRatio(pixelRatio()); renderer.setSize(w, h, false);
   // Shift the whole projection so the floor, markers, and input ray stay aligned.
-  const drop = Math.round(h * (compact ? .018 : .026));
+  const drop = portraitAtlas ? 0 : Math.round(h * (compact ? .018 : .026));
   camera.aspect = safe.w / safe.h; camera.fov = L.FOV;
   camera.setViewOffset(safe.w, safe.h, -safe.l, -safe.t - drop, w, h);
   safe = { ...safe, t: safe.t + drop };
@@ -385,6 +398,10 @@ function tick() {
     }
     if(e.type==='launch'&&!e.secondary){
       audio.play(e.kind);
+      if(DRAGOON_FX && e.kind==='dragoon'){
+        const u=before.get(e.from);
+        if(u)puffs.live.push({x:u.x+(u.dx||0)*.44,z:u.z+(u.dz||0)*.44,y:1.30,size:.40,life:.18,color:'#beedff'});
+      }
       if(e.effect==='effect')puffs.live.push({x:e.x,z:e.z,y:heightOf(before.get(e.target)),size:LOOK[e.kind].puff[1]*.48,life:.13,color:L.seatById(e.seat).secondary});
     }
     if (e.type === 'shot') {
@@ -406,7 +423,7 @@ function tick() {
     }
     if (e.type === 'impact') {
       const y=e.tower?TOWER_MUZZLE:e.kind==='battlecruiser'||(e.kind==='wraith'&&MATCH_VERSION>=10) ? (typeof e.target==='string'?2.5:heightOf(before.get(e.target))) : LOOK[e.kind].puff[0];
-      puffs.live.push({x:e.x,z:e.z,y,size:LOOK[e.kind].puff[1],life:.25,color:L.seatById(e.seat).secondary});
+      puffs.live.push({x:e.x,z:e.z,y,size:LOOK[e.kind].puff[1],life:.25,color:DRAGOON_FX&&e.kind==='dragoon'?'#a7ebff':L.seatById(e.seat).secondary});
       continue;
     }
     if (e.transient) continue;
@@ -582,13 +599,21 @@ function draw(dt, k) {
     const pct=s.fixedFlight && s.length>0 ? 1-s.remaining/s.length : 0;
     const targetY=s.tower?TOWER_MUZZLE:s.airTarget ? FLY_HEIGHT+.6 : s.core ? 2.5 : .8;
     const height=s.fixedFlight ? THREE.MathUtils.lerp(y,targetY,pct) : y;
-    dummy.position.set(x,height,z);
+    if (orbGlow && mesh===orbs) {
+      // The hit simulation begins at the centre; visibly present the orb at the
+      // raised muzzle, fading that offset as it leaves the model.
+      const dx=s.tx-x,dz=s.tz-z,n=Math.hypot(dx,dz),offset=Math.min(n*.45,.36)*Math.max(0,1-(s.age??0)/6);
+      dummy.position.set(x+(n?dx/n*offset:0),height+.17,z+(n?dz/n*offset:0));
+    } else dummy.position.set(x,height,z);
     const followsDirection=mesh===darts||mesh===missiles||mesh===bolts||mesh===cruiserPulse;
     dummy.quaternion.setFromAxisAngle(THREE.Object3D.DEFAULT_UP,followsDirection?Math.atan2(s.tx-s.x,s.tz-s.z):(state.tick+k)*.7);
     if (s.fixedFlight && s.kind==='wraith' && !s.airTarget) dummy.scale.set(.45,.45,1.35);
     else dummy.scale.setScalar(s.hop ? 1-s.hop*.22 : 1);
-    dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);mesh.setColorAt(i,color.set(L.seatById(s.seat).secondary));
+    dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
+    mesh.setColorAt(i,color.set(orbGlow&&mesh===orbs ? '#d2f8ff' : L.seatById(s.seat).secondary));
+    if(orbGlow&&mesh===orbs)orbGlow.setMatrixAt(i,dummy.matrix);
   }
+  if(orbGlow){orbGlow.count=flying.dragoon;orbGlow.instanceMatrix.needsUpdate=true;}
   for (const [kind, [mesh]] of Object.entries(PROJ)) { const n = flying[kind]; mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
   for (const m of [barBack, barFill]) { m.count = bars; m.instanceMatrix.needsUpdate = true; } if (barFill.instanceColor) barFill.instanceColor.needsUpdate = true;
   const fx = (mesh, place) => { mesh.live = mesh.live.filter(e => (e.life -= dt) > 0); mesh.live.forEach((e, i) => { place(e); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, color.set(e.color)); }); mesh.count = mesh.live.length; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; };
