@@ -4,7 +4,7 @@
 
 [在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [目前狀態與待辦](research/STATUS.md) · [開放議題](https://github.com/xdxd-lab/battle_craft/issues) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)
 
-BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購兵與部隊沿十字路線自動交戰；四人連線和戰爭迷霧尚待開發。
+BaattleCraft 目前的四席基準為 **v5-9**（一人加三席電腦），較早的單機試作繼續保留。長期方向是四人 2v2、場外購兵與部隊沿十字路線自動交戰；四人連線和戰爭迷霧尚待開發。
 
 橫幅是原創場景概念圖，供儲存庫展示及後續美術方向討論；遊戲內畫面以各版試作為準。
 
@@ -16,11 +16,11 @@ BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購
 | [v2](v2/battle_craft-v2.html) | 信標移到戰區外，站著等到金幣足夠會購買；每次停留只買一次。 |
 | [v3](v3/battle_craft-v3.html) | [3D Garden 裝飾試作](v3/README.md)，含紙板樹、木桶與 2D 回退。此版可站著等金幣買一次；[最初快照](research/archive/battle_craft-v3-original.html)須重新踏入。 |
 | [v4](v4/battle_craft-v4.html) | [傾斜 3D 星際戰場](v4/README.md)，加入寫實燈具與畫質切換。每次停留只買一次。 |
-| [v5](v5/battle_craft-v5.html) | [提高俯角、持續自動購兵、血條與分色事件紀錄](v5/README.md)。建議從此版試玩。 |
+| [v5](v5/battle_craft-v5.html) | [提高俯角、持續自動購兵、血條與分色事件紀錄](v5/README.md)。可獨立試玩，作為較早的單機規則基準。 |
 | [v5-2](v5-2/battle_craft-v5-2.html) | 保留歷史 HTML 快照。 |
-| [四席 2v2](dev02-four-seats/battle_craft-dev02.html) | [單人加三電腦，陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機、戰鬥巡洋艦、斥候、自殺蟲](dev02-four-seats/README.md)；[九兵種與九信標](research/BC-NINE-UNITS.md)、[六兵種與六信標](research/BC-SIX-UNITS.md)、[傷害規則與暫定值](research/BC01-ROSTER-DAMAGE.md)、[受損外觀與道路依據](research/BC-SURFACE-HUD.md)、[經濟與聲音](research/BC-AUDIO-ROSTER.md)。 |
+| [v5-9 · 四席 2v2](dev02-four-seats/battle_craft-dev02.html) | [單人加三電腦，陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機、戰鬥巡洋艦、斥候、自殺蟲](dev02-four-seats/README.md)；[九兵種與九信標](research/BC-NINE-UNITS.md)、[六兵種與六信標](research/BC-SIX-UNITS.md)、[傷害規則與暫定值](research/BC01-ROSTER-DAMAGE.md)、[受損外觀與道路依據](research/BC-SURFACE-HUD.md)、[經濟與聲音](research/BC-AUDIO-ROSTER.md)。 |
 
-各版 HTML 可下載後雙擊離線遊玩。3D 版本需要支援 WebGL 的瀏覽器。
+v5-9 保留原有 `dev02-four-seats/` 網址及重播格式 7；後續新開發從 **v6-0** 開始，不回改既存歷史快照。各版 HTML 可下載後雙擊離線遊玩。3D 版本需要支援 WebGL 的瀏覽器。
 
 ## 本機建置
 
@@ -32,7 +32,7 @@ npm run build
 npm test
 ```
 
-建置會重新產生 v3、v4、v5 的獨立 HTML。測試檢查 v5 信標持續購兵規則。v1、v2 和 v5-2 是歷史快照，直接開啟 HTML 即可。
+建置會重新產生 v3、v4、v5、DEV05 場景預覽與 v5-9 的獨立 HTML。測試檢查 v5 信標持續購兵規則。v1、v2 和 v5-2 是歷史快照，直接開啟 HTML 即可。
 
 ## 資料來源與素材授權
 
