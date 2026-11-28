@@ -79,7 +79,18 @@ function portrait(renderer, kind, quality) {
   return image.toDataURL('image/png');
 }
 
-export function createDossier(renderer, card, panel, quality = () => 'std') {
+const deliveryDescriptions = {
+  marine: '步槍起手後在目標處結算單體傷害，不用等子彈跑過畫面。',
+  dragoon: '站定後發射追蹤光球，光球飛到目標才扣血；護盾持續回復。',
+  mutalisk: '一顆刃彈可再彈兩次，依命中點附近的空間順序選敵，傷害依序為全傷、1/3、1/9。',
+  archon: '靈能衝擊在目標附近顯現，3 源幀後從固定位置濺射地空單位；同席免傷、盟友可能受傷。',
+  scout: '對地光子砲在目標處結算；對空同時發射兩枚反物質飛彈，各自追蹤、分別計算護甲。',
+  scourge: '只打空中。碰撞盒相近時自爆，5 源幀後傷害原目標；不做範圍傷害。',
+  hydralisk: '刺蛇起手後，骨刺的命中特效出現在目標身上，不需等骨刺飛過兩者之間。指向性爆炸對大型目標最有效。',
+  wraith: '對地短程雷射（普通），對空 Gemini 飛彈（指向性爆炸）。兩者飛向發射瞬間鎖定的位置，不追更新座標。隱形未實作。',
+  battlecruiser: '主力艦，對地與對空各有雷射砲台，先飛行再結算。基礎護甲 3；大和砲未實作。',
+};
+export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false) {
   const name = card.querySelector('h2'), role = card.querySelector('.profile-role');
   const description = card.querySelector('p'), stats = card.querySelector('dl'), image = card.querySelector('img');
   const buttons = [...card.querySelectorAll('[data-profile]')], images = {};
@@ -90,7 +101,7 @@ export function createDossier(renderer, card, panel, quality = () => 'std') {
     if (kind === visible) return;
     visible = kind;
     const data = profiles[kind];
-    name.textContent = `${data.name}（${data.english}）`; role.textContent = data.role; description.textContent = data.description;
+    name.textContent = `${data.name}（${data.english}）`; role.textContent = data.role; description.textContent = (faithfulDelivery && deliveryDescriptions[kind]) || data.description;
     stats.replaceChildren(...data.stats.flatMap(([label, value]) => {
       const term = document.createElement('dt'), detail = document.createElement('dd');
       term.textContent = label; detail.textContent = value;

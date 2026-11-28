@@ -236,7 +236,7 @@ test('版本 6 三新兵種：BWAPI 原版 hp／盾／傷害／冷卻／射程 p
   assert.deepEqual(Object.values(weaponOf('wraith', true)).length && ['attack', 'damage', 'cooldown', 'range'].map(f => weaponOf('wraith', true)[f]), ['E', 20, 22, px(160)]);
   for (const k of ['marine', 'dragoon', 'mutalisk', 'hydralisk', 'archon']) assert.equal(weaponOf(k, true), KINDS[k], k);
   assert.deepEqual(ROSTER[3], ['marine', 'dragoon', 'mutalisk']);
-  return '刺蛇 80／E10、破壞能 10＋350／N30 濺射、死靈戰機 120／對地 N8、對空 E20';
+  return '刺蛇 80／E10、破壞能 10＋350／N30 濺射、死靈式戰機 120／對地 N8、對空 E20';
 });
 test('刺蛇 E 依體型 50／75／100%；E 不濺射', () => {
   const out = ['marine', 'hydralisk', 'dragoon'].map(kind => {
@@ -248,13 +248,13 @@ test('刺蛇 E 依體型 50／75／100%；E 不濺射', () => {
   assert.deepEqual([t.hp, side.hp], [30, 40]);
   return '輕 5／中 7.5／重 10；鄰兵 0';
 });
-test('死靈戰機：對地即時 N 8、對空投射物 E 20（打輕甲 10），冷卻依武器', () => {
+test('死靈式戰機：對地即時 N 8、對空投射物 E 20（打輕甲 10），冷卻依武器', () => {
   const g = none(), a = unit(g, 'N', 'wraith', 0, 0), m = near(g, 'S', 'marine', 1.5, 0); const e = S.step(g);
   assert(e.some(v => v.type === 'shot') && !e.some(v => v.type === 'launch')); assert.deepEqual([m.hp, a.cd], [32, 30]);
   const f = none(), b = unit(f, 'N', 'wraith', 0, 0), mu = near(f, 'S', 'mutalisk', 1.5, 0); assert(S.step(f).some(v => v.type === 'launch')); assert.equal(b.cd, 22);
   until(f, 'impact'); assert.equal(mu.hp, 110);
   const h = none(); unit(h, 'N', 'hydralisk', 0, 0); const w = near(h, 'S', 'wraith', 1.5, 0); until(h, 'impact'); assert.equal(w.hp, 110);
-  return '對地 8、對空 10、刺蛇打死靈戰機 10';
+  return '對地 8、對空 10、刺蛇打死靈式戰機 10';
 });
 test('破壞能：主目標整發，濺射 100／50／25% 依距離；不傷己席，可傷隊友；盾先扣不套體型', () => {
   const [r0, r1, r2] = SPLASH.archon.radii, st = none(), a = unit(st, 'N', 'archon', 0, 0);
@@ -308,7 +308,7 @@ test('自殺蟲：只打空中、接觸自爆（自己陣亡、不算對方擊�
   const k = none(7); unit(k, 'N', 'scourge', 0, 0); near(k, 'S', 'mutalisk', .4, 0, { hp: 100 }); const d = run(k, 5).filter(e => e.type === 'death').map(e => [e.kind, e.by]); assert.deepEqual(d, [['scourge', []], ['mutalisk', ['N']]]); assert.deepEqual([k.seats.N.kills, k.seats.N.lost], [1, 1]);
   const c = none(7), [x, z] = corePos('S'), dir = L.seatById('S').dir, r = S.RULES.coreRadius + .2, s2 = unit(c, 'N', 'scourge', x - dir[0] * r, z - dir[1] * r, { target: 'S' }); run(c, 60);
   assert.deepEqual([c.seats.S.hp, s2.hp], [CORE.hp, 25], '核心不受傷、自殺蟲待命');
-  return '打死靈戰機 110（剩 10）、殘血飛螳擊殺計自殺蟲席';
+  return '打死靈式戰機 110（剩 10）、殘血飛螳擊殺計自殺蟲席';
 });
 test('玩家全程不動也會終局', () => S.SEAT_IDS.map(id => { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); run(st, S.HZ * 60 * 30); assert.equal(st.mode, 'end'); return (st.tick / 30).toFixed(0); }).join('、') + ' 秒');
 console.table(rows); console.log('BC01 roster QA: OK');

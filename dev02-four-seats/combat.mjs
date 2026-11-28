@@ -4,6 +4,8 @@ import { motionDisplacement, WORLD_PER_PX } from './motion.mjs';
 import { attackReady, noteAttackFired } from './combat-phases.mjs';
 import { airPair, airDisperse, clampAir } from './air-spacing.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
+import { deliveryFor, placeFixedShot, advanceFixedShot, placeSeekingShot, advanceSeekingShot,
+  firstBounceTarget, unitGap, shockwaveRing, SCOURGE_CONTACT, targetPoint } from './weapon-delivery.mjs';
 import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -23,7 +25,7 @@ function splash(units, center, h, spec, killer, plateOf) {
 }
 
 export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) {
-  const units = state.units, alive = new Map(units.map(u => [u.id, u])), frame = framesAt(state.tick), frames = frame - framesAt(state.tick - 1), experimental = state.version >= 9;
+  const units = state.units, alive = new Map(units.map(u => [u.id, u])), frame = framesAt(state.tick), frames = frame - framesAt(state.tick - 1), experimental = state.version >= 9, faithful = state.version >= 10;
   const plateOf = state.version >= 7 ? u => PLATE[u.kind] : () => 0; // 基礎護甲自版本 7 起生效
   for (const u of units) {
     const max = KINDS[u.kind].shield;
@@ -43,7 +45,9 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     }
     const p = { mx: 0, mz: 0, sx: 0, sz: 0, hit: null, core: null };
     u.foe = foe ? foe.id : 0;
-    if (foe && best <= weaponOf(u.kind, KINDS[foe.kind].air).range) { p.hit = foe; if (experimental) p.hitRange = weaponOf(u.kind, KINDS[foe.kind].air).range; }
+    const contact=faithful && spec.suicide;
+    const inReach=foe && (contact ? unitGap(u,foe)<=SCOURGE_CONTACT : best<=weaponOf(u.kind,KINDS[foe.kind].air).range);
+    if (inReach) { p.hit=foe; if(experimental && !contact)p.hitRange=weaponOf(u.kind,KINDS[foe.kind].air).range; }
     else if (foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
     else if (u.target) {
       const [cx, cz] = L.corePos(u.target, dim);
@@ -63,6 +67,17 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   // 第二階段：飛行中的投射物前進
   const arrived = [], flying = [];
   for (const s of state.shots) {
+    if (s.effect) { (frame>=s.due ? arrived : flying).push(s); continue; }
+    if (s.seekingFlight) {
+      const t=!s.core&&alive.get(s.target);
+      if(t){s.tx=t.x;s.tz=t.z;}
+      (advanceSeekingShot(s,deliveryFor(state.version,s.kind,!!s.w),frames)?arrived:flying).push(s);
+      continue;
+    }
+    if (s.fixedFlight) {
+      (advanceFixedShot(s,deliveryFor(state.version,s.kind,s.airTarget),frames) ? arrived : flying).push(s);
+      continue;
+    }
     const foe = s.core ? null : alive.get(s.target);
     if (foe) { s.tx = foe.x; s.tz = foe.z; }
     const speed = weaponOf(s.kind, !!s.w).projectile, d = dist(s.x, s.z, s.tx, s.tz), left = d - (s.core ? R.coreRadius : 0);
@@ -79,14 +94,38 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     if (!p.hit && !p.core) { if (experimental) attackReady(u,p,frame,frames); return; }
     const vsAir = !p.core && !!KINDS[u.kind].vsAir && KINDS[p.hit.kind].air, spec = weaponOf(u.kind, vsAir);
     const [x, z] = p.core ? L.corePos(p.core, dim) : [p.hit.x, p.hit.z];
+    const delivery = deliveryFor(state.version,u.kind,!p.core && KINDS[p.hit.kind].air);
     if (experimental) {
       p.attackAngle = Math.atan2(z-u.z,x-u.x);
       p.interval = spec.cooldown;
-      if (!attackReady(u,p,frame,frames)) return;
+      if(faithful) p.attackArc=delivery?.angle;
+      if (!attackReady(u,p,frame,frames,state.version)) return;
       noteAttackFired(u,p,frame);
     } else if (u.cd) return;
     u.cd = spec.cooldown;
-    if (spec.projectile) {
+    if (delivery?.mode === 'latched') {
+      const shot = {id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,hop:0,prev:null,...(vsAir?{w:1}:{})};
+      placeFixedShot(shot,delivery,u.x,u.z,x,z,p.core?R.coreRadius:0,!p.core&&KINDS[p.hit.kind].air);
+      emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind},true);
+      // The launch frame already takes the first movement step in the source traces.
+      if (advanceFixedShot(shot,delivery,frames)) arrived.push(shot);
+      else state.shots.push(shot);
+    } else if(delivery?.mode==='home'||delivery?.mode==='bounce'){
+      const sideOptions=u.kind==='scout'&&vsAir ? [-1,1] : [0], pair=state.shotSerial+1;
+      for(const side of sideOptions){
+        const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,hop:0,prev:null,...(vsAir?{w:1}:{}),...(side?{salvo:pair,side,hits:1}:{})};
+        placeSeekingShot(shot,delivery,u,x,z,p.core?R.coreRadius:0,side);
+        emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,...(side?{salvo:pair,secondary:side===1}:{})},true);
+        if(advanceSeekingShot(shot,delivery,frames)) arrived.push(shot);
+        else state.shots.push(shot);
+      }
+    } else if(delivery?.mode==='effect'||delivery?.mode==='suicide'){
+      const [ix,iz]=delivery.mode==='suicide' ? [u.x,u.z] : p.core?[x,z]:targetPoint(u,p.hit);
+      const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,hop:0,effect:delivery.mode,x:ix,z:iz,due:frame+delivery.delay};
+      state.shots.push(shot);
+      if(delivery.mode==='suicide'){u.hp=0;u.boom=1;}
+      emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,effect:shot.effect,x:ix,z:iz,target:shot.target},true);
+    } else if (spec.projectile && delivery?.mode !== 'atTarget') {
       const split = experimental && u.kind === 'scout' && vsAir;
       const pair = state.shotSerial + 1, heading = Math.atan2(z-u.z,x-u.x);
       // Measured releases occur together with two offset bodies. Each flies and
@@ -101,7 +140,8 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     } else {
       instant.push({ from: u.id, kind: u.kind, seat: u.seat, team: u.team, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0 });
       if (spec.suicide) { u.hp = 0; u.boom = 1; } // 自殺蟲：出手即自爆，同步其他對它的攻擊落空；計入己席損失、不算對方擊殺
-      emit('shot', u.seat, { from: u.id, x, z, ...(p.core ? { core: p.core } : { to: p.hit.id }) }, true);
+      const [ix,iz]=delivery?.mode==='atTarget'&&!p.core ? targetPoint(u,p.hit) : [x,z];
+      emit('shot', u.seat, { from: u.id, x:ix, z:iz, ...(p.core ? { core: p.core } : { to: p.hit.id }), ...(delivery?.mode === 'atTarget' ? {atTarget:true} : {}) }, true);
     }
   });
   // 第四階段：依固定順序結算傷害
@@ -111,6 +151,18 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     let dealt = null;
     if (h.core) {
       if (state.seats[h.core].alive) { const body = { hp: 0, sh: 0, armor: CORE.armor }; dealt = applyDamage(body, spec.damage, spec.attack, divisor); coreDamage[h.core] = (coreDamage[h.core] || 0) + dealt.body; }
+    } else if(h.effect==='effect'){
+      // The impact point stays put during the 3-frame effect, and the damage test
+      // uses geometry, not a mandatory full hit on the original target.
+      for(const t of units){
+        if(t.hp<=0||t.seat===h.seat||!canTarget(spec,KINDS[t.kind].air))continue;
+        const ring=shockwaveRing(t,h.x,h.z);
+        if(ring<0)continue;
+        const body={hp:t.hp,sh:t.sh,armor:armorOf(t)};
+        const d=applyDamage(body,spec.damage,spec.attack,2**ring,plateOf(t));t.hp=body.hp;t.sh=body.sh;
+        if(t.hp<=0&&t.team!==h.team)killer.set(t.id,h.seat);
+        if(t.id===h.target||dealt===null)dealt=d;
+      }
     } else {
       const t = alive.get(h.target);
       if (t && t.hp > 0) {
@@ -130,7 +182,11 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     if (s.hop >= spec.bounces || !owner || owner.hp <= 0) continue;
     const here = s.core || s.target;
     let next = null, best = Infinity;
-    for (const o of units) {
+    if(s.seekingFlight==='bounce'){
+      const o=firstBounceTarget(units,s,t=>t.team!==s.team&&t.hp>0&&t.id!==here&&t.id!==s.prev&&canTarget(spec,KINDS[t.kind].air));
+      if(o)next={target:o.id,core:null,tx:o.x,tz:o.z};
+    }
+    if(!s.seekingFlight) for (const o of units) {
       if (o.team === s.team || o.hp <= 0 || o.id === here || o.id === s.prev || !canTarget(spec, KINDS[o.kind].air)) continue;
       const d = dist(s.x, s.z, o.x, o.z);
       if (d <= BOUNCE_RADIUS && (d < best || (d === best && o.id < next.target))) { best = d; next = { target: o.id, core: null, tx: o.x, tz: o.z }; }
@@ -141,7 +197,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       const [cx, cz] = L.corePos(c.id, dim), d = dist(s.x, s.z, cx, cz) - R.coreRadius;
       if (d <= BOUNCE_RADIUS && d < best) { best = d; next = { target: 0, core: c.id, tx: cx, tz: cz }; }
     }
-    if (next) state.shots.push({ ...s, ...next, id: ++state.shotSerial, hop: s.hop + 1, prev: here });
+    if (next) state.shots.push({ ...s, ...next, id: s.seekingFlight ? s.id : ++state.shotSerial, hop: s.hop + 1, prev: here });
   }
   // 第六階段：移動一起套用，移除陣亡者
   const groundIntents = [];

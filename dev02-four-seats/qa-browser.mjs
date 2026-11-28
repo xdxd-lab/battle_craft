@@ -264,7 +264,7 @@ await test('側欄按鈕：兩欄等寬、不跨欄、血條在切全景旁、�
   }
   assert(shifted.has('667E'), '667 寬東席核心應平移（原本被右緣裁切）'); return `平移：${[...shifted].join(' ')}`;
 });
-await test('飛螳、死靈戰機、戰鬥巡洋艦、斥候、自殺蟲飛行（離地、有影子）；重騎兵、刺蛇地面；破壞能低空懸浮', async () => {
+await test('飛螳、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲飛行（離地、有影子）；重騎兵、刺蛇地面；破壞能低空懸浮', async () => {
   const page = await open('none', { seed: 11, quality: 'high' }); const seen = {}, want = ['dragoon', 'mutalisk', 'hydralisk', 'wraith', 'archon', 'battlecruiser', 'scout', 'scourge'];
   for (let i = 0; i < 400 && !want.every(k => seen[k]); i++) {
     await page.eval('__step(20)'); const [info, air] = await page.eval(`[__dev02.info(), __dev02.snapshot().units.filter(u => ['mutalisk', 'wraith', 'battlecruiser', 'scout', 'scourge'].includes(u.kind)).length]`);
@@ -370,11 +370,11 @@ await test('四席各買九兵種；模型、盾條、五種飛行中投射物�
   const left = await open('none', { seed: 3 }); for (let i = 0; i < 300 && await left.eval('__dev02.mode()') === 'play'; i++) await left.eval('__step(300)'); await left.eval('__step(2)'); assert((await left.eval('__dev02.snapshot().shots.length')) > 0); assert.deepEqual(await left.eval('__dev02.info().projectiles'), { dragoon: 0, mutalisk: 0, hydralisk: 0, wraith: 0, scout: 0 }); await left.done();
   for (const quality of ['std', 'high']) {
     const card = await open('N', { quality });
-    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈戰機（Wraith）', '對地 8／對空 20'], ['battlecruiser', '戰鬥巡洋艦（Battlecruiser）', '基礎護甲\n3'], ['scout', '斥候（Scout）', '對地 8／對空 14×2'], ['scourge', '自殺蟲（Scourge）', '一次性（自爆後陣亡）']]) {
+    for (const [kind, name, attack] of [['marine', '陸戰隊（Marine）', '普通'], ['dragoon', '重騎兵（Dragoon）', '指向性爆炸'], ['mutalisk', '飛螳（Mutalisk）', '彈跳'], ['hydralisk', '刺蛇（Hydralisk）', '指向性爆炸'], ['archon', '破壞能（Archon）', '濺射'], ['wraith', '死靈式戰機（Wraith）', '對地 8／對空 20'], ['battlecruiser', '戰鬥巡洋艦（Battlecruiser）', '基礎護甲\n3'], ['scout', '斥候（Scout）', '對地 8／對空 14×2'], ['scourge', '自殺蟲（Scourge）', '一次性（自爆後陣亡）']]) {
       await card.clickOn(`[data-profile="${kind}"]`); const text = await card.eval(`document.getElementById('dossier').innerText`); assert(text.includes(name) && text.includes(attack), text);
       if (SHOTS) await card.shot(path.join(SHOTS, `dossier-${quality}-${kind}.png`));
     }
-    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '刺蛇 Hydralisk', '破壞能 Archon', '死靈戰機 Wraith', '戰鬥巡洋艦 Battlecruiser', '斥候 Scout', '自殺蟲 Scourge', '指揮官 Commander']);
+    assert.deepEqual(await card.eval(`[...document.querySelectorAll('#dossier nav button')].map(b => b.innerText.replace(/\\s+/g, ' '))`), ['陸戰隊 Marine', '重騎兵 Dragoon', '飛螳 Mutalisk', '刺蛇 Hydralisk', '破壞能 Archon', '死靈式戰機 Wraith', '戰鬥巡洋艦 Battlecruiser', '斥候 Scout', '自殺蟲 Scourge', '指揮官 Commander']);
     await card.done();
   }
   for (const [w, h] of [[844, 390], [1600, 900]]) { const p = await open('S', { w, h, quality: 'high', seed: 11 }); await p.eval('__step(30)'); for (let i = 0; i < 22; i++) { await p.down('123456'[i % 6]); await p.up('123456'[i % 6]); await p.eval('__step(60)'); } if (SHOTS) await p.shot(path.join(SHOTS, `battle-${w}.png`));

@@ -9,17 +9,19 @@ const WINDUP = {
 };
 
 export const shotTarget = p => p.hit?.id ?? p.core ?? null;
-export function attackReady(u, p, frame, hasFrame) {
-  const target = shotTarget(p), profile = WINDUP[u.kind];
+const FLYING_WINDUP = { first:1, repeat:1, stationary:false };
+export function attackReady(u, p, frame, hasFrame, version=9) {
+  const target = shotTarget(p), profile = WINDUP[u.kind] ?? (version>=10&&(u.kind==='battlecruiser'||u.kind==='wraith'||u.kind==='scout'||u.kind==='mutalisk') ? FLYING_WINDUP : null);
   if (u.fight?.target != null && (u.fight.target !== target || (profile?.stationary && u.motion?.speed > .001))) {
     u.fight.target = null;
   }
   if (!hasFrame || target === null || u.cd > 0) return false;
   if (!profile) return true; // do not guess wind-ups for the other weapons.
-  if (profile.stationary) {
-    if (u.motion?.speed > .001) return false;
-    if (u.motion && Math.abs(Math.atan2(Math.sin(p.attackAngle-u.motion.heading),Math.cos(p.attackAngle-u.motion.heading))) > Math.PI/4) return false;
-  }
+  if(profile.stationary && u.motion?.speed > .001) return false;
+  if(version>=10){
+    const facing=u.motion?.heading??((u.dx||u.dz)?Math.atan2(u.dz,u.dx):p.attackAngle);
+    if(Math.abs(Math.atan2(Math.sin(p.attackAngle-facing),Math.cos(p.attackAngle-facing)))>(p.attackArc??Math.PI)) return false;
+  }else if(profile.stationary&&u.motion&&Math.abs(Math.atan2(Math.sin(p.attackAngle-u.motion.heading),Math.cos(p.attackAngle-u.motion.heading)))>Math.PI/4) return false;
   const fight = u.fight ??= {target:null,lastTarget:null,at:-1,due:-1,fired:-1};
   if (fight.target !== target) {
     const continuous = fight.lastTarget === target && frame-fight.fired <= p.interval+8;

@@ -33,7 +33,17 @@ try {
     await page.until("!!window.__dev02 && !!document.querySelector('[data-seat]')");
     assert.match(await page.eval('document.title'), /v6-0/);
     await page.clickOn(`[data-seat="${seat}"]`);
-    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [preview?9:8,2700]);
+    if (preview && tier==='high'){
+      assert.match(await page.eval("document.querySelector('[data-profile=wraith]').textContent"),/死靈式戰機/);
+      await page.clickOn('[data-profile=wraith]');
+      await page.eval('__step(3)');
+      await page.until("document.querySelector('#dossier p').textContent.includes('發射瞬間鎖定的位置')");
+    }
+    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [preview?10:8,2700]);
+    const zones=await page.eval('__dev02.specialZones()');
+    assert.equal(zones.length,preview?4:0);
+    assert(zones.every(z=>z.positions.length===2));
+    assert.equal(await page.eval("document.querySelectorAll('#shop button').length"),9); // no purchasable special pad
     assert.match(await page.eval("document.querySelector('#shop button[data-pad=\"6\"]').textContent"), /40\s*金\s*→\s*3\s*艘/);
     await page.clickOn('#shop button[data-pad="6"]');
     await page.eval('__step(10)');

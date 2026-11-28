@@ -17,3 +17,5 @@
 - 原始運動研究及逐幀方式見 [現有證據](https://github.com/xdxd-lab/battle_craft/blob/67153d09c5771838e38fc6ddada92fd048567535/research/BC-V6-ENGINE-MOTION.md)。
 
 完整對照見 [九兵攻擊調查](BC-V6-ATTACK-SURVEY.md)。較完整對局測試：`node dev02-four-seats/qa-v9-match.mjs`。
+
+後續模擬 10 候選疊加：[全九兵種發射與命中修正](BC-V6-WEAPON-DELIVERY.md) · [特殊信標展示區與售價考證](BC-V6-SPECIAL-POWERS.md)。現分支的 `#preview=combat` 已指向模擬 10；第 9 版仍可用記錄重播。
