@@ -40,7 +40,33 @@ const CSS = `
 #v18-field-actions button[data-tower-kind]{background:#243840;border-color:#637c7d}
 #v18-field-actions button[data-installed=true]{box-shadow:inset 0 -2px #98d7ba}
 #v18-field-actions button[data-affordable=false]{background:#182430;color:#c9d7e1;border-style:dashed}
-#v18-field-actions button:active:not(:disabled){background:#455b69}
+#v18-field-actions button:active:not(:disabled),
+#v18-field-actions button[data-pressing]:not(:disabled){
+ background:#557084;border-color:#d5ecff;box-shadow:inset 0 2px 5px #08121a;transform:translateY(1px);
+}
+#v18-field-actions button[data-tapped]:not(:disabled):not([data-pressing]){
+ animation:v18-action-release 240ms ease-out;
+}
+@keyframes v18-action-release{
+ from{outline:2px solid #f3dc9a;outline-offset:-2px}
+ to{outline:2px solid transparent;outline-offset:0}
+}
+@media(prefers-reduced-motion:reduce){
+ #v18-field-actions button[data-tapped]:not(:disabled):not([data-pressing]){
+  animation:none;outline:2px solid #f3dc9a;outline-offset:-2px
+ }
+}
+#v18-field-dock > #shop button[aria-pressed=true]{
+ color:#fff2c9;background:#354556;border-color:#ffe9a8;
+}
+#v18-field-dock > #shop button[aria-pressed=true] small{color:#e3eef6}
+@media(forced-colors:active){
+ #v18-field-dock > #shop button[aria-pressed=true]{
+  forced-color-adjust:none;color:HighlightText;background:Highlight;border-color:HighlightText;
+  box-shadow:inset 0 0 0 1px HighlightText;
+ }
+ #v18-field-dock > #shop button[aria-pressed=true] small{color:HighlightText}
+}
 #v18-field-actions button small{flex:none;white-space:nowrap;color:#d6dfe5;font-size:.87em;font-variant-numeric:tabular-nums}
 #v18-core-minerals{
  --field-ui:1;position:fixed;z-index:1;pointer-events:none;transform:translate(-50%,-50%);
@@ -84,7 +110,18 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
   const powerRow=makeRow('特殊能力','powerRow'),towerRow=makeRow('購買砲塔','towerRow');
   shop.before(dock);dock.append(actions,shop);
   const amount=document.createElement('span');amount.id='v18-core-minerals';amount.hidden=true;amount.dataset.coreMinerals='';document.body.append(amount);
-  const buttons=[];
+  const buttons=[], tapTimers=new Map();
+  // Acknowledges the physical tap, not a successful cast. Never call the
+  // command from a transition, and never leave a one-shot action selected.
+  function showTap(button){
+    clearTimeout(tapTimers.get(button));
+    button.dataset.tapped='';
+    tapTimers.set(button,setTimeout(()=>{delete button.dataset.tapped;tapTimers.delete(button);},240));
+  }
+  function clearTaps(){
+    for(const [button,timer] of tapTimers){clearTimeout(timer);delete button.dataset.tapped;}
+    tapTimers.clear();
+  }
   function makeButton(row,{key,label,cost,detail,tower}){
     const button=document.createElement('button'), name=document.createElement('strong'), price=document.createElement('small');
     button.type='button';button.dataset[tower?'towerKind':'v18Power']=key;
@@ -96,6 +133,7 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
     const trigger=()=>{
       const {c,enabled,affordable}=get();
       if(!enabled)return;
+      showTap(button);
       if(!affordable){notice(`${label}需要 ${costText(cost)}，還差 ${costText(cost-c.gold)}。`);return;}
       if(tower)purchaseTower(key);
       else cast(key);
@@ -111,26 +149,29 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
 
   let visibleScale=1,lastSeat=null,lastPose=-1,intent=null;
   const touches=new Set();
-  const cancel=()=>{intent=null;touches.clear();};
+  const clearPress=()=>{if(intent)delete intent.button.dataset.pressing;intent=null;};
+  const cancel=()=>{clearPress();clearTaps();touches.clear();};
   const wandered=e=>intent?.id===e.pointerId&&Math.hypot(e.clientX-intent.x,e.clientY-intent.y)>10*visibleScale;
   // Track concurrent contacts at window capture without preventing gestures
   // elsewhere. Scope the browser's tap/pinch suppression to the action panel.
   window.addEventListener('pointerdown',e=>{
-    if(e.pointerType==='touch'){touches.add(e.pointerId);if(touches.size>1)intent=null;}
+    if(e.pointerType==='touch'){touches.add(e.pointerId);if(touches.size>1)clearPress();}
     const c=context(), button=idOf(e.target);
     if(!active(c)||!button||!actions.contains(button)||!e.isPrimary||e.button!==0||touches.size>1)return;
+    clearPress();
     intent={button,seat:c.seat,match:c.match,id:e.pointerId,x:e.clientX,y:e.clientY};
+    button.dataset.pressing='';
   },true);
-  window.addEventListener('pointermove',e=>{if(wandered(e))intent=null;},true);
+  window.addEventListener('pointermove',e=>{if(wandered(e))clearPress();},true);
   window.addEventListener('pointerup',e=>{
     touches.delete(e.pointerId);
     if(intent?.id!==e.pointerId)return;
-    const wanted=intent,c=context(), drag=wandered(e);intent=null;
+    const wanted=intent,c=context(), drag=wandered(e);clearPress();
     if(drag||touches.size||!active(c)||c.seat!==wanted.seat||c.match!==wanted.match||
       idOf(document.elementFromPoint(e.clientX,e.clientY))!==wanted.button)return;
     buttons.find(b=>b.button===wanted.button)?.trigger();
   },true);
-  window.addEventListener('pointercancel',e=>{touches.delete(e.pointerId);if(intent?.id===e.pointerId)intent=null;},true);
+  window.addEventListener('pointercancel',e=>{touches.delete(e.pointerId);if(intent?.id===e.pointerId)clearPress();},true);
   window.addEventListener('blur',cancel);
   window.addEventListener('pagehide',cancel);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)cancel();});
@@ -138,7 +179,7 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
   function update(){
     const c=context();
     const show=!!(c.seat && c.mode!=='menu');
-    if(!active(c))intent=null;
+    if(!active(c)){clearPress();clearTaps();}
     dock.hidden=!show;
     if(!show||!c.alive||c.mode==='end')amount.hidden=true;
     if(!show){lastPose=-1;return;}
