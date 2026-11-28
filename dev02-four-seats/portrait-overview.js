@@ -1,7 +1,25 @@
 // Rendering/UI only. Kept out of the replay state and enabled only by the new
 // portrait full-overview entry. No external stylesheet fetch (offline build).
 export const PORTRAIT_OVERVIEW_VERSION = 13;
-export const isNarrowPortrait = (w,h) => w>0 && w<=700 && h>w;
+// Some Android Chromium desktop-site/embedded shells expose a fixed desktop
+// layout (usually 980 CSS px) and scale it down to the actual narrow screen.
+const browserMetrics=()=>({
+  coarse:!!globalThis.matchMedia?.('(any-pointer: coarse)').matches || (globalThis.navigator?.maxTouchPoints??0)>0,
+  screenW:globalThis.screen?.width, screenH:globalThis.screen?.height,
+  scale:globalThis.visualViewport?.scale,
+});
+export function portraitOverviewScale(w,h,{coarse=false,screenW,screenH,scale} = browserMetrics()) {
+  if (!(w>0 && h>w)) return 0;
+  if (w<=700) return 1;
+  if(w>1120 || h/w<1.30) return 0;
+  const narrowScreen=screenW>0 && screenW<=700 && screenH>screenW && screenW/w<.82;
+  const compressed=scale>0 && scale<=.82 && w*scale<=700;
+  if(!coarse && !(narrowScreen && compressed))return 0; // keep desktop windows above 700 unchanged
+  if(!narrowScreen && !compressed && w<880)return 0; // ordinary touch/tablet viewport
+  const usable = narrowScreen ? screenW : compressed ? w*scale : 420;
+  return Math.min(2.38,Math.max(1,w/usable));
+}
+export const isNarrowPortrait = (w,h,metrics) => portraitOverviewScale(w,h,metrics)>0;
 export const overviewAngles = angles => ({ ...angles, el: 70*Math.PI/180 });
 
 const className='bc-portrait-overview';
@@ -40,6 +58,7 @@ const style=`
 }
 .${className} #shop button {min-width:0;min-height:44px;padding:3px 4px;font-size:12px;line-height:1.25}
 .${className} #shop small {font-size:10px}
+.${className} .compass {display:none}
 .${className} #msg {
   left:max(8px,env(safe-area-inset-left));right:max(111px,calc(env(safe-area-inset-right) + 103px));
   max-width:none;transform:none;text-align:left;padding:4px 6px;font-size:11px;line-height:1.3;
@@ -50,20 +69,22 @@ const style=`
 .${className} #panel:not([open]) {max-height:none}
 .${className} #panel[open] {width:min(270px,calc(100vw - 16px));max-height:min(42vh,385px)}
 .${className} #panel>summary {font-size:11.5px;line-height:1.2;padding:7px 6px}
-`;
+`.replace(/(\d+(?:\.\d+)?)px/g,'calc($1px * var(--bc-portrait-scale,1))');
 let installed=false;
 export function syncPortraitOverview(enabled,w,h,root=document.documentElement) {
-  const active = enabled && isNarrowPortrait(w,h);
+  const scale = enabled ? portraitOverviewScale(w,h) : 0, active=scale>0;
   if(active && !installed){
     const node=document.createElement('style');node.id='portrait-overview-style';node.textContent=style;
     document.head.append(node);installed=true;
   }
   root.classList.toggle(className,active);
-  return active;
+  if(active) root.style.setProperty('--bc-portrait-scale',String(scale));
+  else root.style.removeProperty('--bc-portrait-scale');
+  return scale;
 }
 
 export function setPortraitOverviewActionInset(active,shopH,root=document.documentElement) {
-  if(active) root.style.setProperty('--bc-overview-action-bottom',`${Math.ceil(shopH+6)}px`);
+  if(active) root.style.setProperty('--bc-overview-action-bottom',`${Math.ceil(shopH+6*active)}px`);
   else root.style.removeProperty('--bc-overview-action-bottom');
 }
 
@@ -80,3 +101,18 @@ export function setPortraitOverviewFog(fog,active) {
     originalFog.delete(fog);
   }
 }
+
+// Resizing an unchanged WebGL drawing buffer can blank it and costs a surface
+// reallocation. HUD ResizeObserver and visualViewport events need not redraw it.
+export function ensureDrawingBuffer(renderer,w,h,ratio) {
+  if(renderer.getPixelRatio()===ratio &&
+    renderer.domElement.width===Math.floor(w*ratio) &&
+    renderer.domElement.height===Math.floor(h*ratio))return false;
+  renderer.setDrawingBufferSize(w,h,ratio);
+  return true;
+}
+
+// In a compressed viewport the browser already draws fewer physical pixels per
+// CSS pixel. Supersample that picture, not an imaginary 980px-wide phone.
+export const overviewPixelRatio = (ratio, uiScale) =>
+  uiScale>1 ? Math.min(ratio,Math.max(.75,ratio*1.45/uiScale)) : ratio;

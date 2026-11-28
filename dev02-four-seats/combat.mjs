@@ -12,7 +12,15 @@ import { DEFENSE_VERSION, TOWER, hitTower, fireTowers } from './defense-tower.mj
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
 const DRAGOON_EDGE_RANGE_FROM = 13;
-const inDragoonRange = (u, o, gap = unitGap(u,o)) => gap <= weaponOf(u.kind,KINDS[o.kind].air).range + 1e-9;
+export const DRAGOON_TRACK_RANGE_FROM = 14;
+export const DRAGOON_RANGE_TRIAL_FROM = 15;
+// Trial only: 3 × the current 1.068-wide movement reservation, measured as
+// a DAT weapon-box gap. The movement shape, attacks and projectile speed stay independent.
+export const DRAGOON_TRIAL_RANGE = 3.204;
+export const effectiveWeaponRange = (version, kind, air = false) =>
+  version >= DRAGOON_RANGE_TRIAL_FROM && kind === 'dragoon' ? DRAGOON_TRIAL_RANGE : weaponOf(kind, air).range;
+const DRAGOON_TRACK_FRAMES = 6, DRAGOON_TRACK_MARGIN = .12; // keep stance, never permission to shoot
+const inDragoonRange = (u, o, range, gap = unitGap(u,o)) => gap <= range + 1e-9;
 export const armorOf = u => u.armor ?? KINDS[u.kind].armor;
 
 // 範圍傷害：以主目標位置為圓心，依部隊編號順序結算；主目標已吃整發不重複
@@ -40,6 +48,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   const plan = units.map(u => {
     const spec = KINDS[u.kind];
     const edgeRange = state.version >= DRAGOON_EDGE_RANGE_FROM && u.kind === 'dragoon';
+    const groundRange = edgeRange ? effectiveWeaponRange(state.version, u.kind) : spec.range;
     let foe = null, best = Infinity, reachable = null, reachableGap = Infinity, reachableCenter = Infinity;
     for (const o of units) {
       if (o.team === u.team || !canTarget(spec,KINDS[o.kind].air)) continue;
@@ -49,7 +58,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       // Movement reserves a separate, larger footprint. Only DAT weapon boxes
       // decide whether to halt and aim, so a crowd cannot force aimless chasing.
       const gap = unitGap(u,o);
-      if (inDragoonRange(u,o,gap) && (gap < reachableGap || (gap === reachableGap &&
+      if (inDragoonRange(u,o,groundRange,gap) && (gap < reachableGap || (gap === reachableGap &&
         (d < reachableCenter || (d === reachableCenter && o.id < reachable.id))))) {
         reachable = o; reachableGap = gap; reachableCenter = d;
       }
@@ -61,23 +70,41 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       const d = dist(u.x, u.z, locked.x, locked.z);
       // A still-reachable wind-up is not cancelled just because a different
       // enemy passes in front. Outside true weapon range it cannot release.
-      if (edgeRange ? locked.hp > 0 && d <= R.aggro && inDragoonRange(u,locked) : d <= weaponOf(u.kind,KINDS[locked.kind].air).range) {
+      if (edgeRange ? locked.hp > 0 && d <= R.aggro && inDragoonRange(u,locked,groundRange) : d <= weaponOf(u.kind,KINDS[locked.kind].air).range) {
         foe = locked; best = d;
       }
     }
+    const stableDragoon = edgeRange && state.version >= DRAGOON_TRACK_RANGE_FROM;
     const p = { mx: 0, mz: 0, sx: 0, sz: 0, hit: null, core: null };
     u.foe = foe ? foe.id : 0;
     const contact=faithful && spec.suicide;
-    const inReach=foe && (contact ? unitGap(u,foe)<=SCOURGE_CONTACT : edgeRange ? inDragoonRange(u,foe) : best<=weaponOf(u.kind,KINDS[foe.kind].air).range);
-    if (inReach) { p.hit=foe; if(experimental && !contact)p.hitRange=weaponOf(u.kind,KINDS[foe.kind].air).range; }
-    else if (foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
-    else if (u.target) {
+    const inReach=foe && (!stableDragoon || foe.hp>0) && (contact ? unitGap(u,foe)<=SCOURGE_CONTACT : edgeRange ? inDragoonRange(u,foe,groundRange) : best<=weaponOf(u.kind,KINDS[foe.kind].air).range);
+    if (inReach) {
+      p.hit=foe;
+      if(experimental && !contact)p.hitRange=edgeRange ? groundRange : weaponOf(u.kind,KINDS[foe.kind].air).range;
+      if(stableDragoon && frames) {
+        const track = u.dragoonTrack ??= { target:foe.id, seen:frame };
+        track.target=foe.id; track.seen=frame;
+      }
+    } else if(stableDragoon && u.dragoonTrack && frame-u.dragoonTrack.seen<=DRAGOON_TRACK_FRAMES) {
+      const tracked=alive.get(u.dragoonTrack.target);
+      // Wait through a small, brief range excursion rather than requesting a
+      // fresh sidestep through the firing line. Keep the original hitbox range
+      // for every release and take a genuinely reachable alternative first.
+      if(tracked?.hp>0 && tracked.team!==u.team && unitGap(u,tracked)<=groundRange+DRAGOON_TRACK_MARGIN) {
+        p.dragoonHold=tracked.id;
+        p.attackAngle=Math.atan2(tracked.z-u.z,tracked.x-u.x);
+        u.foe=tracked.id;
+      }
+    }
+    if (!p.hit && p.dragoonHold===undefined && foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
+    else if (!p.hit && p.dragoonHold===undefined && u.target) {
       const [cx, cz] = L.corePos(u.target, dim);
       const tower=state.version>=DEFENSE_VERSION?state.seats[u.target]?.tower:null;
       // Mobile enemies still take priority. In its firing envelope the turret is a
       // separate target, not a pool of extra core health or a global damage shield.
-      if(tower?.hp>0&&canTarget(spec,false)&&dist(u.x,u.z,tower.x,tower.z)<=spec.range+TOWER.hitRadius) {p.core=u.target;p.tower=true;}
-      else if (dist(u.x, u.z, cx, cz) <= R.coreRadius + spec.range) { if (canTarget(spec, false)) p.core = u.target; } // 只打空中者（自殺蟲）到核心旁待命
+      if(tower?.hp>0&&canTarget(spec,false)&&dist(u.x,u.z,tower.x,tower.z)<=groundRange+TOWER.hitRadius) {p.core=u.target;p.tower=true;}
+      else if (dist(u.x, u.z, cx, cz) <= R.coreRadius + groundRange) { if (canTarget(spec, false)) p.core = u.target; } // 只打空中者（自殺蟲）到核心旁待命
       else { const [wx, wz] = waypoint(u, dim); p.mx = wx - u.x; p.mz = wz - u.z; }
     }
     for (const o of units) { // 隊形分離只在同一高度層

@@ -11,6 +11,12 @@ const WINDUP = {
 export const shotTarget = p => p.hit?.id ?? (p.tower ? 'tower:' + p.core : p.core) ?? null;
 const FLYING_WINDUP = { first:1, repeat:1, stationary:false };
 export function attackReady(u, p, frame, hasFrame, version=9) {
+  if (p.dragoonHold !== undefined) {
+    // Keep turning and pause accumulated wind-up on a short loss of reach.
+    // No shot can be started or released while this hold intent is active.
+    if (hasFrame && u.fight?.target === p.dragoonHold) u.fight.due++;
+    return false;
+  }
   const target = shotTarget(p), profile = WINDUP[u.kind] ?? (version>=10&&(u.kind==='battlecruiser'||u.kind==='wraith'||u.kind==='scout'||u.kind==='mutalisk') ? FLYING_WINDUP : null);
   if (u.fight?.target != null && (u.fight.target !== target || (profile?.stationary && u.motion?.speed > .001))) {
     u.fight.target = null;

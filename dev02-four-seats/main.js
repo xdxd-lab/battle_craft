@@ -21,13 +21,13 @@ import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER } fr
 import { towerModels } from './defense-tower-view.js';
 import { buildSpecialZones } from './special-zone.js';
 import { fitSpecialZoneCamera, specialZoneFor } from './special-zone-layout.mjs';
-import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog } from './portrait-overview.js';
+import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog, ensureDrawingBuffer, overviewPixelRatio } from './portrait-overview.js';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
 // Preserve the old Pages and offline entry points as simulation 8.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM].includes(requestedMatch) ? requestedMatch : S.VERSION;
 const DEFENSE_LAB = MATCH_VERSION >= DEFENSE_VERSION;
 const DRAGOON_FX = MATCH_VERSION >= DEFENSE_TUNING_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
@@ -141,7 +141,7 @@ function markFallen(id) {
 }
 
 // ---------- 鏡頭 ----------
-let fittedView, fittedSafe, overview = false, portraitAtlas = false;
+let fittedView, fittedSafe, overview = false, portraitAtlas = 0;
 const markerProjection = new THREE.Vector3(), markerTop = new THREE.Vector3();
 function keepMarkersReadable() {
   const { clientWidth: w, clientHeight: h } = canvas;
@@ -200,9 +200,9 @@ function setFraming(full) {
   if (renderer && MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION && isNarrowPortrait(canvas.clientWidth, canvas.clientHeight)) resize();
 }
 // 訊息列一律貼在購兵列上緣之上（九鈕兩列、三列高度隨畫面變），不壓到按鈕文字
-function placeMsg() {
+function placeMsg(scale = 1) {
   const top = $('shop').childElementCount ? $('shop').getBoundingClientRect().top : innerHeight - 10, panel = $('panel');
-  $('msg').style.bottom = `${Math.ceil(innerHeight - top + 6)}px`;
+  $('msg').style.bottom = `${Math.ceil(innerHeight - top + 6 * scale)}px`;
   panel.style.maxHeight = innerWidth > innerHeight ? `${Math.max(120, Math.floor(top - 52 - panel.getBoundingClientRect().top))}px` : ''; // 橫式：介紹面板止於購兵列與兩行訊息之上
   return innerHeight - top;
 }
@@ -212,15 +212,16 @@ function resize() {
     portraitAtlas = syncPortraitOverview(overview,w,h);
     setPortraitOverviewFog(scene.fog,portraitAtlas);
   }
-  const shopH = placeMsg();
+  const shopH = placeMsg(portraitAtlas || 1);
   if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) setPortraitOverviewActionInset(portraitAtlas,shopH);
   const compact = h <= 560 || portraitAtlas;
   if (compact !== compactPadLabels) { compactPadLabels = compact; buildPads(); }
-  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portraitAtlas ? shopH + 42 : Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + (SPECIAL_LAB && portrait ? 72 : 34)); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
-  let l = portraitAtlas ? 7 : portrait ? 0 : bar.right + 8, r = portraitAtlas ? 7 : portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 : 0;
+  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portraitAtlas ? shopH + 42 * portraitAtlas : Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + (SPECIAL_LAB && portrait ? 72 : 34)); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
+  let l = portraitAtlas ? 7 * portraitAtlas : portrait ? 0 : bar.right + 8, r = portraitAtlas ? 7 * portraitAtlas : portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 * (portraitAtlas || 1) : 0;
   if (!portrait && w - 2 * Math.max(l, r) > h * 1.25) l = r = Math.max(l, r);
   safe = { l, t, w: Math.max(80, w - l - r), h: Math.max(80, h - t - bottom) };
-  renderer.setPixelRatio(pixelRatio()); renderer.setSize(w, h, false);
+  if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) ensureDrawingBuffer(renderer,w,h,overviewPixelRatio(pixelRatio(),portraitAtlas));
+  else { renderer.setPixelRatio(pixelRatio()); renderer.setSize(w,h,false); }
   // Shift the whole projection so the floor, markers, and input ray stay aligned.
   const drop = portraitAtlas ? 0 : Math.round(h * (compact ? .018 : .026));
   camera.aspect = safe.w / safe.h; camera.fov = L.FOV;
@@ -681,6 +682,7 @@ try {
   applyDisplay(false); applyQuality();
   applySurface();
   const watch = new ResizeObserver(resize); [canvas, $('panel'), $('bar')].forEach(o => watch.observe(o)); $('panel').addEventListener('toggle', resize);
+  if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) window.visualViewport?.addEventListener('resize',resize);
   shopUi(); setView(view, true); resize(); menu(); hud(); requestAnimationFrame(frame);
 } catch (err) { console.error(err); $('card').innerHTML = '<h3>無法啟動 3D</h3><p>此裝置或瀏覽器無法使用 WebGL，這一版沒有 2D 備援。</p>'; }
 // 供自動核對：唯讀快照

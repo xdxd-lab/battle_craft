@@ -3,7 +3,8 @@
 import * as L from '../dev05-layout/layout.mjs';
 import { ARENA, ARENA_V8 } from './arena.mjs';
 import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
-import { stepRoster } from './combat.mjs';
+import { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, stepRoster } from './combat.mjs';
+export { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, DRAGOON_TRIAL_RANGE, effectiveWeaponRange } from './combat.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
 
 import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, buyTower } from './defense-tower.mjs';
@@ -72,6 +73,8 @@ GEOMETRY[10] = GEOMETRY[9];
 GEOMETRY[DEFENSE_VERSION] = GEOMETRY[10];
 GEOMETRY[VISIBILITY_VERSION] = {...GEOMETRY[10],dim:{...GEOMETRY[10].dim,visibleTower:true,dragoonLaneClearance:true}};
 GEOMETRY[DEFENSE_TUNING_VERSION] = {...GEOMETRY[VISIBILITY_VERSION],dim:{...GEOMETRY[VISIBILITY_VERSION].dim,dragoonClearanceScale:1.2}};
+GEOMETRY[DRAGOON_TRACK_RANGE_FROM] = GEOMETRY[DEFENSE_TUNING_VERSION]; // 保留 v13 佔位，重騎兵加入短暫的瞄準保持
+GEOMETRY[DRAGOON_RANGE_TRIAL_FROM] = GEOMETRY[DRAGOON_TRACK_RANGE_FROM]; // 只試射程，移動佔位不變
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
