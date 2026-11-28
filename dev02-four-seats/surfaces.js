@@ -2,7 +2,7 @@
 // 圖檔為 Poly Haven CC0，建置時以 base64 內嵌；任何一張載入失敗就整組回到程序材質（'orig'，僅作回退，不供選擇）。
 import * as THREE from 'three';
 import * as W from '../dev05-layout/world.js';
-import DATA from './surface-data.generated.js';
+import DATA, { assetBytes } from './surface-data.generated.js';
 
 export const TIERS = {
   std: { name: '標準', floor: '512', ground: '1k', canvas: 2048 },
@@ -97,4 +97,4 @@ export async function setSurface(tier) {
   } catch (err) { console.warn(err); if (my === token) { restore(); current = 'orig'; } throw err; }
 }
 export const surface = () => current;
-export const bytes = Object.fromEntries(Object.entries(DATA).map(([k, v]) => [k, Math.round((v.length - v.indexOf(',') - 1) * 3 / 4)]));
+export const bytes = assetBytes;

@@ -1,12 +1,12 @@
-// DEV02 四席固定步模擬。純資料：不碰 DOM、Three.js、Math.random、Date，也不用三角函式。
+// DEV02 四席固定步模擬。純資料：不碰 DOM、Three.js、Math.random、Date。版本 8 的移動才使用三角函式。
 // 同一組設定與指令在任何地方重跑都得到相同狀態；呈現層只讀不寫。
 import * as L from '../dev05-layout/layout.mjs';
-import { ARENA } from './arena.mjs';
+import { ARENA, ARENA_V8 } from './arena.mjs';
 import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
 
 export const HZ = 30;
-export const VERSION = 7; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效（舊版保留供重播）
+export const VERSION = 8; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
   startGold: 12, incomeEvery: 30, purchaseGap: 15, // v5：12 金起始、每秒 1 金、兩次購買至少 0.5 秒
@@ -31,9 +31,11 @@ const PADS_V2 = place([
 // 版本 5 經濟：以版本 3、4 的值乘上倍率。7.5 金不取整；金幣只會是 0.5 的倍數，二進位浮點可精確表示。
 export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.incomeEvery / 2, costs: { marine: KINDS.marine.cost * 1.5 } };
 const ECONOMY_V7 = { ...ECONOMY, income: 3 }; // 版本 7：每次發放金額×3（間隔、起始金幣不變）
-export const economyFor = version => version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+// 版本 8 以舊版 15 步 × 5/4 = 18.75 步為週期，不把每次間隔單獨取整。
+const ECONOMY_V8 = { ...ECONOMY_V7, income: ECONOMY_V7.income * 1.5, incomeEvery: ECONOMY_V7.incomeEvery * 1.25 };
+export const economyFor = version => version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
 export const padRadiusFor = version => version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
-const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: KINDS[kind].count, label: KINDS[kind].name });
+const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: version >= 8 && kind === 'battlecruiser' ? 3 : KINDS[kind].count, label: KINDS[kind].name });
 // 版本 6：購買區 9×15 內兩欄三列，信標中心相距 4.4／4.8（大於兩倍 padRadius），皆在指揮官可走範圍內（暫定）
 export const SIX_PAD_POSITIONS = [[2.2, 4.8], [-2.2, 4.8], [2.2, 0], [-2.2, 0], [2.2, -4.8], [-2.2, -4.8]];
 // 版本 7：三欄三列，欄 x＝3／0／−3、列 z＝4.8／0／−4.8（由上而下、由左而右），中心相距 3／4.8（暫定）
@@ -41,10 +43,10 @@ export const NINE_PAD_POSITIONS = [4.8, 0, -4.8].flatMap(z => [3, 0, -3].map(x =
 const rosterPads = version => version >= 7 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), NINE_PAD_POSITIONS)
   : version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
   : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
-const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7);
-export const padsFor = version => version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7), PADS_V8 = rosterPads(8);
+export const padsFor = version => version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
-export const coreMax = version => version >= 3 ? CORE.hp : RULES.coreHp;
+export const coreMax = version => version >= 8 ? CORE.hp * 3 : version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
 const homeFor = version => version >= 7 ? HOME_V7 : version >= 6 ? HOME_V6 : HOME_V2;
 const GEOMETRY = {
@@ -59,6 +61,7 @@ GEOMETRY[4] = { ...GEOMETRY[2], dim: { ...ARENA, laneHalf: RULES.laneHalf * 1.1 
 GEOMETRY[5] = GEOMETRY[4];
 GEOMETRY[6] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: SIX_PAD_POSITIONS } };
 GEOMETRY[7] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: NINE_PAD_POSITIONS } };
+GEOMETRY[8] = { ...GEOMETRY[7], dim: { ...GEOMETRY[7].dim, ...ARENA_V8, shopPadPositions: NINE_PAD_POSITIONS } };
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -287,7 +290,11 @@ export function step(state, commands = []) {
   const live = SEAT_IDS.map(id => state.seats[id]).filter(s => s.alive);
   live.forEach(s => moveCommander(s, geometry));
   const econ = economyFor(state.version);
-  if (state.tick % econ.incomeEvery === 0) for (const s of live) s.gold += econ.income ?? 1;
+  // 累計期數每跨一個整數就發放，步號 19／38／57／75 循環，平均精確為 18.75 步。
+  const pays = state.version >= 8
+    ? Math.floor(state.tick / econ.incomeEvery) > Math.floor((state.tick - 1) / econ.incomeEvery)
+    : state.tick % econ.incomeEvery === 0;
+  if (pays) for (const s of live) s.gold += econ.income ?? 1;
   for (const s of live) checkBeacon(state, s, emit, dim);
   if (state.version >= 3) stepCores(state, stepRoster(state, emit, dim, { RULES, waypoint, clampWalk }), emit);
   else stepUnits(state, emit, dim);

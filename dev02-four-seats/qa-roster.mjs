@@ -1,4 +1,4 @@
-// BC01 兵種（模擬版本 3 起）、版本 4 道路寬、版本 5 經濟與版本 6 六兵種、版本 7 九兵種驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
+// BC01 兵種（模擬版本 3 起）、版本 4 道路寬、版本 5 經濟與版本 6 六兵種、版本 7 九兵種、版本 8 經濟與部署驗收：傷害、護盾、投射物、彈跳、購兵與完整終局。純 Node，可重跑。
 import assert from 'node:assert/strict';
 import * as L from '../dev05-layout/layout.mjs';
 import * as S from './sim.mjs';
@@ -164,11 +164,46 @@ test('版本 4 全電腦 60 局：皆終局，部隊不出道路、交會區與�
   return `勝場 ${JSON.stringify(wins)}；最寬 ${widest.toFixed(2)}；${a.final} ${a.events}`;
 });
 test('版本 5 經濟：48 金起、每秒 2 金、陸戰隊 7.5；舊版維持 12／每秒 1／5', () => {
-  assert.equal(S.VERSION, 7); assert.deepEqual(S.ECONOMY, { startGold: 48, incomeEvery: 15, costs: { marine: 7.5 } });
+  assert.equal(S.VERSION, 8); assert.deepEqual(S.ECONOMY, { startGold: 48, incomeEvery: 15, costs: { marine: 7.5 } });
   for (const [version, start, perSecond, costs] of [[1, 12, 1, [5, 12]], [2, 12, 1, [5, 12]], [3, 12, 1, [5, 12, 14]], [4, 12, 1, [5, 12, 14]], [5, 48, 2, [7.5, 12, 14]], [6, 48, 2, [7.5, 12, 14, 9, 28, 17]], [7, 48, 6, [7.5, 12, 14, 9, 28, 17, 40, 24, 6]]]) {
     const st = S.createSim({ version, bots: [] }); assert(S.SEAT_IDS.every(id => st.seats[id].gold === start), `v${version}`);
     run(st, 14); assert.equal(st.seats.N.gold, start); run(st, 1); assert.equal(st.seats.N.gold, version >= 7 ? start + 3 : version >= 5 ? start + 1 : start, `v${version} 每次收入`); run(st, 285); assert.equal(st.seats.N.gold, start + perSecond * 10);
     assert.deepEqual(S.padsFor(version).filter(p => !p.locked).map(p => p.cost), costs, `v${version}`);
+  }
+});
+test('版本 8 每次 4.5 金：30 Hz 上每 75 步恰四次，舊核心不變', () => {
+  const st = none(8), { N, W } = st.seats;
+  assert.deepEqual(S.SEAT_IDS.map(id => [st.seats[id].gold, st.seats[id].hp]), Array(4).fill([48, 2700]));
+  assert.deepEqual([1, 2, 3, 4, 5, 6, 7, 8].map(S.coreMax), [120, 120, 900, 900, 900, 900, 900, 2700]);
+  W.alive = false;
+  const first = [];
+  for (let tick = 1; tick <= 7500; tick++) {
+    const previous = N.gold;
+    S.step(st);
+    assert.equal(N.gold, 48 + 4.5 * Math.floor(tick * 4 / 75), `tick ${tick}`);
+    if (tick <= 150 && N.gold !== previous) first.push(tick);
+  }
+  assert.deepEqual(first, [19, 38, 57, 75, 94, 113, 132, 150]);
+  assert.equal(N.gold, 1848);
+  assert.equal(W.gold, 48, '失守席不領收入');
+});
+test('版本 8 戰鬥巡洋艦：單筆 40 金生出 3 艘；發錢的同一步可成交；舊版仍 1 艘', () => {
+  const legacyPads = S.padsFor(7), pads = S.padsFor(8), i = pads.findIndex(p => p.kind === 'battlecruiser');
+  assert(i >= 0); assert.deepEqual(legacyPads.filter((_, j) => i !== j), pads.filter((_, j) => i !== j));
+  for (const [version, startGold, tick, count] of [[7, 37, 15, 1], [8, 35.5, 19, 3]]) {
+    const st = none(version), [x, z] = S.padWorld('S', i, S.dimFor(version));
+    const s = st.seats.S;
+    Object.assign(s.commander, { x, z }); s.gold = startGold;
+    const pre = run(st, tick - 1);
+    assert(pre.some(e => e.type === 'wait' && e.cost === 40));
+    assert(!pre.some(e => e.type === 'buy')); assert.equal(s.gold, startGold);
+    const buys = S.step(st).filter(e => e.type === 'buy');
+    assert.equal(buys.length, 1);
+    const [buy] = buys;
+    assert.deepEqual([buy.tick, buy.cost, buy.count, buy.gold, s.buys, s.spent, s.deployed], [tick, 40, count, 0, 1, 40, count]);
+    assert.deepEqual(st.units.map(u => [u.id, u.kind, u.hp]), buy.units.map(id => [id, 'battlecruiser', KINDS.battlecruiser.hp]));
+    assert.equal(new Set(buy.units).size, count);
+    assert(!S.step(st).some(e => e.type === 'buy'));
   }
 });
 test('半金門檻：7 金不能買、湊到 7.5 以上才成交，餘額保留半金', () => {
@@ -275,5 +310,5 @@ test('自殺蟲：只打空中、接觸自爆（自己陣亡、不算對方擊�
   assert.deepEqual([c.seats.S.hp, s2.hp], [CORE.hp, 25], '核心不受傷、自殺蟲待命');
   return '打死靈戰機 110（剩 10）、殘血飛螳擊殺計自殺蟲席';
 });
-test('玩家全程不動也會終局', () => S.SEAT_IDS.map(id => { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); run(st, 30 * 60 * 13); assert.equal(st.mode, 'end'); return (st.tick / 30).toFixed(0); }).join('、') + ' 秒');
+test('玩家全程不動也會終局', () => S.SEAT_IDS.map(id => { const st = S.createSim({ seed: 5, bots: S.SEAT_IDS.filter(x => x !== id) }); run(st, S.HZ * 60 * 30); assert.equal(st.mode, 'end'); return (st.tick / 30).toFixed(0); }).join('、') + ' 秒');
 console.table(rows); console.log('BC01 roster QA: OK');

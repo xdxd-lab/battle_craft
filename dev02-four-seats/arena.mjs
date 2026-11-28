@@ -21,11 +21,13 @@ export const ARENA = {
   shopRadial: 28,
   shopPadPositions: [[2, 3.1], [-2, 3.1], [2, -3.1], [-2, -3.1]],
 };
-export const corePos = id => L.corePos(id, ARENA);
+// v6-0：v5-9 的 8.8／7.92 各乘 1.2，再四捨五入到一位小數。
+export const ARENA_V8 = { ...ARENA, laneWidth: 10.6, laneHalf: 4.75 };
+export const corePos = id => L.corePos(id, ARENA_V8);
 
 export function fitArenaCamera(angles, aspect) {
   const reference = L.fitAngles(angles, aspect);
-  return L.fitAngles(angles, aspect, .98, ARENA, reference.distance / CAMERA_SCALE);
+  return L.fitAngles(angles, aspect, .98, ARENA_V8, reference.distance / CAMERA_SCALE);
 }
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -37,7 +39,7 @@ export function fitNearCamera(angles, aspect, seat) {
   const tan = Math.tan(L.FOV * Math.PI / 360) * .96;
   const points = [[0, 0, 0]];
   if (seat) {
-    for (const [x, z] of L.shopCorners(seat, ARENA)) points.push([x, 0, z], [x, 4.8, z]);
+    for (const [x, z] of L.shopCorners(seat, ARENA_V8)) points.push([x, 0, z], [x, 4.8, z]);
   }
   // Keep the camera direction and scale fixed. Pan only as far as the
   // player's platform needs to stay in the part of the view clear of HUD.

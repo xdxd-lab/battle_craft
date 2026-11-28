@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launch } from '../tools/browser.mjs';
 import { TRACKS } from './music-tracks.mjs';
 
-const url = pathToFileURL(fileURLToPath(new URL('./battle_craft-dev02.html', import.meta.url))).href;
+const url = pathToFileURL(fileURLToPath(new URL('./battle_craft-v6-0-offline.html', import.meta.url))).href;
 const browser = await launch();
 const sizes = [[667, 375], [640, 375], [740, 360], [844, 390], [1280, 720]];
 const longest = TRACKS.map(t => `♪ ${t.phase === 'opening' ? '開場' : '激戰'}｜${t.title} — ${t.author}（${t.license}）`).sort((a, b) => b.length - a.length)[0];
