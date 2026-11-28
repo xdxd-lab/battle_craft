@@ -43,28 +43,29 @@ try {
       await page.eval('__step(3)');
       await page.until("document.querySelector('#dossier p').textContent.includes('發射瞬間鎖定的位置')");
     }
-    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?15:10,2700]);
+    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?16:10,2700]);
     assert.equal(await page.eval("!!__dev02.specialZones || document.body.textContent.includes('全場清除')"),specialLab);
     if (specialLab) {
       const zones=await page.eval('__dev02.specialZones()');
       assert.equal(zones.length,4);
       assert(zones.every(z=>z.positions.length===2));
-      assert.match(await page.eval("document.querySelector('#rules').textContent"),/未定價，不能購買或發動/);
+      assert.match(await page.eval("document.querySelector('#rules').textContent"),defenseLab ? /敵對兵清除/ : /未定價，不能購買或發動/);
       await page.eval('__step(1)');
       const [x,y]=await page.eval(`(()=>{const z=__dev02.specialZones().find(v=>v.id==='${seat}'); return __dev02.screen(...z.positions[0],.25);})()`);
       assert(x>=0&&x<w&&y>=0&&y<h,'own reserve platform is in view');
       await page.click(x,y);
       await page.eval('__step(3)');
       assert.deepEqual(await page.eval(`[__dev02.snapshot().seats.${seat}.spent,__dev02.snapshot().seats.${seat}.buys]`),[0,0]);
+      if(defenseLab) await page.eval("document.querySelector('#special-power-dialog[open]')?.close()");
     }
     if(defenseLab){
       const button='#tower-buy';
-      assert.match(await page.eval(`document.querySelector('${button}').textContent`),/建砲塔 70 金/);
+      assert.match(await page.eval(`document.querySelector('${button}').textContent`),/建砲塔\s*1[,]?400\s*礦/);
       assert.equal(await page.eval(`document.querySelector('${button}').disabled`),true);
       const elapsed=await page.eval("document.querySelector('#speed').click(); __step(10,100); [__dev02.snapshot().tick,document.querySelector('#speed').textContent]");
       assert.equal(await page.eval(`document.querySelector('${button}').disabled`),false,JSON.stringify(elapsed));
       await page.clickOn(button);await page.eval('__step(3)');
-      assert.deepEqual(await page.eval(`[__dev02.snapshot().seats.${seat}.tower.hp,__dev02.snapshot().seats.${seat}.spent]`),[180,70]);
+      assert.deepEqual(await page.eval(`[__dev02.snapshot().seats.${seat}.tower.hp,__dev02.snapshot().seats.${seat}.spent]`),[180,1400]);
       assert.equal(await page.eval(`document.querySelector('${button}').disabled`),true);
       await page.eval("document.querySelector('#speed').click(); document.querySelector('#speed').click()");
       const marker=await page.eval("(()=>{const m=document.querySelector('#tower-marker'), b=m.getBoundingClientRect();return [m.hidden,b.x,b.y,b.width]})()");
@@ -73,7 +74,7 @@ try {
       if(process.env.BC_TOWER_SHOT && (!process.env.BC_DEFENSE_NARROW || tier==='std'))await page.shot(process.env.BC_TOWER_SHOT);
     }
     assert.equal(await page.eval("document.querySelectorAll('#shop button').length"),9); // no purchasable special pad
-    assert.match(await page.eval("document.querySelector('#shop button[data-pad=\"6\"]').textContent"), /40\s*金\s*→\s*3\s*艘/);
+    assert.match(await page.eval("document.querySelector('#shop button[data-pad=\"6\"]').textContent"), defenseLab ? /800\s*礦\s*→\s*3\s*艘/ : /40\s*金\s*→\s*3\s*艘/);
     await page.clickOn('#shop button[data-pad="6"]');
     await page.eval('__step(10)');
     await page.until('__dev02.audio().musicSource === "track"');
@@ -83,7 +84,7 @@ try {
     // Crossing another beacon can also buy it under the original shop rules.
     for (let i=0;i<190 && !(await page.eval(bought));i++) await page.eval('__step(3)');
     assert(await page.eval(bought) >= 3);
-    assert(await page.eval(`__dev02.snapshot().seats.${seat}.spent`) >= 40);
+    assert(await page.eval(`__dev02.snapshot().seats.${seat}.spent`) >= (defenseLab?800:40));
     assert.equal(await page.eval('__dev02.mode()'), 'play');
     assert.deepEqual(page.errors, []);
     await page.close();

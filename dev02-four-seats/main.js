@@ -17,26 +17,35 @@ import { KINDS, KIND_IDS, ATTACKS, CORE, FRAME_MS } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
 import { attackPose } from './combat-phases.mjs';
-import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER } from './defense-tower.mjs';
+import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER, towerCost } from './defense-tower.mjs';
 import { towerModels } from './defense-tower-view.js';
 import { buildSpecialZones } from './special-zone.js';
-import { fitSpecialZoneCamera, specialZoneFor } from './special-zone-layout.mjs';
-import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog, ensureDrawingBuffer, overviewPixelRatio } from './portrait-overview.js';
+import { fitSpecialZoneCamera, specialZoneFor, SPECIAL_BEACONS, SPECIAL_ZONE } from './special-zone-layout.mjs';
+import { SPECIAL_POWER_VERSION, SPECIAL_POWER_COSTS, specialPowerZone, specialPowerTargets } from './special-powers.mjs';
+import { createSpecialPowerUi, formatMinerals, powerResult, SPECIAL_POWER_LABELS } from './special-power-ui.js';
+import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog, ensureDrawingBuffer, overviewPixelRatio, portraitOverviewScale } from './portrait-overview.js';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
 // Preserve the old Pages and offline entry points as simulation 8.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
 const DEFENSE_LAB = MATCH_VERSION >= DEFENSE_VERSION;
 const DRAGOON_FX = MATCH_VERSION >= DEFENSE_TUNING_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
 const MATCH_DIM = S.dimFor(MATCH_VERSION);
 const TOWER_MUZZLE = MATCH_DIM.visibleTower ? 1.54 : 1.25;
 const MATCH_PADS = S.padsFor(MATCH_VERSION).map(p => p.kind === 'wraith' ? { ...p,label: KINDS.wraith.name } : p);
+const MINERALS = MATCH_VERSION >= SPECIAL_POWER_VERSION;
+const ACTIVE_SPECIAL = MINERALS && SPECIAL_LAB;
+const liveEconomy=S.economyFor(MATCH_VERSION), matchTowerCost=towerCost(MATCH_VERSION);
+const currency=MINERALS?'礦':'金', amount=MINERALS?formatMinerals:String;
+const price = value => `${amount(value)} ${currency}`;
+const specialDeckPowers=ACTIVE_SPECIAL?Object.fromEntries(Object.entries(SPECIAL_POWER_COSTS)
+  .map(([key,cost])=>[key,{label:SPECIAL_POWER_LABELS[key],price:price(cost)}])):null;
 const SPEEDS = [1, 2, 4], DEFAULT_SPEED = 1;
 let inBattle = false, state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
-let renderer, camera, dossier, towers, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
+let renderer, camera, dossier, towers, specialPowerUi, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
 
 // ---------- 場景物件 ----------
 const deploymentUnit = kind => kind === 'battlecruiser' ? '艘' : '名';
@@ -118,7 +127,7 @@ function buildPads() {
     const t = W.label(compactPadLabels ? 108 : 300, 108, (g, w, h) => {
       g.fillStyle = 'rgba(7,11,15,.84)'; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 14); g.fill(); g.lineWidth = 5; g.strokeStyle = p.locked ? '#6a747c' : '#ffe9a8'; g.stroke();
       const lines = compactPadLabels ? [p.locked ? '—' : String(i + 1)]
-        : p.locked ? ['未開放'] : [`${i + 1}｜${p.label}`, `${p.cost} 金`];
+        : p.locked ? ['未開放'] : [`${i + 1}｜${p.label}`, price(p.cost)];
       g.fillStyle = p.locked ? '#9eabb4' : '#fff';
       g.font = `800 ${compactPadLabels ? 76 : 42}px ${W.FONT}`;
       lines.forEach((line, n) => g.fillText(line, w / 2, h / 2 + 2 + (n - (lines.length - 1) / 2) * 46));
@@ -239,12 +248,20 @@ function sendKeys() { // 螢幕方向依目前鏡頭換成世界方向
   command({ type: 'dir', x: dx, z: dz });
 }
 const ray = new THREE.Raycaster(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.1), hit = new THREE.Vector3();
+const specialPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-(SPECIAL_ZONE.deck+.24));
 const pointer = new THREE.Vector2(), probe = new THREE.Mesh(), instance = new THREE.Matrix4(), partMatrix = new THREE.Matrix4(), bounds = new THREE.Sphere(), picks = [];
 let mouse = null, hoverAt = 0;
 function pointRay(e) {
   const b = canvas.getBoundingClientRect();
   pointer.set((e.clientX - b.left) / b.width * 2 - 1, 1 - (e.clientY - b.top) / b.height * 2);
   ray.setFromCamera(pointer, camera);
+}
+function openSpecialAt(e) {
+  if(!specialPowerUi || !seat || mode!=='play' || !state?.seats[seat]?.alive)return false;
+  pointRay(e);
+  if(!ray.ray.intersectPlane(specialPlane,hit))return false;
+  const idx=specialZoneFor(seat,MATCH_DIM).ringPositions.findIndex(([x,z])=>Math.hypot(hit.x-x,hit.z-z)<=SPECIAL_ZONE.beaconRadius+.27);
+  return idx>=0 && specialPowerUi.open(SPECIAL_BEACONS[idx].id);
 }
 function unitAt(e) {
   pointRay(e);
@@ -280,6 +297,7 @@ canvas.addEventListener('pointerdown', e => {
   if (!e.isPrimary || e.button !== 0) return;
   canvas.focus();
   if (!state || mode === 'menu') return;
+  if (openSpecialAt(e)) return; // only opens the confirmation UI, never casts
   if (!display.engineering) {
     const kind = unitAt(e);
     if (kind) { dossier.select(kind); return; }
@@ -293,6 +311,7 @@ canvas.addEventListener('pointerdown', e => {
   command({ type: 'goal', x: hit.x, z: hit.z });
 });
 addEventListener('keydown', e => {
+  if(specialPowerUi?.isOpen())return;
   const k = e.key.toLowerCase();
   if (k === ' ' && mode !== 'menu' && !document.activeElement?.closest('button, summary')) { e.preventDefault(); return pause(); }
   if (mode !== 'play' || document.activeElement?.closest('#panel')) return;
@@ -351,9 +370,13 @@ function write(e) {
     start: () => ['info', seat ? `對局開始，你是${seatName(seat)}。走到購買區的信標上會自動購兵。` : '觀戰開始，四席皆由電腦控制。'],
     enter: () => mine && ['info', `進入${e.label}信標，停留期間持續自動購兵。`],
     leave: () => mine && ['info', `離開${e.label}信標，停止購兵。`],
-    wait: () => mine && ['warn', `金幣不足（需 ${e.cost} 金）；保持站立，存夠會自動購買。`],
-    buy: () => ['info', `${who}花 ${e.cost} 金，部署 ${e.count} ${deploymentUnit(e.kind)}${KINDS[e.kind].name}。${mine ? `剩 ${e.gold} 金。` : ''}`],
-    'tower-build': () => ['info', `${who}花 ${e.cost} 金建成主城砲塔。`],
+    wait: () => mine && ['warn', `${MINERALS?'礦量':'金幣'}不足（需 ${price(e.cost)}）；保持站立，存夠會自動購買。`],
+    buy: () => ['info', `${who}花 ${price(e.cost)}，部署 ${e.count} ${deploymentUnit(e.kind)}${KINDS[e.kind].name}。${mine ? `剩 ${price(e.gold)}。` : ''}`],
+    'tower-build': () => ['info', `${who}花 ${price(e.cost)}建成主城砲塔。`],
+    special: () => {
+      const message=powerResult(e);
+      return message&&(mine||e.status==='applied')?[e.status==='applied'?'info':'warn',mine?message:`${who}使用${message}`]:null;
+    },
     'tower-fall': () => ['warn', `${who}主城砲塔被摧毀。`],
     'npc-defense': () => ['info', `${who}轉為守城，前往${KINDS[e.kind].name}信標。`],
     core: () => [e.level === 'critical' ? 'critical' : 'warn', `${who}核心${{ first: '開始受損', half: '剩一半', critical: '危急' }[e.level]}，${Math.ceil(e.hp)}／${CORE_MAX}。`],
@@ -443,30 +466,34 @@ function finish() {
   $('restart').onclick = menu; $('look').onclick = () => { $('cover').hidden = true; }; $('cover').hidden = false;
 }
 function menu() {
+  specialPowerUi?.close();
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，錢不夠就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
-  $('shop').innerHTML = seat ? MATCH_PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${i + 1}　${p.label}</b><small>${p.cost} 金<i> → ${p.count} ${deploymentUnit(p.kind)}</i></small></button>`).join('') : '';
+  $('shop').innerHTML = seat ? MATCH_PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${i + 1}　${p.label}</b><small>${price(p.cost)}<i> → ${p.count} ${deploymentUnit(p.kind)}</i></small></button>`).join('') : '';
   for (const b of $('shop').querySelectorAll('button')) b.onclick = () => { gotoPad(+b.dataset.pad); canvas.focus(); };
   placeMsg();
-  $('gold-label').textContent = seat ? `${seatName(seat)}金幣` : '金幣'; 
+  const label=MINERALS?'礦量':'金幣';
+  $('gold-label').textContent=seat?`${seatName(seat)}${label}`:label;
+  if(MINERALS)$('gold-label').title=`起始 ${price(liveEconomy.startGold)}；每 ${liveEconomy.incomeEvery/S.HZ} 秒增加 ${price(liveEconomy.income)}`;
   $('cores').innerHTML = L.SEATS.map(s => `<div class="core" id="core-${s.id}"><b style="background:${s.primary};border-color:${s.secondary}">${s.name}</b><div class="hp" style="color:${relColor(s.id)}"><i></i></div><span style="color:${relColor(s.id)}"></span></div>`).join('');
 }
 function hud() {
   if (!state) return;
+  specialPowerUi?.update();
   if(DEFENSE_LAB){
     const button=$('tower-buy'), own=state.seats[seat];
     button.hidden=!own;
     if(own){const t=own.tower;
-      const label=t ? t.hp ? `砲塔 ${Math.ceil(t.hp)}／${TOWER.hp}` : '砲塔已毀' : `建砲塔 ${TOWER.cost} 金`;
+      const label=t ? t.hp ? `砲塔 ${Math.ceil(t.hp)}／${TOWER.hp}` : '砲塔已毀' : `建砲塔 ${price(matchTowerCost)}`;
       if(button.textContent!==label)button.textContent=label;
-      button.disabled=!own.alive||!!t||own.gold<TOWER.cost||mode!=='play';
+      button.disabled=!own.alive||!!t||own.gold<matchTowerCost||mode!=='play';
     }
   }
   audio.setPaused(mode === 'paused');
-  $('clock').textContent = time(state.tick); $('gold').textContent = seat ? state.seats[seat].gold : '—';
+  $('clock').textContent = time(state.tick); $('gold').textContent = seat ? amount(state.seats[seat].gold) : '—';
   for (const s of L.SEATS) { const v = state.seats[s.id], e = $('core-' + s.id); e.classList.toggle('down', !v.alive); e.querySelector('i').style.width = `${v.hp / CORE_MAX * 100}%`; e.querySelector('span').textContent = `${relName(s.id)} ${Math.ceil(v.hp)}`; }
   for (const b of $('shop').querySelectorAll('button')) { b.classList.toggle('on', state.seats[seat].pad === +b.dataset.pad); b.disabled = !state.seats[seat].alive || mode === 'end'; }
   $('pause').textContent = mode === 'paused' ? '繼續' : '暫停'; $('pause').disabled = mode === 'end' || mode === 'menu';
@@ -666,15 +693,22 @@ $('view').onclick = () => { nextView(); canvas.focus(); };
 $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(); };
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
-const liveEconomy = S.economyFor(MATCH_VERSION), battlecruiserPad = MATCH_PADS.find(p => p.kind === 'battlecruiser');
-$('rules').innerHTML = [`起始 ${liveEconomy.startGold} 金、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${liveEconomy.income} 金、陸戰隊 ${liveEconomy.costs.marine} 金；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈式戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈式戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `版本 8：戰鬥巡洋艦每次花 ${battlecruiserPad.cost} 金部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。',...(SPECIAL_LAB?['特殊信標（未開放）：各席主城順時鐘側有「全場清除」與「控制單位」。兩招都未定價，不能購買或發動。']:[])].map(t => `<li>${t}</li>`).join('');
+const battlecruiserPad = MATCH_PADS.find(p => p.kind === 'battlecruiser');
+$('rules').innerHTML = [`起始 ${price(liveEconomy.startGold)}、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${MINERALS?'+':''}${price(liveEconomy.income)}、陸戰隊 ${price(MATCH_PADS.find(p=>p.kind==='marine').cost)}；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈式戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈式戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `${MINERALS?'':'版本 8：'}戰鬥巡洋艦每次花 ${price(battlecruiserPad.cost)}部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。',...(ACTIVE_SPECIAL?[`特殊信標需手動確認：敵對兵清除 ${price(SPECIAL_POWER_COSTS.clear)}，敵對兵控制 ${price(SPECIAL_POWER_COSTS.control)}。只選中央與道路上的敵方部隊，控制為主路長度的 70%。`]:SPECIAL_LAB?['特殊信標（未開放）：各席主城順時鐘側有「全場清除」與「控制單位」。兩招都未定價，不能購買或發動。']:[])].map(t => `<li>${t}</li>`).join('');
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: MATCH_DIM }));
-  if (SPECIAL_LAB) scene.add(buildSpecialZones(MATCH_DIM));
+  if (SPECIAL_LAB) scene.add(buildSpecialZones(MATCH_DIM,{powers:specialDeckPowers}));
   if (DEFENSE_LAB) {
     towers=towerModels(MATCH_DIM);scene.add(towers.root);
-    const b=$('tower-buy');b.title=`單席一座，拆毀後不能重買。試驗價 ${TOWER.cost} 金。`;
+    const b=$('tower-buy');b.title=`單席一座，拆毀後不能重買。試驗價 ${price(matchTowerCost)}。`;
     b.onclick=()=>{command({type:'tower'});canvas.focus();};
+    if(ACTIVE_SPECIAL)specialPowerUi=createSpecialPowerUi({
+      towerButton:b,costs:SPECIAL_POWER_COSTS,zone:power=>({...specialPowerZone(power,MATCH_DIM),coreDistance:MATCH_DIM.coreDistance,corePlatformRadius:MATCH_DIM.corePlatformRadius}),
+      context:()=>{const own=state?.seats[seat];return {seat,mode,alive:!!own?.alive,gold:own?.gold??0};},
+      targets:power=>state&&seat?specialPowerTargets(state,seat,power,MATCH_DIM).length:0,
+      cast:power=>command({type:'special',power}),release:()=>releaseInput(false),
+      scale:()=>portraitOverviewScale(canvas.clientWidth,canvas.clientHeight),
+    });
   }
   buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;

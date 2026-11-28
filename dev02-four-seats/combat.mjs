@@ -9,6 +9,7 @@ import { deliveryFor, placeFixedShot, advanceFixedShot, placeSeekingShot, advanc
 import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
 import { DEFENSE_VERSION, TOWER, hitTower, fireTowers } from './defense-tower.mjs';
+import { SPECIAL_POWER_VERSION } from './special-powers.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
 const DRAGOON_EDGE_RANGE_FROM = 13;
@@ -38,6 +39,7 @@ function splash(units, center, h, spec, killer, plateOf) {
 
 export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) {
   const units = state.units, alive = new Map(units.map(u => [u.id, u])), frame = framesAt(state.tick), frames = frame - framesAt(state.tick - 1), experimental = state.version >= 9, faithful = state.version >= 10;
+  const ownershipChanges = state.version >= SPECIAL_POWER_VERSION;
   const plateOf = state.version >= 7 ? u => PLATE[u.kind] : () => 0; // 基礎護甲自版本 7 起生效
   for (const u of units) {
     const max = KINDS[u.kind].shield;
@@ -170,6 +172,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       const sideOptions=u.kind==='scout'&&vsAir ? [-1,1] : [0], pair=state.shotSerial+1;
       for(const side of sideOptions){
         const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,prev:null,...(vsAir?{w:1}:{}),...(side?{salvo:pair,side,hits:1}:{})};
+        if (ownershipChanges && delivery.mode === 'bounce') shot.launchTick = state.tick;
         placeSeekingShot(shot,delivery,u,x,z,radius,side);
         emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,...(side?{salvo:pair,secondary:side===1}:{})},true);
         if(advanceSeekingShot(shot,delivery,frames)) arrived.push(shot);
@@ -178,6 +181,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     } else if(delivery?.mode==='effect'||delivery?.mode==='suicide'){
       const [ix,iz]=delivery.mode==='suicide' ? [u.x,u.z] : p.core?[x,z]:targetPoint(u,p.hit);
       const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,effect:delivery.mode,x:ix,z:iz,due:frame+delivery.delay};
+      if (ownershipChanges && delivery.mode === 'effect') shot.launchTick = state.tick;
       state.shots.push(shot);
       if(delivery.mode==='suicide'){u.hp=0;u.boom=1;}
       emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,effect:shot.effect,x:ix,z:iz,target:shot.target},true);
@@ -214,6 +218,9 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       // uses geometry, not a mandatory full hit on the original target.
       for(const t of units){
         if(t.hp<=0||t.seat===h.seat||!canTarget(spec,KINDS[t.kind].air))continue;
+        // Collateral rules are unchanged except for newly friendly converts
+        // since this shockwave was released.
+        if (ownershipChanges && t.team === h.team && t.controlledAt > h.launchTick) continue;
         const ring=shockwaveRing(t,h.x,h.z);
         if(ring<0)continue;
         const body={hp:t.hp,sh:t.sh,armor:armorOf(t)};
@@ -223,7 +230,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       }
     } else {
       const t = alive.get(h.target);
-      if (t && t.hp > 0) {
+      if (t && t.hp > 0 && (!ownershipChanges || t.team !== h.team)) {
         const body = { hp: t.hp, sh: t.sh, armor: armorOf(t) };
         dealt = applyDamage(body, spec.damage, spec.attack, divisor, plateOf(t));
         for (let k = 1; k < (h.hits ?? spec.hits ?? 1); k++) { const d2 = applyDamage(body, spec.damage, spec.attack, divisor, plateOf(t)); dealt = { shield: dealt.shield + d2.shield, body: dealt.body + d2.body }; } // 斥候對空一次兩發，各自套盾與護甲
@@ -238,6 +245,10 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   for (const s of arrived) {
     const spec = KINDS[s.kind], owner = alive.get(s.from);
     if (s.hop >= spec.bounces || !owner || owner.hp <= 0) continue;
+    // A shot keeps its launch-side ownership. No continuation if its source
+    // switched sides or the contact has become a friendly fizzle.
+    if (ownershipChanges && (owner.seat !== s.seat || owner.controlledAt > s.launchTick ||
+      (!s.core && alive.get(s.target)?.team === s.team))) continue;
     const here = s.core || s.target;
     let next = null, best = Infinity;
     if(s.seekingFlight==='bounce'){

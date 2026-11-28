@@ -1,0 +1,21 @@
+// Browser integration exercises first close, then verify dispatch-only-on-confirm.
+import assert from 'node:assert/strict';
+import { SPECIAL_POWER_LABELS, formatMinerals, powerAvailability, powerResult } from './special-power-ui.js';
+const live={seat:'N',mode:'play',alive:true,gold:960};
+assert.deepEqual(Object.values(SPECIAL_POWER_LABELS),['敵對兵清除','敵對兵控制']);
+assert.equal(formatMinerals(1400),'1,400');
+assert.match(powerAvailability({...live,seat:null},4500,9).text,/觀戰/);
+assert.match(powerAvailability({...live,alive:false},4500,9).text,/失守/);
+assert.match(powerAvailability({...live,mode:'paused'},4500,9).text,/暫停/);
+const empty=powerAvailability(live,4500,0);
+assert.equal(empty.allowed,false);
+assert.match(empty.text,/沒有敵對兵.*3,540 礦/);
+assert.equal(powerAvailability({...live,gold:4499},4500,1).allowed,false);
+assert.equal(powerAvailability({...live,gold:4500},4500,1).allowed,true);
+assert.equal(powerAvailability({...live,gold:6000},6000,0).allowed,false);
+assert.equal(powerAvailability({...live,gold:6000},6000,2).allowed,true);
+assert.match(powerResult({power:'clear',status:'empty',cost:4500,count:0}),/沒有敵對兵，未扣礦/);
+assert.match(powerResult({power:'control',status:'insufficient',cost:6000,count:0}),/6,000 礦，未扣礦/);
+assert.match(powerResult({power:'control',status:'applied',cost:6000,count:2}),/接管 2 名/);
+assert.match(powerResult({power:'clear',status:'applied',cost:4500,count:2}),/移除 2 名/);
+console.log('Special-power UI messages: resource, scope availability, spectators and result states.');

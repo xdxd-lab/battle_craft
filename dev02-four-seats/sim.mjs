@@ -9,6 +9,7 @@ import { createGroundOccupancy } from './ground-occupancy.mjs';
 
 import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, buyTower } from './defense-tower.mjs';
 import { chooseDefense, hasDefenseThreat } from './bot-defense.mjs';
+import { SPECIAL_POWER_VERSION, PLAYABLE_JUNCTION_RADIUS, scaleCoins, applySpecialPower } from './special-powers.mjs';
 
 export const HZ = 30;
 export const VERSION = 10; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈式戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3；9：佔位、空軍慢慢散開、起手；10：九兵種發射和命中（舊版保留供重播）
@@ -20,7 +21,7 @@ export const RULES = {
   aggro: 5,           // 平面距離內主動接敵
   spacing: .95,       // 部隊間距
   overtimeAt: 30 * 60 * 8, overtimeEvery: 60, // 8 分鐘起所有核心每 2 秒過載扣 1，保證終局
-  coreRadius: 4.6, spawnRadial: ARENA.spawnRadial, laneHalf: 3.6, junction: 8.2, platform: ARENA.platformWalkRadius,
+  coreRadius: 4.6, spawnRadial: ARENA.spawnRadial, laneHalf: 3.6, junction: PLAYABLE_JUNCTION_RADIUS, platform: ARENA.platformWalkRadius,
 };
 // 信標位置以北席本地座標相對購買區中心
 const place = (pads, positions = ARENA.shopPadPositions) => pads.map((pad, i) => {
@@ -38,7 +39,15 @@ export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.inco
 const ECONOMY_V7 = { ...ECONOMY, income: 3 }; // 版本 7：每次發放金額×3（間隔、起始金幣不變）
 // 版本 8 以舊版 15 步 × 5/4 = 18.75 步為週期，不把每次間隔單獨取整。
 const ECONOMY_V8 = { ...ECONOMY_V7, income: ECONOMY_V7.income * 1.5, incomeEvery: ECONOMY_V7.incomeEvery * 1.25 };
-export const economyFor = version => version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+// v16 redenominates the ongoing economy; payout cadence and purchase cooldown stay intact.
+const ECONOMY_V16 = {
+  ...ECONOMY_V8,
+  startGold: scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.startGold),
+  income: scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.income),
+  costs: Object.fromEntries(rosterFor(SPECIAL_POWER_VERSION).map(kind =>
+    [kind, scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.costs[kind] ?? KINDS[kind].cost)])),
+};
+export const economyFor = version => version >= SPECIAL_POWER_VERSION ? ECONOMY_V16 : version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
 export const padRadiusFor = version => version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
 const LEGACY_WRAITH = '死靈戰機'; // 保留 v1–9 歷史重播的事件字串
 const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: version >= 8 && kind === 'battlecruiser' ? 3 : KINDS[kind].count, label: kind === 'wraith' && version < 10 ? LEGACY_WRAITH : KINDS[kind].name });
@@ -50,7 +59,8 @@ const rosterPads = version => version >= 7 ? place(rosterFor(version).map(kind =
   : version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
   : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
 const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7), PADS_V8 = rosterPads(8), PADS_V10 = rosterPads(10);
-export const padsFor = version => version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const PADS_V16 = rosterPads(SPECIAL_POWER_VERSION);
+export const padsFor = version => version >= SPECIAL_POWER_VERSION ? PADS_V16 : version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 8 ? CORE.hp * 3 : version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
@@ -75,6 +85,7 @@ GEOMETRY[VISIBILITY_VERSION] = {...GEOMETRY[10],dim:{...GEOMETRY[10].dim,visible
 GEOMETRY[DEFENSE_TUNING_VERSION] = {...GEOMETRY[VISIBILITY_VERSION],dim:{...GEOMETRY[VISIBILITY_VERSION].dim,dragoonClearanceScale:1.2}};
 GEOMETRY[DRAGOON_TRACK_RANGE_FROM] = GEOMETRY[DEFENSE_TUNING_VERSION]; // 保留 v13 佔位，重騎兵加入短暫的瞄準保持
 GEOMETRY[DRAGOON_RANGE_TRIAL_FROM] = GEOMETRY[DRAGOON_TRACK_RANGE_FROM]; // 只試射程，移動佔位不變
+GEOMETRY[SPECIAL_POWER_VERSION] = GEOMETRY[DRAGOON_RANGE_TRIAL_FROM];
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -362,7 +373,11 @@ export function step(state, commands = []) {
     ? Math.floor(state.tick / econ.incomeEvery) > Math.floor((state.tick - 1) / econ.incomeEvery)
     : state.tick % econ.incomeEvery === 0;
   if (pays) for (const s of live) s.gold += econ.income ?? 1;
-  if(state.version>=DEFENSE_VERSION)for(const c of commands)if(c?.type==='tower')buyTower(state,state.seats[c.seat],dim,emit);
+  if (state.version >= DEFENSE_VERSION) for (const c of commands) {
+    if (c?.type === 'tower') buyTower(state,state.seats[c.seat],dim,emit);
+    else if (state.version >= SPECIAL_POWER_VERSION && c?.type === 'special')
+      applySpecialPower(state,c.seat,c.power,dim,targetOf,emit);
+  }
   for (const s of live) checkBeacon(state, s, emit, dim);
   if (state.version >= 3) stepCores(state, stepRoster(state, emit, dim, { RULES, waypoint, clampWalk }), emit);
   else stepUnits(state, emit, dim);

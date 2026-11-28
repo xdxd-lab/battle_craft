@@ -1,4 +1,4 @@
-// Four inactive special-beacon display areas. No simulation/action binding.
+// Four special-beacon display areas. Interactions are separate, and always require confirmation.
 import * as THREE from 'three';
 import { SEATS } from '../dev05-layout/layout.mjs';
 import { FONT, label } from '../dev05-layout/world.js';
@@ -8,9 +8,9 @@ const solid = (color, roughness=.8) => new THREE.MeshStandardMaterial({ color, r
 const flat = color => new THREE.MeshBasicMaterial({ color, toneMapped:false });
 const noPick = () => {}; // The visual object itself never becomes a command target.
 
-export function buildSpecialZones(dim) {
+export function buildSpecialZones(dim,{powers=null}={}) {
   const root = new THREE.Group();
-  root.name = 'special-zones:preview';
+  root.name = powers?'special-zones:active':'special-zones:preview';
   root.userData.visualOnly = true;
   const mats = {
     base: solid(0x252b34), deck: solid(0x57606a), well: solid(0x202933),
@@ -29,13 +29,15 @@ export function buildSpecialZones(dim) {
   // The muted border and separate unlit deck distinguish reservations from purchasable pads.
   const board = label(620,204,(g,w,h)=>{
     g.fillStyle='rgba(9,15,21,.96)';g.beginPath();g.roundRect(4,4,w-8,h-8,22);g.fill();
-    g.lineWidth=5;g.strokeStyle='#807760';g.stroke();
-    g.fillStyle='#c9b997';g.font=`750 33px ${FONT}`;g.fillText('特別信標｜未開放',w/2,39);
+    g.lineWidth=5;g.strokeStyle=powers?'#9cbac8':'#807760';g.stroke();
+    g.fillStyle='#c9b997';g.font=`750 33px ${FONT}`;g.fillText(powers?'特殊信標':'特別信標｜未開放',w/2,39);
     g.fillStyle='#48515b';g.fillRect(26,63,w-52,2);
     for (const [i,b] of SPECIAL_BEACONS.entries()) {
       const x=i ? w*.75 : w*.25;
-      g.fillStyle=b.color;g.font=`850 49px ${FONT}`;g.fillText(b.label,x,146);
-      g.font=`800 31px ${FONT}`;g.fillText(`0${b.number}`,x,96);
+      const power=powers?.[b.id];
+      g.fillStyle=b.color;g.font=`850 ${power?43:49}px ${FONT}`;g.fillText(power?.label??b.label,x,power?104:146);
+      g.font=`800 ${power?38:31}px ${FONT}`;
+      g.fillText(power?power.price:`0${b.number}`,x,power?158:96);
     }
     g.fillStyle='#48515b';g.fillRect(w/2-1,77,2,95);
   });
@@ -76,7 +78,7 @@ export function buildSpecialZones(dim) {
     }
     const caption=board.clone();caption.name=`special-zone-label:${s.id}`;
     caption.position.set(0,Z.signY,Z.signR);caption.scale.set(Z.signW,Z.signH,1);
-    caption.userData = { visualOnly:true, label:'特別信標（未開放）：全場清除、控制單位' };
+    caption.userData = { visualOnly:true, label:powers?SPECIAL_BEACONS.map(b=>`${powers[b.id].label} ${powers[b.id].price}`).join('、'):'特別信標（未開放）：全場清除、控制單位' };
     caption.raycast=noPick;g.add(caption);
   }
   return root;

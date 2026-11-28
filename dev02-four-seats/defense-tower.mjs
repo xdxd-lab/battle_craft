@@ -1,11 +1,14 @@
 // v11 defense lab. This is the Web prototype, not the original CHK's stats.
 import { ccw, corePos, seatById } from '../dev05-layout/layout.mjs';
 import { KINDS, PLATE, applyDamage } from './roster.mjs';
+import { scaleCoins } from './special-powers.mjs';
 
 export const DEFENSE_VERSION = 11;
 export const VISIBILITY_VERSION = 12;
 export const DEFENSE_TUNING_VERSION = 13;
 export const TOWER = Object.freeze({ cost: 70, hp: 180, range: 3.2, hitRadius: .50, damage: 55, period: 34, plate: 1 });
+
+export const towerCost = version => scaleCoins(version, TOWER.cost);
 
 export function towerPosition(id, dim) {
   const [cx,cz] = corePos(id,dim), [dx,dz] = seatById(id).dir, [sx,sz]=ccw([dx,dz]);
@@ -14,12 +17,13 @@ export function towerPosition(id, dim) {
 }
 
 export function buyTower(state, seat, dim, emit) {
-  if (state.version < DEFENSE_VERSION || !seat?.alive || seat.tower || seat.gold < TOWER.cost) return false;
+  const cost = towerCost(state.version);
+  if (state.version < DEFENSE_VERSION || !seat?.alive || seat.tower || seat.gold < cost) return false;
   const [x,z]=towerPosition(seat.id,dim);
-  seat.gold-=TOWER.cost;seat.spent+=TOWER.cost;
+  seat.gold-=cost;seat.spent+=cost;
   // Keep the wreck (hp=0) on the seat so a destroyed turret cannot be re-purchased.
   seat.tower={x,z,hp:TOWER.hp,next:state.tick};
-  emit('tower-build',seat.id,{x,z,hp:TOWER.hp,cost:TOWER.cost});
+  emit('tower-build',seat.id,{x,z,hp:TOWER.hp,cost});
   return true;
 }
 
