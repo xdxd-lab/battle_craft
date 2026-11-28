@@ -9,11 +9,13 @@ import { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
 export { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
 
-import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, buyTower } from './defense-tower.mjs';
+import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER_VARIANTS_VERSION, buyTower } from './defense-tower.mjs';
 import { chooseDefense, hasDefenseThreat } from './bot-defense.mjs';
 import { SPECIAL_POWER_VERSION, PLAYABLE_JUNCTION_RADIUS, scaleCoins, applySpecialPower } from './special-powers.mjs';
+import { shopRetreatPath } from './shop-retreat.mjs';
 
 export const HZ = 30;
+export const FIELD_CONTROLS_VERSION = 18;
 export const VERSION = 10; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈式戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3；9：佔位、空軍慢慢散開、起手；10：九兵種發射和命中（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
@@ -89,6 +91,7 @@ GEOMETRY[DRAGOON_TRACK_RANGE_FROM] = GEOMETRY[DEFENSE_TUNING_VERSION]; // 保留
 GEOMETRY[DRAGOON_RANGE_TRIAL_FROM] = GEOMETRY[DRAGOON_TRACK_RANGE_FROM]; // 只試射程，移動佔位不變
 GEOMETRY[SPECIAL_POWER_VERSION] = GEOMETRY[DRAGOON_RANGE_TRIAL_FROM];
 GEOMETRY[UNIFIED_ATTACK_RANGE_FROM] = GEOMETRY[SPECIAL_POWER_VERSION]; // Geometry of the map and movement stays v16.
+GEOMETRY[FIELD_CONTROLS_VERSION] = GEOMETRY[UNIFIED_ATTACK_RANGE_FROM];
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -118,8 +121,10 @@ export function createSim({ seed = 1, bots = SEAT_IDS, version = VERSION } = {})
   for (const s of L.SEATS) {
     const home = homeFor(version), [x, z] = toWorld(s.id, home.x, home.z, dim);
     state.seats[s.id] = { id: s.id, team: s.team, alive: true, gold: economyFor(version).startGold, hp: coreMax(version), commander: { x, z, dx: 0, dz: 0 }, goal: null, dir: null, pad: -1, nextBuy: 0, waiting: false, buys: 0, spent: 0, deployed: 0, lost: 0, kills: 0 };
+    if (version >= FIELD_CONTROLS_VERSION) Object.assign(state.seats[s.id],{shopChoice:null,shopPath:null});
   }
   if (version >= 3) Object.assign(state, { shots: [], shotSerial: 0 });
+  if (version >= TOWER_VARIANTS_VERSION) state.towerShots = [];
   SEAT_IDS.forEach((id, i) => { if (bots.includes(id)) state.bots[id] = { rng: mix(state.seed, i), pad: -1, until: 0, left: 0, seen: 0 }; });
   return state;
 }
@@ -129,8 +134,27 @@ export function createSim({ seed = 1, bots = SEAT_IDS, version = VERSION } = {})
 function apply(state, c, geometry) {
   const s = state.seats[c?.seat];
   if (!s || !s.alive) return;
-  if (c.type === 'stop') { s.goal = s.dir = null; return; }
+  if (state.version >= FIELD_CONTROLS_VERSION && c.type === 'shop') {
+    if (state.bots[s.id] || !Number.isInteger(c.index) || !padsFor(state.version)[c.index]?.kind) return;
+    const {dim} = geometry;
+    const active = s.shopChoice ?? s.pad;
+    if (active === c.index) {
+      s.shopChoice = -1;
+      const path=shopRetreatPath(toLocal(s.id,s.commander.x,s.commander.z,dim),dim.shopPadPositions,padRadiusFor(state.version))
+        .map(([a,b])=>{const [x,z]=toWorld(s.id,a,b,dim);return {x,z};});
+      s.goal=path.shift();s.shopPath=path.length?path:null;
+    } else {
+      s.shopChoice = c.index;
+      s.shopPath=null;
+      const [x,z] = padWorld(s.id,c.index,dim);
+      s.goal = {x,z};
+    }
+    s.dir = null;
+    return;
+  }
+  if (c.type === 'stop') { s.goal = s.dir = null; if(state.version >= FIELD_CONTROLS_VERSION)s.shopPath=null; return; }
   if (!Number.isFinite(c.x) || !Number.isFinite(c.z)) return;
+  if(state.version >= FIELD_CONTROLS_VERSION && (c.type==='goal' || (c.type==='dir' && (c.x || c.z)))) s.shopChoice=s.shopPath=null;
   if (c.type === 'goal') { const [x, z] = clampShop(s.id, c.x, c.z, geometry); s.goal = { x, z }; s.dir = null; }
   if (c.type === 'dir') { const n = dist(c.x, c.z, 0, 0); s.dir = n ? { x: c.x / n, z: c.z / n } : null; if (n) s.goal = null; } // 放開方向鍵不取消點擊目標
 }
@@ -236,7 +260,10 @@ function padAt(s, PADS, dim, r) {
   return -1;
 }
 function checkBeacon(state, s, emit, dim) {
-  const PADS = padsFor(state.version), i = padAt(s, PADS, dim, padRadiusFor(state.version));
+  const PADS = padsFor(state.version);
+  // Cancel takes effect before the commander moves. Even if the straight path
+  // touches a neighbouring beacon, a retreat is never a purchase order.
+  const i = s.shopChoice === -1 ? -1 : padAt(s, PADS, dim, padRadiusFor(state.version));
   if (i !== s.pad) {
     if (s.pad >= 0) emit('leave', s.id, { label: PADS[s.pad].label });
     s.pad = i; s.nextBuy = state.tick; s.waiting = false;
@@ -255,7 +282,14 @@ function checkBeacon(state, s, emit, dim) {
 function moveCommander(s, geometry) {
   const c = s.commander; let dx = 0, dz = 0, len = 1, step = RULES.commanderSpeed;
   if (s.dir) { dx = s.dir.x; dz = s.dir.z; }
-  else if (s.goal) { dx = s.goal.x - c.x; dz = s.goal.z - c.z; len = dist(dx, dz, 0, 0); if (len <= step) { c.x = s.goal.x; c.z = s.goal.z; s.goal = null; return; } }
+  else if (s.goal) {
+    dx = s.goal.x - c.x; dz = s.goal.z - c.z; len = dist(dx, dz, 0, 0);
+    if (len <= step) {
+      c.x=s.goal.x;c.z=s.goal.z;s.goal=s.shopPath?.shift()??null;
+      if(s.shopPath?.length===0)s.shopPath=null;
+      return;
+    }
+  }
   else return;
   [c.x, c.z] = clampShop(s.id, c.x + dx / len * step, c.z + dz / len * step, geometry);
   c.dx = dx / len; c.dz = dz / len;
@@ -377,7 +411,7 @@ export function step(state, commands = []) {
     : state.tick % econ.incomeEvery === 0;
   if (pays) for (const s of live) s.gold += econ.income ?? 1;
   if (state.version >= DEFENSE_VERSION) for (const c of commands) {
-    if (c?.type === 'tower') buyTower(state,state.seats[c.seat],dim,emit);
+    if (c?.type === 'tower') buyTower(state,state.seats[c.seat],dim,emit,c.kind);
     else if (state.version >= SPECIAL_POWER_VERSION && c?.type === 'special')
       applySpecialPower(state,c.seat,c.power,dim,targetOf,emit);
   }
@@ -393,7 +427,7 @@ export function digest(value) {
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
   return (h >>> 0).toString(16).padStart(8, '0');
 }
-// 依紀錄重跑：record = { seed, bots, commands: [{ tick, seat, type, x, z }], ticks? }
+// 依紀錄重跑：record = { seed, bots, commands: [{ tick, seat, type, ...payload }], ticks? }
 export function replay(record, maxTicks = 30 * 60 * 30) {
   const state = createSim(record), log = [], marks = []; let i = 0;
   const limit = record.ticks ?? maxTicks;

@@ -3,12 +3,13 @@ import * as L from '../dev05-layout/layout.mjs';
 import { motionDisplacement, WORLD_PER_PX } from './motion.mjs';
 import { attackReady, noteAttackFired } from './combat-phases.mjs';
 import { airPair, airDisperse, clampAir } from './air-spacing.mjs';
+import { hasAirShortcut, approachAirCore } from './air-reroute.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
 import { deliveryFor, placeFixedShot, advanceFixedShot, placeSeekingShot, advanceSeekingShot,
   firstBounceTarget, unitGap, shockwaveRing, SCOURGE_CONTACT, targetPoint } from './weapon-delivery.mjs';
 import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
-import { DEFENSE_VERSION, TOWER, hitTower, fireTowers } from './defense-tower.mjs';
+import { DEFENSE_VERSION, TOWER_VARIANTS_VERSION, TOWER, towerWeaponBox, regenerateTowerShields, hitTower, fireTowers } from './defense-tower.mjs';
 import { SPECIAL_POWER_VERSION } from './special-powers.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -36,16 +37,20 @@ function splash(units, center, h, spec, killer, plateOf) {
 export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) {
   const units = state.units, alive = new Map(units.map(u => [u.id, u])), frame = framesAt(state.tick), frames = frame - framesAt(state.tick - 1), experimental = state.version >= 9, faithful = state.version >= 10;
   const ownershipChanges = state.version >= SPECIAL_POWER_VERSION;
+  const variantTowers=state.version>=TOWER_VARIANTS_VERSION;
   const plateOf = state.version >= 7 ? u => PLATE[u.kind] : () => 0; // 基礎護甲自版本 7 起生效
   for (const u of units) {
     const max = KINDS[u.kind].shield;
     if (u.sh < max) u.sh = Math.min(max, u.sh + SHIELD_REGEN * frames / 256);
     u.cd = Math.max(0, u.cd - frames);
   }
+  if(variantTowers)regenerateTowerShields(state,frames);
   // Unit positions do not move between intent, wind-up and release. Build one
   // box per live entity rather than quantizing / allocating per target pair.
   const unified = state.version >= UNIFIED_ATTACK_RANGE_FROM;
   const boxes = unified ? new Map(units.map(u=>[u.id,weaponBoxPx(u.kind,u.x,u.z)])) : null;
+  const towerBoxes=variantTowers?Object.fromEntries(Object.values(state.seats)
+    .filter(s=>s.alive&&s.tower?.hp>0).map(s=>[s.id,towerWeaponBox(s.tower)])):null;
   const aggroPx = unified ? rangeInPixels(R.aggro) : 0;
   // 第一階段：全部依同一份位置決定目標與移動
   const plan = units.map(u => {
@@ -109,9 +114,24 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     else if (!p.hit && p.dragoonHold===undefined && u.target) {
       const [cx, cz] = L.corePos(u.target, dim);
       const tower=state.version>=DEFENSE_VERSION?state.seats[u.target]?.tower:null;
+      const airShortcut=hasAirShortcut(state,u);
       // Mobile enemies still take priority. In its firing envelope the turret is a
       // separate target, not a pool of extra core health or a global damage shield.
-      if(tower?.hp>0&&canTarget(spec,false)&&dist(u.x,u.z,tower.x,tower.z)<=groundRange+TOWER.hitRadius) {p.core=u.target;p.tower=true;}
+      const towerRangePx=variantTowers&&tower?.hp>0?rangeInPixels(groundRange):0;
+      if(tower?.hp>0&&canTarget(spec,false)&&(variantTowers
+        ? towerBoxes[u.target]&&weaponGapPx(boxes.get(u.id),towerBoxes[u.target])<=towerRangePx
+        : dist(u.x,u.z,tower.x,tower.z)<=groundRange+TOWER.hitRadius)){
+        p.core=u.target;p.tower=true;
+        if(variantTowers)p.towerId=tower.id;
+        // Dispersion must not take a firing aircraft out of the same real
+        // rectangle-based range used to acquire the tower.
+        if(airShortcut){
+          const box=towerBoxes[u.target];
+          p.airStructureRange={allows:(x,z)=>weaponGapPx(weaponBoxPx(u.kind,x,z),box)<=towerRangePx};
+        }
+      }
+      // A mobile engagement above this fallback pauses the route.
+      else if(airShortcut)approachAirCore(p,u,cx,cz,dim.platformWalkRadius,R.coreRadius,groundRange);
       else if (dist(u.x, u.z, cx, cz) <= R.coreRadius + groundRange) { if (canTarget(spec, false)) p.core = u.target; } // 只打空中者（自殺蟲）到核心旁待命
       else { const [wx, wz] = waypoint(u, dim); p.mx = wx - u.x; p.mz = wz - u.z; }
     }
@@ -157,7 +177,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     const tower=p.tower?state.seats[p.core].tower:null;
     const [x, z] = tower ? [tower.x,tower.z] : p.core ? L.corePos(p.core, dim) : [p.hit.x, p.hit.z];
     const radius=p.tower?TOWER.hitRadius:p.core?R.coreRadius:0;
-    const mark=p.tower?{tower:true}:{};
+    const mark=p.tower?{tower:true,...(variantTowers?{towerId:p.towerId}:{})}:{};
     const delivery = deliveryFor(state.version,u.kind,!p.core && KINDS[p.hit.kind].air);
     if (experimental) {
       p.attackAngle = Math.atan2(z-u.z,x-u.x);
@@ -216,7 +236,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     const spec = weaponOf(h.kind, !!h.w), divisor = 3 ** h.hop;
     let dealt = null;
     if (h.tower) {
-      dealt=hitTower(state,h.core,spec.damage,spec.attack,divisor,emit);
+      dealt=hitTower(state,h.core,spec.damage,spec.attack,divisor,emit,h.towerId);
     } else if (h.core) {
       if (state.seats[h.core].alive) { const body = { hp: 0, sh: 0, armor: CORE.armor }; dealt = applyDamage(body, spec.damage, spec.attack, divisor); coreDamage[h.core] = (coreDamage[h.core] || 0) + dealt.body; }
     } else if(h.effect==='effect'){
@@ -272,9 +292,9 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       const [cx, cz] = L.corePos(c.id, dim), d = dist(s.x, s.z, cx, cz) - R.coreRadius;
       if (d <= BOUNCE_RADIUS && d < best) { best = d; next = { target: 0, core: c.id, tx: cx, tz: cz }; }
     }
-    if (next) { const {tower, ...shot}=s; state.shots.push({ ...shot, ...next, id: s.seekingFlight ? s.id : ++state.shotSerial, hop: s.hop + 1, prev: here }); }
+    if (next) { const {tower, towerId, ...shot}=s; state.shots.push({ ...shot, ...next, id: s.seekingFlight ? s.id : ++state.shotSerial, hop: s.hop + 1, prev: here }); }
   }
-  if(state.version>=DEFENSE_VERSION)fireTowers(state,units,killer,emit);
+  if(state.version>=DEFENSE_VERSION)fireTowers(state,units,killer,emit,boxes,frame,frames);
   // 第六階段：移動一起套用，移除陣亡者
   const groundIntents = [];
   units.forEach((u, i) => {
@@ -287,7 +307,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     } else if (n > 0) { const k = Math.min(R.unitSpeed, n) / n; x += p.mx * k; z += p.mz * k; u.dx = p.mx / n; u.dz = p.mz / n; }
     else if (p.hit) { const d = dist(p.hit.x, p.hit.z, u.x, u.z) || 1; u.dx = (p.hit.x - u.x) / d; u.dz = (p.hit.z - u.z) / d; }
     if (experimental && KINDS[u.kind].air) {
-      const [fx,fz] = airDisperse(u,p,frames,frame);
+      const [fx,fz] = airDisperse(u,p,frames,frame,x,z);
       x += fx; z += fz; p.to = clampAir(x,z,dim);
     } else if (experimental) {
       p.to = [u.x,u.z];

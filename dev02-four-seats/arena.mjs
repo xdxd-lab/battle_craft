@@ -32,7 +32,7 @@ export function fitArenaCamera(angles, aspect) {
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-export function fitNearCamera(angles, aspect, seat) {
+export function fitNearCamera(angles, aspect, seat, {includeCore=false}={}) {
   const reference = L.fitAngles(angles, aspect);
   const { forward, up, right } = reference;
   const distance = reference.distance / CAMERA_SCALE;
@@ -40,6 +40,16 @@ export function fitNearCamera(angles, aspect, seat) {
   const points = [[0, 0, 0]];
   if (seat) {
     for (const [x, z] of L.shopCorners(seat, ARENA_V8)) points.push([x, 0, z], [x, 4.8, z]);
+    // The button dock removes the old deck's bounding box. v18 instead keeps
+    // the real own core (and its mineral readout) in the available near view.
+    if(includeCore){
+      const [cx,cz]=corePos(seat), r=ARENA_V8.corePlatformRadius+1.1;
+      for(let i=0;i<8;i++){
+        const a=i*Math.PI/4;
+        points.push([cx+Math.cos(a)*r,0,cz+Math.sin(a)*r],
+          [cx+Math.cos(a)*3.1,7.6,cz+Math.sin(a)*3.1]);
+      }
+    }
   }
   // Keep the camera direction and scale fixed. Pan only as far as the
   // player's platform needs to stay in the part of the view clear of HUD.

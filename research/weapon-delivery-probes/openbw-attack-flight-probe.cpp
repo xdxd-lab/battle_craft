@@ -14,7 +14,12 @@ int main(int argc,char** argv) {
   auto& f=p.funcs(); const int tx=600+std::stoi(argv[3]);
   for(int i=0;i<12;i++)p.next_frame(); // Before spawning, to avoid phase-0 automatic attacks.
   const UnitTypes source=UnitTypes(std::stoi(argv[1])), target=UnitTypes(std::stoi(argv[2]));
-  auto* u=f.trigger_create_unit(f.get_unit_type(source),{600,704},0);
+  // The flat probe map is not a legal normal build site for all three towers.
+  // Spawn completed fixtures directly; provide a real power field to Cannon.
+  const bool tower=source==UnitTypes(144)||source==UnitTypes(146)||source==UnitTypes(162);
+  if(source==UnitTypes(162)) f.create_completed_unit(f.get_unit_type(UnitTypes(156)),{600,640},0);
+  auto* u=tower?f.create_completed_unit(f.get_unit_type(source),{600,704},0)
+    :f.trigger_create_unit(f.get_unit_type(source),{600,704},0);
   auto* t=f.trigger_create_unit(f.get_unit_type(target),{tx,704},1);
   if(!u||!t)return 3;
   f.set_unit_heading(u,direction_t::from_raw(64));

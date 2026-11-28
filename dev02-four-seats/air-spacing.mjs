@@ -14,7 +14,7 @@ export function airPair(u,o,radius=AIR_SPACING.radius) {
   }
   const q=(1-d/radius)**2/d; return [dx*q,dz*q];
 }
-export function airDisperse(u,p,frames,frame) {
+export function airDisperse(u,p,frames,frame,nextX=u.x,nextZ=u.z) {
   if(!frames) return [0,0];
   const s=u.airDrift??={x:0,z:0};
   const aim=p.hit || p.core;
@@ -26,6 +26,17 @@ export function airDisperse(u,p,frames,frame) {
   let {x,z}=s;
   // Near an already-locked opposing unit, don't let dispersion alone steal the
   // attack position. It can still push tangentially and the foe can move away.
+  if(p.airStructureRange) {
+    // Keep the soft separation visible but never let it alone break firing
+    // range. Unlike the older center clamp on mobile units, don't snap the
+    // body to a ring or cancel the already-integrated momentum.
+    const {x:cx,z:cz,radius,allows}=p.airStructureRange;
+    const allowed=(dx,dz)=>allows?allows(nextX+dx,nextZ+dz):Math.hypot(nextX-cx+dx,nextZ-cz+dz)<=radius;
+    if(allowed(x,z))return [x,z];
+    if(x&&allowed(x,0))return [x,0];
+    if(z&&allowed(0,z))return [0,z];
+    return [0,0];
+  }
   if (p.weaponBoxRange) {
     // v17: a legal edge-to-edge attack position may already be outside the
     // old center-radius circle. Never snap the flyer toward the target.

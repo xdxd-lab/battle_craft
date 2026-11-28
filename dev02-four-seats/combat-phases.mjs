@@ -8,7 +8,7 @@ const WINDUP = {
   archon: { first: 4, repeat: 4, stationary: false },
 };
 
-export const shotTarget = p => p.hit?.id ?? (p.tower ? 'tower:' + p.core : p.core) ?? null;
+export const shotTarget = p => p.hit?.id ?? (p.tower ? 'tower:' + p.core + (p.towerId===undefined?'':':'+p.towerId) : p.core) ?? null;
 const FLYING_WINDUP = { first:1, repeat:1, stationary:false };
 export function attackReady(u, p, frame, hasFrame, version=9) {
   if (p.dragoonHold !== undefined) {

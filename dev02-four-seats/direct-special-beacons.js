@@ -13,7 +13,7 @@ const same=(a,b)=>a.seat===b.seat && a.match===b.match;
 // too close at distance, separate without reordering the original pads.
 export function directBeaconLayout(anchors, bank, frame, scale=1, keepClear=null) {
   if(!anchors?.every(Boolean) || anchors.length!==2)return null;
-  const w=56*scale,h=44*scale,g=4*scale,bw=82*scale,bh=23*scale;
+  const w=56*scale,h=44*scale,g=4*scale;
   const mid=anchors[0].map((v,k)=>(v+anchors[1][k])/2);
   const [dx,dy]=anchors[1].map((v,k)=>v-anchors[0][k]);
   const patterns=[anchors,
@@ -41,11 +41,18 @@ export function directBeaconLayout(anchors, bank, frame, scale=1, keepClear=null
       score=cost;winner={points,boxes};
     }
   }
+  return {buttons:winner?.points??null,balance:coreBalancePlacement(bank,frame,scale,[keepClear,...(winner?.boxes??[])].filter(Boolean))};
+}
+
+// The static field controls also reuse this world-local label without any
+// dependence on retained special-zone models or interactive map elements.
+export function coreBalancePlacement(bank, frame, scale=1, obstacles=[]) {
   let balance=null, bankCost=Infinity;
+  const bw=82*scale,bh=23*scale,g=4*scale;
   if(bank && frame.right-frame.left>=bw && frame.bottom-frame.top>=bh){
     const xs=[0,-bw*.56,bw*.56,-bw,bw].map(x=>x+bank[0]),
       ys=[0,-bh,bh,-2*bh,2*bh].map(y=>y+bank[1]);
-    for(const a of [keepClear,...(winner?.boxes??[])].filter(Boolean)){
+    for(const a of obstacles){
       xs.push(a.left-bw/2-g,a.right+bw/2+g);
       ys.push(a.top-bh/2-g,a.bottom+bh/2+g);
     }
@@ -53,11 +60,11 @@ export function directBeaconLayout(anchors, bank, frame, scale=1, keepClear=null
       const x=clamp(px,frame.left+bw/2,frame.right-bw/2),
         y=clamp(py,frame.top+bh/2,frame.bottom-bh/2);
       const b=bounds(x,y,bw,bh), cost=(x-bank[0])**2+(y-bank[1])**2;
-      if(cost>=bankCost || Math.sqrt(cost)>84*scale || (keepClear&&overlaps(b,keepClear)) || winner?.boxes.some(a=>overlaps(a,b)))continue;
+      if(cost>=bankCost || Math.sqrt(cost)>84*scale || obstacles.some(a=>overlaps(a,b)))continue;
       balance=[x,y];bankCost=cost;
     }
   }
-  return {buttons:winner?.points??null,balance};
+  return balance;
 }
 
 const CSS=`
