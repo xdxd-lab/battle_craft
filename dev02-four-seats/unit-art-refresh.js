@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 import { WING_HINGE } from './unit-models.js';
+import { v64UnitMaterials } from './v64-unit-models.js';
 
 const vec = v => new THREE.Vector3(...v);
 const group = geos => mergeGeometries(geos.map(g => {
@@ -216,7 +217,7 @@ const glowing = (color,intensity=.72) => new THREE.MeshStandardMaterial({
 });
 const solidLight = color => new THREE.MeshBasicMaterial({color,toneMapped:false});
 export function refreshedMaterials(kind,seatPrimary='#2d73cb') {
-  if(!Object.hasOwn(refreshedModels.std,kind))return null;
+  if(!Object.hasOwn(refreshedModels.std,kind))return v64UnitMaterials(kind,seatPrimary);
   const key=`${kind}:${seatPrimary}`;
   if(!materialCache.has(key)){
     const seat=new THREE.Color(seatPrimary);

@@ -1,0 +1,61 @@
+{'Acid_Spore': 46, 'Acid_Spore_Kukulza': 47, 'Halo_Rockets': 103, 'Scarab': 82, 'Scarab_Damage': 35, 'Reaver_Capacity': 36, 'Zerg_Guardian': 44, 'Hero_Warbringer': 81, 'Terran_Valkyrie': 58, 'Protoss_Reaver': 83, 'Protoss_Scarab': 85}
+units.dat {44: {'flingy': 7, 'has_shield': 0, 'shield_points': 100, 'hitpoints': 38400, 'ground_weapon': 46, 'air_weapon': 130, 'target_acquisition_range': 0, 'unit_size': 3, 'armor': 2, 'dimensions': (22, 22, 21, 21), 'mineral_cost': 50, 'build_time': 600}, 56: {'flingy': 7, 'has_shield': 0, 'shield_points': 100, 'hitpoints': 102400, 'ground_weapon': 47, 'air_weapon': 130, 'target_acquisition_range': 0, 'unit_size': 3, 'armor': 4, 'dimensions': (22, 22, 21, 21), 'mineral_cost': 100, 'build_time': 1200}, 58: {'flingy': 190, 'has_shield': 0, 'shield_points': 100, 'hitpoints': 51200, 'ground_weapon': 130, 'air_weapon': 103, 'target_acquisition_range': 0, 'unit_size': 3, 'armor': 2, 'dimensions': (24, 16, 24, 20), 'mineral_cost': 250, 'build_time': 750}, 81: {'flingy': 47, 'has_shield': 1, 'shield_points': 400, 'hitpoints': 51200, 'ground_weapon': 130, 'air_weapon': 130, 'target_acquisition_range': 8, 'unit_size': 3, 'armor': 3, 'dimensions': (16, 16, 15, 15), 'mineral_cost': 400, 'build_time': 1800}, 83: {'flingy': 47, 'has_shield': 1, 'shield_points': 80, 'hitpoints': 25600, 'ground_weapon': 130, 'air_weapon': 130, 'target_acquisition_range': 8, 'unit_size': 3, 'armor': 0, 'dimensions': (16, 16, 15, 15), 'mineral_cost': 200, 'build_time': 1050}, 85: {'flingy': 48, 'has_shield': 1, 'shield_points': 10, 'hitpoints': 5120, 'ground_weapon': 82, 'air_weapon': 130, 'target_acquisition_range': 3, 'unit_size': 1, 'armor': 0, 'dimensions': (2, 2, 2, 2), 'mineral_cost': 15, 'build_time': 105}}
+weapons.dat {103: {'flingy': 202, 'target_flags': 1, 'min_range': 0, 'max_range': 192, 'damage_upgrade': 9, 'damage_type': 1, 'bullet_type': 8, 'lifetime': 255, 'hit_type': 24, 'inner_splash_radius': 5, 'medium_splash_radius': 50, 'outer_splash_radius': 100, 'damage_amount': 6, 'damage_bonus': 1, 'cooldown': 64, 'bullet_count': 2, 'attack_angle': 32, 'bullet_heading_offset': 64, 'forward_offset': 20, 'upward_offset': 0}, 46: {'flingy': 163, 'target_flags': 2, 'min_range': 0, 'max_range': 256, 'damage_upgrade': 12, 'damage_type': 3, 'bullet_type': 1, 'lifetime': 255, 'hit_type': 1, 'inner_splash_radius': 0, 'medium_splash_radius': 0, 'outer_splash_radius': 0, 'damage_amount': 20, 'damage_bonus': 2, 'cooldown': 30, 'bullet_count': 1, 'attack_angle': 16, 'bullet_heading_offset': 0, 'forward_offset': 0, 'upward_offset': 0}, 47: {'flingy': 163, 'target_flags': 2, 'min_range': 0, 'max_range': 256, 'damage_upgrade': 12, 'damage_type': 3, 'bullet_type': 1, 'lifetime': 255, 'hit_type': 1, 'inner_splash_radius': 0, 'medium_splash_radius': 0, 'outer_splash_radius': 0, 'damage_amount': 40, 'damage_bonus': 2, 'cooldown': 30, 'bullet_count': 1, 'attack_angle': 16, 'bullet_heading_offset': 0, 'forward_offset': 0, 'upward_offset': 0}, 82: {'flingy': 172, 'target_flags': 2, 'min_range': 0, 'max_range': 128, 'damage_upgrade': 35, 'damage_type': 3, 'bullet_type': 5, 'lifetime': 255, 'hit_type': 3, 'inner_splash_radius': 20, 'medium_splash_radius': 40, 'outer_splash_radius': 60, 'damage_amount': 100, 'damage_bonus': 25, 'cooldown': 1, 'bullet_count': 1, 'attack_angle': 16, 'bullet_heading_offset': 0, 'forward_offset': 0, 'upward_offset': 0}}
+flingy.dat {5: {'top_speed': 1280, 'acceleration': 67, 'halt_distance': 12227, 'turn_rate': 40, 'movement_type': 0}, 18: {'top_speed': 0, 'acceleration': 0, 'halt_distance': 0, 'turn_rate': 0, 'movement_type': 2}, 26: {'top_speed': 0, 'acceleration': 0, 'halt_distance': 0, 'turn_rate': 0, 'movement_type': 2}, 85: {'top_speed': 1, 'acceleration': 1, 'halt_distance': 1, 'turn_rate': 13, 'movement_type': 2}, 122: {'top_speed': 0, 'acceleration': 0, 'halt_distance': 0, 'turn_rate': 0, 'movement_type': 2}, 128: {'top_speed': 0, 'acceleration': 0, 'halt_distance': 0, 'turn_rate': 0, 'movement_type': 2}, 202: {'top_speed': 8533, 'acceleration': 267, 'halt_distance': 136352, 'turn_rate': 13, 'movement_type': 1}, 163: {'top_speed': 8533, 'acceleration': 667, 'halt_distance': 54582, 'turn_rate': 40, 'movement_type': 1}, 172: {'top_speed': 0, 'acceleration': 0, 'halt_distance': 0, 'turn_rate': 0, 'movement_type': 2}}
+
+=== 7zGY2kzG-unpacked
+unit 44 0 750.0 0 0 Monstrous Chimera $500
+unit 56 1 400.0 0 4 0
+unit 58 0 1000.0 0 0 Enigmatic Phantom $300
+unit 81 0 5000.0 0 100 Unforgiving Conqueror $750
+unit 83 0 1500.0 0 0 Merciless Subjugator $300
+unit 85 0 0.0 0 0 Malevolent Warbringer
+weapon 103 25 0
+weapon 46 550 0
+weapon 47 40 2
+weapon 82 185 0
+upgrade 35 global max/current 3 0 P1–P4 [(3, 0, 1), (3, 0, 1), (3, 0, 1), (3, 0, 1)]
+upgrade 36 global max/current 1 1 P1–P4 [(1, 1, 1), (1, 1, 1), (1, 1, 1), (1, 1, 1)]
+trigger 6 owner [17] cond [(0, 0, 0, 0, 0, 22, 0, 0, 0)] act [(1, (64, 0, 0, 0, 13, 3, 83, 53, 0, 0, 0, 0), None), (2, (0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0), None), (3, (0, 164, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Full Power Reaver')]
+trigger 39 owner [17] cond [(17, 13, 1, 54, 10, 3, 0, 0, 0), (0, 13, 300, 0, 0, 4, 0, 0, 0)] act [(1, (39, 0, 0, 0, 13, 0, 83, 44, 3, 0, 0, 0), None), (2, (40, 0, 0, 0, 13, 0, 83, 44, 3, 0, 0, 0), None), (3, (41, 0, 0, 0, 13, 0, 83, 44, 2, 0, 0, 0), None), (4, (42, 0, 0, 0, 13, 0, 83, 44, 2, 0, 0, 0), None), (5, (43, 0, 0, 0, 13, 0, 83, 44, 2, 0, 0, 0), None), (6, (0, 0, 0, 0, 13, 300, 0, 26, 9, 0, 0, 0), None), (7, (0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0), None), (8, (0, 205, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Reaver - $300')]
+trigger 59 owner [17] cond [(25, 13, 1, 54, 10, 3, 0, 0, 0), (0, 13, 500, 0, 0, 4, 0, 0, 0)] act [(1, (39, 0, 0, 0, 13, 0, 44, 44, 2, 0, 0, 0), None), (2, (40, 0, 0, 0, 13, 0, 44, 44, 2, 0, 0, 0), None), (3, (41, 0, 0, 0, 13, 0, 44, 44, 2, 0, 0, 0), None), (4, (42, 0, 0, 0, 13, 0, 44, 44, 1, 0, 0, 0), None), (5, (43, 0, 0, 0, 13, 0, 44, 44, 1, 0, 0, 0), None), (6, (0, 0, 0, 0, 13, 500, 0, 26, 9, 0, 0, 0), None), (7, (0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0), None), (8, (0, 226, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Guardian - $500')]
+trigger 102 owner [17] cond [(91, 13, 1, 54, 10, 3, 0, 0, 0), (0, 13, 300, 0, 0, 4, 0, 0, 0)] act [(1, (39, 0, 0, 0, 13, 0, 58, 44, 2, 0, 0, 0), None), (2, (40, 0, 0, 0, 13, 0, 58, 44, 2, 0, 0, 0), None), (3, (41, 0, 0, 0, 13, 0, 58, 44, 2, 0, 0, 0), None), (4, (42, 0, 0, 0, 13, 0, 58, 44, 2, 0, 0, 0), None), (5, (43, 0, 0, 0, 13, 0, 58, 44, 1, 0, 0, 0), None), (6, (0, 0, 0, 0, 13, 300, 0, 26, 9, 0, 0, 0), None), (7, (0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0), None), (8, (0, 363, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Valk - $300')]
+preplaced [(36229184, 384, 832, 83, 0, 24, 39, 6, 100, 100, 0, 0, 0, 16, 0, 0)]
+
+=== 2tzpVkp9-unpacked
+unit 44 0 1500.0 0 5 Hells Guardian - $1000
+unit 56 0 3000.0 0 30 Darkstar-$1500
+unit 58 0 500.0 0 2 Anti Air Human-$650
+unit 81 0 1200.0 0 0 Warbringer - $300
+unit 83 0 1500.0 10 10 Fat Alien-$1250
+unit 85 0 1.0 0 0 War
+weapon 103 105 1
+weapon 46 600 2
+weapon 47 222 222
+weapon 82 300 0
+upgrade 35 global max/current 255 0 P1–P4 [(255, 0, 1), (255, 0, 1), (255, 0, 1), (255, 0, 1)]
+upgrade 36 global max/current 1 1 P1–P4 [(1, 0, 1), (1, 0, 1), (1, 0, 1), (1, 0, 1)]
+trigger 4 owner [17] cond [(0, 0, 0, 0, 0, 22, 0, 0, 0)] act [(1, (64, 0, 0, 0, 13, 10, 81, 53, 0, 20, 0, 0), None), (2, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (3, (0, 86, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Full Power')]
+trigger 35 owner [17] cond [(0, 13, 300, 0, 0, 4, 0, 0, 0), (23, 13, 1, 15, 10, 3, 0, 16, 0)] act [(1, (26, 0, 0, 0, 13, 0, 81, 44, 12, 20, 0, 0), None), (2, (0, 0, 0, 0, 13, 300, 0, 26, 9, 4, 0, 0), None), (3, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (4, (0, 118, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Reaver - $300')]
+trigger 78 owner [17] cond [(63, 13, 1, 61, 10, 3, 0, 16, 0), (0, 13, 650, 0, 0, 4, 0, 0, 0)] act [(1, (26, 0, 0, 0, 13, 0, 58, 44, 10, 20, 0, 0), None), (2, (0, 0, 0, 0, 13, 650, 0, 26, 9, 4, 0, 0), None), (3, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (4, (0, 213, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Anti Air Huamn-$650')]
+trigger 89 owner [17] cond [(75, 13, 1, 61, 10, 3, 0, 16, 0), (0, 13, 1000, 0, 0, 4, 0, 0, 0)] act [(1, (26, 0, 0, 0, 13, 0, 44, 44, 10, 20, 0, 0), None), (2, (0, 0, 0, 0, 13, 1000, 0, 26, 9, 4, 0, 0), None), (3, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (4, (0, 240, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Hellz Guardian-$1000')]
+preplaced [(52960104, 523, 734, 81, 0, 24, 39, 6, 100, 100, 0, 0, 0, 16, 0, 0)]
+
+=== gamez-2009-unpacked
+unit 44 0 1500.0 0 5 Hells Guardian - $1000
+unit 56 0 3000.0 0 30 Darkstar-$1500
+unit 58 0 500.0 0 2 Anti Air Human-$650
+unit 81 0 1200.0 0 0 Warbringer - $300
+unit 83 0 1500.0 10 10 Fat Alien-$1250
+unit 85 0 1.0 0 0 War
+weapon 103 105 1
+weapon 46 600 2
+weapon 47 222 222
+weapon 82 300 0
+upgrade 35 global max/current 255 0 P1–P4 [(255, 0, 1), (255, 0, 1), (255, 0, 1), (255, 0, 1)]
+upgrade 36 global max/current 1 1 P1–P4 [(1, 0, 1), (1, 0, 1), (1, 0, 1), (1, 0, 1)]
+trigger 4 owner [17] cond [(0, 0, 0, 0, 0, 22, 0, 0, 0)] act [(1, (64, 0, 0, 0, 13, 10, 81, 53, 0, 20, 0, 0), None), (2, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (3, (0, 86, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Full Power')]
+trigger 35 owner [17] cond [(0, 13, 300, 0, 0, 4, 0, 0, 0), (23, 13, 1, 15, 10, 3, 0, 16, 0)] act [(1, (26, 0, 0, 0, 13, 0, 81, 44, 12, 20, 0, 0), None), (2, (0, 0, 0, 0, 13, 300, 0, 26, 9, 4, 0, 0), None), (3, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (4, (0, 118, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Reaver - $300')]
+trigger 78 owner [17] cond [(63, 13, 1, 61, 10, 3, 0, 16, 0), (0, 13, 650, 0, 0, 4, 0, 0, 0)] act [(1, (26, 0, 0, 0, 13, 0, 58, 44, 10, 20, 0, 0), None), (2, (0, 0, 0, 0, 13, 650, 0, 26, 9, 4, 0, 0), None), (3, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (4, (0, 213, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Anti Air Huamn-$650')]
+trigger 89 owner [17] cond [(75, 13, 1, 61, 10, 3, 0, 16, 0), (0, 13, 1000, 0, 0, 4, 0, 0, 0)] act [(1, (26, 0, 0, 0, 13, 0, 44, 44, 10, 20, 0, 0), None), (2, (0, 0, 0, 0, 13, 1000, 0, 26, 9, 4, 0, 0), None), (3, (0, 0, 0, 0, 0, 0, 0, 3, 0, 4, 0, 0), None), (4, (0, 240, 0, 0, 0, 0, 0, 47, 0, 0, 0, 0), 'Hellz Guardian-$1000')]
+preplaced [(46996600, 523, 734, 81, 0, 24, 39, 6, 100, 100, 0, 0, 0, 16, 0, 0)]

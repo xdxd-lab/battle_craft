@@ -23,6 +23,9 @@ export const MOTION = {
   battlecruiser: inertia(640, 27, 7585, 20),
   scout: inertia(1280, 48, 17067, 30),
   scourge: inertia(1707, 107, 13616, 40),
+  guardian: inertia(640,27,7585,20),
+  valkyrie: inertia(1690,65,21901,30),
+  warbringer: walk([1,2,2,2,2],20),
 };
 
 export function brakingDistance(profile, speed) {

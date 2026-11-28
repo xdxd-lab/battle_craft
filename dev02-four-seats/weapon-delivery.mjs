@@ -10,6 +10,7 @@ const HYDRA = { mode:'atTarget', angle:Math.PI/8 };         // Needle Spines, we
 
 export function deliveryFor(version,kind,air) {
   if(version<10) return null;
+  if(kind==='guardian') return GUARDIAN;
   if(kind==='hydralisk'||kind==='marine') return HYDRA;
   if(kind==='dragoon') return DRAGOON;
   if(kind==='mutalisk') return GLAIVE;
@@ -69,6 +70,7 @@ export function shockwaveRing(u,x,z,version=10) {
 }
 
 const seeking = (mode, muzzle,speed,accel,turn, lifetime,offset=0) => ({mode,muzzle,speed,accel,turn:turn*Math.PI/128,lifetime,offset,angle: mode==='bounce'?Math.PI/8:offset?Math.PI/4:Math.PI});
+const GUARDIAN = {...seeking('home',0,8533,667,40,255),angle:Math.PI/8};
 const DRAGOON = seeking('home',0,17067,850,127,255);
 const GLAIVE = seeking('bounce',5,8533,667,127,Infinity);
 const SCOUT_AIR = seeking('home',5,8533,267,13,30,Math.PI/2);

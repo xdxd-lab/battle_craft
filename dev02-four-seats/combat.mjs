@@ -7,13 +7,14 @@ import { hasAirShortcut, approachAirCore } from './air-reroute.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
 import { deliveryFor, placeFixedShot, advanceFixedShot, placeSeekingShot, advanceSeekingShot,
   firstBounceTarget, unitGap, shockwaveRing, SCOURGE_CONTACT, targetPoint } from './weapon-delivery.mjs';
-import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
+import { EXPANSION_VERSION, KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
 import { DEFENSE_VERSION, TOWER_VARIANTS_VERSION, TOWER, towerWeaponBox, regenerateTowerShields, hitTower, fireTowers } from './defense-tower.mjs';
+import { HALO_OFFSETS, HALO_RELEASE_FRAMES, refillScarab, launchScarab, advanceScarab, advanceHalo, haloHits, ringDamageDivisor } from './expansion-weapons.mjs';
 import { SPECIAL_POWER_VERSION } from './special-powers.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
-import { UNIFIED_ATTACK_RANGE_FROM, effectiveWeaponRange, weaponBoxPx, weaponGapPx, rangeInPixels, scanWeaponTargets } from './combat-reach.mjs';
+import { UNIFIED_ATTACK_RANGE_FROM, effectiveWeaponRange, weaponBoxPx, weaponGapPx, pointWeaponGapPx, rangeInPixels, scanWeaponTargets } from './combat-reach.mjs';
 export { DRAGOON_RANGE_TRIAL_FROM, DRAGOON_TRIAL_RANGE, effectiveWeaponRange } from './combat-reach.mjs';
 const DRAGOON_EDGE_RANGE_FROM = 13;
 export const DRAGOON_TRACK_RANGE_FROM = 14;
@@ -40,6 +41,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   const variantTowers=state.version>=TOWER_VARIANTS_VERSION;
   const plateOf = state.version >= 7 ? u => PLATE[u.kind] : () => 0; // 基礎護甲自版本 7 起生效
   for (const u of units) {
+    if(u.kind==='warbringer' && frames)refillScarab(u,frame);
     const max = KINDS[u.kind].shield;
     if (u.sh < max) u.sh = Math.min(max, u.sh + SHIELD_REGEN * frames / 256);
     u.cd = Math.max(0, u.cd - frames);
@@ -148,6 +150,31 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   // 第二階段：飛行中的投射物前進
   const arrived = [], flying = [];
   for (const s of state.shots) {
+    if (s.specialFlight==='halo') {
+      if(frames&&frame>=s.releaseFrame&&!s.visible){
+        const launcher=alive.get(s.from);
+        if(!launcher || launcher.hp<=0 || launcher.seat!==s.seat)continue;
+        const a=launcher.motion?.heading??Math.atan2(s.tz-launcher.z,s.tx-launcher.x);
+        s.x=launcher.x+Math.cos(a)*20*WORLD_PER_PX;s.z=launcher.z+Math.sin(a)*20*WORLD_PER_PX;
+        s.heading=a+s.side*Math.PI/2;
+      }
+      const t=alive.get(s.target);
+      (frames&&advanceHalo(s,t?.hp>0?t:null,frame)?arrived:flying).push(s);
+      continue;
+    }
+    if (s.specialFlight==='scarab') {
+      if(!frames){flying.push(s);continue;}
+      const t=alive.get(s.target), tower=s.tower?state.seats[s.core]?.tower:null;
+      const destination=s.core
+        ? s.tower ? tower?.hp>0&&tower.id===s.towerId?{...tower,radius:TOWER.hitRadius}:null
+          : state.seats[s.core]?.alive?{x:s.tx,z:s.tz,radius:R.coreRadius}:null
+        : t?.hp>0&&t.team!==s.team?t:null;
+      const end = advanceScarab(s,destination, t&&boxes?.get(t.id),frame,(x,z)=>clampWalk(x,z,dim));
+      if(end==='fly')flying.push(s);
+      else if(end==='explode')arrived.push(s);
+      else emit('fizzle',s.seat,{shot:s.id,kind:s.kind,x:s.x,z:s.z,target:s.target},true);
+      continue;
+    }
     if (s.effect) { (frame>=s.due ? arrived : flying).push(s); continue; }
     if (s.seekingFlight) {
       const t=!s.core&&alive.get(s.target);
@@ -170,6 +197,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   state.shots = flying;
   // 第三階段：開火
   const instant = [];
+  const activeScarabs = state.version>=EXPANSION_VERSION ? new Set(flying.filter(q=>q.specialFlight==='scarab').map(q=>q.from)) : null;
   units.forEach((u, i) => {
     const p = plan[i];
     if (!p.hit && !p.core) { if (experimental) attackReady(u,p,frame,frames); return; }
@@ -179,15 +207,39 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     const radius=p.tower?TOWER.hitRadius:p.core?R.coreRadius:0;
     const mark=p.tower?{tower:true,...(variantTowers?{towerId:p.towerId}:{})}:{};
     const delivery = deliveryFor(state.version,u.kind,!p.core && KINDS[p.hit.kind].air);
+    if (u.kind==='warbringer' && (!u.scarabs||activeScarabs?.has(u.id))) {
+      p.attackAngle=Math.atan2(z-u.z,x-u.x);
+      return; // stay in position when dry; locomotion still turns toward the target
+    }
     if (experimental) {
       p.attackAngle = Math.atan2(z-u.z,x-u.x);
       p.interval = spec.cooldown;
-      if(faithful) p.attackArc=delivery?.angle;
+      if(faithful) p.attackArc=u.kind==='valkyrie'?Math.PI/4:delivery?.angle;
       if (!attackReady(u,p,frame,frames,state.version)) return;
       noteAttackFired(u,p,frame);
     } else if (u.cd) return;
     u.cd = spec.cooldown;
-    if (delivery?.mode === 'latched') {
+    if(u.kind==='valkyrie'){
+      const next=u.haloIndex??0;
+      for(let k=0;k<HALO_RELEASE_FRAMES.length;k++){
+        const offset=(next+k)%HALO_OFFSETS.length, [dx,dz]=HALO_OFFSETS[offset];
+        const releaseFrame=frame+HALO_RELEASE_FRAMES[k], id=++state.shotSerial;
+        const side=k%2?-1:1, bearing=u.motion?.heading??p.attackAngle;
+        state.shots.push({id,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.hit.id,core:null,hop:0,specialFlight:'halo',offset,
+          visible:releaseFrame===frame,releaseFrame,expires:releaseFrame+255,side,heading:bearing+side*Math.PI/2,speed:0,
+          x:u.x+Math.cos(bearing)*20*WORLD_PER_PX,z:u.z+Math.sin(bearing)*20*WORLD_PER_PX,tx:x+dx*WORLD_PER_PX,tz:z+dz*WORLD_PER_PX,airTarget:true});
+        if(k===0)emit('launch',u.seat,{from:u.id,shot:id,kind:u.kind},true);
+      }
+      u.haloIndex=(next+HALO_RELEASE_FRAMES.length)%HALO_OFFSETS.length;
+    } else if(u.kind==='warbringer'){
+      launchScarab(u,frame);
+      const id=++state.shotSerial;
+      const lead=Math.min(25*WORLD_PER_PX,Math.max(0,Math.hypot(x-u.x,z-u.z)-radius-10*WORLD_PER_PX));
+      const [sx,sz]=clampWalk(u.x+Math.cos(p.attackAngle)*lead,u.z+Math.sin(p.attackAngle)*lead,dim);
+      state.shots.push({id,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,
+        specialFlight:'scarab',expires:frame+90,x:sx,z:sz,tx:x,tz:z});
+      emit('launch',u.seat,{from:u.id,shot:id,kind:u.kind},true);
+    } else if (delivery?.mode === 'latched') {
       const shot = {id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,prev:null,...(vsAir?{w:1}:{})};
       placeFixedShot(shot,delivery,u.x,u.z,x,z,radius,!p.core&&KINDS[p.hit.kind].air);
       emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind},true);
@@ -235,7 +287,31 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   for (const h of [...arrived, ...instant.sort((a, b) => a.from - b.from)]) {
     const spec = weaponOf(h.kind, !!h.w), divisor = 3 ** h.hop;
     let dealt = null;
-    if (h.tower) {
+    if(h.specialFlight){
+      const air=h.specialFlight==='halo';
+      const nearby=[];
+      for(const t of units){
+        if(t.hp<=0||KINDS[t.kind].air!==air||t.seat===h.seat)continue;
+        // Keep a previously hostile target from being hit after a control transfer.
+        if(t.id===h.target&&t.team===h.team)continue;
+        const gap=pointWeaponGapPx(boxes.get(t.id),h.x,h.z);
+        if(gap<=(air?100:60))nearby.push({unit:t,gap});
+      }
+      const targets=air?haloHits(h,nearby,state.seed):nearby.map(o=>({unit:o.unit,divisor:ringDamageDivisor(o.gap,[20,40,60])}));
+      for(const {unit:t,divisor:q} of targets){
+        if(t.hp<=0)continue;
+        const body={hp:t.hp,sh:t.sh,armor:armorOf(t)},d=applyDamage(body,spec.damage,spec.attack,q,plateOf(t));
+        t.hp=body.hp;t.sh=body.sh;
+        if(t.hp<=0&&t.team!==h.team)killer.set(t.id,h.seat);
+        dealt??=d;
+      }
+      if(!air&&h.tower)dealt=hitTower(state,h.core,spec.damage,spec.attack,1,emit,h.towerId)??dealt;
+      else if(!air&&h.core&&state.seats[h.core].alive) {
+        const d=applyDamage({hp:0,sh:0,armor:CORE.armor},spec.damage,spec.attack,1);
+        coreDamage[h.core]=(coreDamage[h.core]||0)+d.body;
+        dealt=d;
+      }
+    } else if (h.tower) {
       dealt=hitTower(state,h.core,spec.damage,spec.attack,divisor,emit,h.towerId);
     } else if (h.core) {
       if (state.seats[h.core].alive) { const body = { hp: 0, sh: 0, armor: CORE.armor }; dealt = applyDamage(body, spec.damage, spec.attack, divisor); coreDamage[h.core] = (coreDamage[h.core] || 0) + dealt.body; }

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import * as L from '../dev05-layout/layout.mjs';
 import * as S from './sim.mjs';
-import { KINDS, CORE, PLATE, ROSTER, SPLASH, applyDamage, canTarget, framesAt, unitStats, weaponOf } from './roster.mjs';
+import { KINDS, CORE, PLATE, ROSTER, rosterFor, SPLASH, applyDamage, canTarget, framesAt, unitStats, weaponOf } from './roster.mjs';
 import { ARENA, corePos } from './arena.mjs';
 
 const rows = [], test = (name, fn) => rows.push({ 案例: name, 摘要: fn() ?? '' });
@@ -86,7 +86,7 @@ test('彈跳：中間一跳目標死亡仍續跳；射手死亡後不續彈', ()
   const c = cluster(); c.st.units = c.st.units.filter(u => u !== c.a); assert.equal(run(c.st, 30).filter(e => e.type === 'impact').length, 1);
 });
 test('合法目標：三兵種可打地面與空中；僅對地規格會濾掉空中', () => {
-  for (const a of Object.keys(KINDS)) for (const b of ['marine', 'mutalisk']) {
+  for (const a of rosterFor(7)) for (const b of ['marine', 'mutalisk']) {
     if (!canTarget(KINDS[a], KINDS[b].air)) { assert.equal(a, 'scourge'); continue; } // 只有自殺蟲不打地面
     const st = none(); unit(st, 'N', a, 0, -.5); const t = unit(st, 'S', b, 0, .5, idle); run(st, 12); assert(t.hp < KINDS[b].hp, `${a} → ${b}`);
   }
@@ -98,7 +98,7 @@ test('同 tick 多發打同一目標：只陣亡一次、擊殺不重複', () =>
   const log = S.step(st); assert.equal(log.filter(e => e.type === 'death').length, 1); assert.equal(st.seats.N.kills + st.seats.W.kills, 1);
 });
 test('核心：六兵種可攻擊，視為重裝甲', () => {
-  for (const kind of Object.keys(KINDS).filter(k => canTarget(KINDS[k], false))) { const st = none(), [x, z] = corePos('S'), d = L.seatById('S').dir, r = S.RULES.coreRadius + KINDS[kind].range - .05; const a = unit(st, 'N', kind, x - d[0] * r, z - d[1] * r, { target: 'S' }); S.step(st); a.cd = 1e9; run(st, 20); assert.equal(CORE.hp - st.seats.S.hp, KINDS[kind].damage, kind); }
+  for (const kind of rosterFor(7).filter(k => canTarget(KINDS[k], false))) { const st = none(), [x, z] = corePos('S'), d = L.seatById('S').dir, r = S.RULES.coreRadius + KINDS[kind].range - .05; const a = unit(st, 'N', kind, x - d[0] * r, z - d[1] * r, { target: 'S' }); S.step(st); a.cd = 1e9; run(st, 20); assert.equal(CORE.hp - st.seats.S.hp, KINDS[kind].damage, kind); }
 });
 test('四席信標：版本 5 三兵種＋未開放、版本 6 六兵種、版本 7 九兵種；扣款、兵種與數值正確；每次一隻', () => [5, 6, 7].map(version => {
   for (const id of S.SEAT_IDS) S.padsFor(version).forEach((p, i) => {
@@ -282,7 +282,7 @@ test('版本 7 三新兵種：BWAPI 原版 hp／盾／護甲／傷害／冷卻�
   for (const [k, hp, sh, plate, armor, attack, damage, cooldown, range, targets] of [['battlecruiser', 500, 0, 3, 'heavy', 'N', 25, 30, 192, ['ground', 'air']], ['scout', 150, 100, 0, 'heavy', 'N', 8, 30, 128, ['ground', 'air']], ['scourge', 25, 0, 0, 'light', 'N', 110, 0, null, ['air']]])
     assert.deepEqual([KINDS[k].hp, KINDS[k].shield, PLATE[k], KINDS[k].armor, KINDS[k].attack, KINDS[k].damage, KINDS[k].cooldown, range === null ? null : KINDS[k].range, KINDS[k].targets, KINDS[k].air, KINDS[k].count], [hp, sh, plate, armor, attack, damage, cooldown, range === null ? null : px(range), targets, true, 1], k);
   assert.deepEqual(['attack', 'damage', 'hits', 'cooldown', 'range'].map(f => weaponOf('scout', true)[f]), ['E', 14, 2, 22, px(128)]);
-  assert.deepEqual(PLATE, { marine: 0, dragoon: 1, mutalisk: 0, hydralisk: 0, archon: 0, wraith: 0, battlecruiser: 3, scout: 0, scourge: 0 });
+  assert.deepEqual(Object.fromEntries(rosterFor(7).map(k=>[k,PLATE[k]])), { marine: 0, dragoon: 1, mutalisk: 0, hydralisk: 0, archon: 0, wraith: 0, battlecruiser: 3, scout: 0, scourge: 0 });
   assert.deepEqual(ROSTER[7].slice(6), ['battlecruiser', 'scout', 'scourge']);
 });
 test('基礎護甲：版本 7 才生效；先扣盾、再扣護甲、再乘體型，下限 0.5', () => {

@@ -16,6 +16,7 @@ export const DAT_EXTENTS = Object.freeze(Object.fromEntries(Object.entries({
   marine:[8,9,8,10], dragoon:[15,15,16,16], mutalisk:[22,22,21,21],
   hydralisk:[10,10,10,12], archon:[16,16,15,15], wraith:[19,15,18,14],
   battlecruiser:[37,29,37,29], scout:[18,16,17,15], scourge:[12,12,11,11],
+  guardian:[22,22,21,21], valkyrie:[24,16,24,20], warbringer:[16,16,15,15],
 }).map(([kind, d]) => [kind, Object.freeze(d)])));
 
 // Map our continuous coordinates onto an integer sprite position, as after a
