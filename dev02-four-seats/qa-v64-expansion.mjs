@@ -56,6 +56,14 @@ for(const seat of SEATS.map(s=>s.id)) for(let i=9;i<12;i++){
  run(st,2050); assert(w.scarabs<10);
  st.units=[w]; run(st,1550); assert.equal(w.scarabs,10); assert.equal(w.scarabDue,null);
 }
+{
+ const st=make(),v=unit(st,'N','valkyrie',-.25,0,{cd:0}),a=unit(st,'S','battlecruiser',.25,0,{hp:5000});
+ while(!st.shots.length&&st.tick<50)step(st);
+ v.cd=10000;
+ const impacts=run(st,125).filter(q=>q.kind==='valkyrie'&&(q.type==='impact'||q.type==='fizzle'));
+ assert.equal(impacts.length,8,'point-blank rockets do not orbit the landing point');
+ assert(a.hp<5000);
+}
 assert.deepEqual(haloHits({target:1,id:22},[{unit:{id:1},gap:4},{unit:{id:2},gap:51}],26).map(h=>[h.unit.id,h.divisor]),[[1,1],[2,4]]);
 const a=createSim({version:19,seed:7}),b=createSim({version:19,seed:7});
 run(a,2400);run(b,2400);assert.equal(digest(a),digest(b));assert(a.serial>10);

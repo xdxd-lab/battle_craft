@@ -53,9 +53,12 @@ export function advanceHalo(s,target,frame) {
   const dx=s.tx-s.x,dz=s.tz-s.z,n=Math.hypot(dx,dz),aim=Math.atan2(dz,dx);
   const err=Math.atan2(Math.sin(aim-s.heading),Math.cos(aim-s.heading)), turn=13*Math.PI/128;
   s.heading+=Math.max(-turn,Math.min(turn,err));
-  s.speed=Math.min(8533,s.speed+267);
+  // Slow at the destination when the turn is still tight: a rocket released
+  // crosswise at point-blank range must not orbit its landing point.
+  const speedLimit=Math.abs(err)>turn ? Math.max(267,n*256/PX*turn*.55) : 8533;
+  s.speed=Math.min(8533,s.speed+267,speedLimit);
   const step=s.speed*PX/256;
-  if ((n<=step && Math.abs(err)<=turn) || frame>=s.expires) {
+  if (n<=step || frame>=s.expires) {
     if(n<=step){s.x=s.tx;s.z=s.tz;}
     return true;
   }
