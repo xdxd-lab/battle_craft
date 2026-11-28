@@ -68,6 +68,28 @@ try{
     await input(p,shop,mobile);await p.eval('__step(35)');
     assert.deepEqual(await p.eval(`[${own}.shopChoice,${own}.pad,${own}.buys]`),[-1,-1,buys]);
     assert.equal(await p.eval(`document.querySelector('${shop}').getAttribute('aria-pressed')`),'false');
+    if(w===390){
+      await p.eval(`(async()=>{
+        window.qaPowers=await import(new URL('./special-powers.mjs',location.href));
+        window.qaSim=await import(new URL('./sim.mjs',location.href));
+        document.getElementById('speed').click();document.getElementById('speed').click();
+      })()`);
+      const targets="window.qaPowers.specialPowerTargets(__dev02.snapshot(),'N','clear',window.qaSim.dimFor(18)).length";
+      for(let i=0;i<60;i++){
+        if(await p.eval(`${own}.gold>=4500&&(${targets})>0`))break;
+        await p.eval(`(()=>{
+          const gl=document.getElementById('stage').getContext('webgl2');
+          const calls=['drawElements','drawArrays','drawElementsInstanced','drawArraysInstanced'];
+          if(gl)for(const key of calls)gl[key]=()=>{};
+          try{__step(10,100);}finally{if(gl)for(const key of calls)delete gl[key];}
+        })()`);
+      }
+      assert(await p.eval(`${own}.gold>=4500&&(${targets})>0`),'players can afford the power with legal targets');
+      const spent=await p.eval(`${own}.spent`);
+      await input(p,all[0],mobile);await p.eval('__step(2)');
+      assert.equal(await p.eval(`${own}.spent`),spent+4500);
+      assert.deepEqual(await p.eval("__dev02.record().commands.filter(c=>c.type==='special').map(c=>c.power)"),['clear']);
+    }
     assert.deepEqual(p.errors,[]);
     console.log(`${w}×${h}: action dock, low funds, tower purchase and replacement, same-button cancellation.`);
     await p.close();
