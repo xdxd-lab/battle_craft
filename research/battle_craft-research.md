@@ -83,3 +83,24 @@ SCX 證據讓經濟假說比原交接稿更具體，但無法證明哪個同名�
 2. 信標維持踩上後有錢就買，站著繼續等待也能再次購買。設計層拆開購買、兵團、出兵轉移、導航、交戰及勝負。隊伍可先試北西對南東，也應可配置。原地圖幾何、角色造型、貼圖與音效只作研究資料。
 3. 核心與兵種用原創外形。3DGarden 先找寫實工業道具，環境 PBR 用 Poly Haven／ambientCG；必要時自行建模。參考版可用低負荷的同風格畫質作對照，採共用材質、合批與較少的陰影，維持半寫實畫風。
 4. 將 GLB、燈光與本地特效和判定、導航分離。用同一場景對照幀時間、繪製呼叫、貼圖下載量和可辨識性。SPEED 從收入與部隊速度各自調整、最後才組合，避免同時改動兩項而看不出效果來源。
+
+## 2026-11-28 雲端重取
+
+以原提示詞 `battlecraft flashback speed` 找到 [SCMSCX FastBlack 版本索引](https://scmscx.com/map/7zGY2kzG) 和 [SC2 作者改版紀錄](https://www.curseforge.com/sc2/maps/battlecraft/files/440142)，再以史料拼法 `BattleCraft-Fastblack-SPEED` 找到 [2009 鐵之狂傲文章](https://www.gamez.com.tw/t/topic/374947)。文章可從搜尋索引核對；附件從雲端請求逾時，未取得 RAR。這些是三種不同的證據，不當作同一圖的連續版本。
+
+使用 scmJS 0.18.0 從 SCMSCX 獨立重取 `2tzpVkp9` 和 `7zGY2kzG`。各自的 SCX、CHK、Trigger 匯出三項 SHA-256 均與[樣本表](battle_craft-scx-checksums.csv)相符。研究原件與記錄保存在 Git 忽略的 `research/local-source/cloud-intake-20261128/`，不分發。原始碼與 Web 設定未被地圖檔覆寫。
+
+```sh
+# 僅重製研究資料。使用核對過的 scmJS 0.18.0（@scm-js/cli）。
+mkdir -p research/local-source/maps
+cd research/local-source/maps
+for id in 2tzpVkp9 7zGY2kzG; do
+  scmjs map fetch --id "$id" --out "$id.scx"
+  scmjs map unpack "$id.scx" --out "$id-unpacked"
+  scmjs map triggers export "$id.scx" > "$id-triggers.txt"
+  scmjs map settings "$id.scx" --json --no-game > "$id-settings.json"
+done
+sha256sum *.scx *-unpacked/staredit/scenario.chk *-triggers.txt
+```
+
+新增 [v6-0 戰鬥資料參考](BC-V6-COMBAT-REFERENCE.md)：BWAPI 原始單位欄位、斥候／Artanis 的地圖武器覆寫，以及逐發傷害和飛彈時序的待驗界線。
