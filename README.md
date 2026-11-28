@@ -2,6 +2,7 @@
 
 **最新版本：[v6-1 線上遊玩](https://xdxd-lab.github.io/battle_craft/dev02-four-seats/battle_craft-v6-1.html)** · [改動與驗證](research/BC-V6-1-RELEASE.md) · [v6-0](dev02-four-seats/battle_craft-v6-0.html) · [v5-9](dev02-four-seats/battle_craft-dev02.html)
 
+暫存試驗：[特殊信標與九兵種售價試算](research/BC-V6-PRICING-COMPARISON.md)。
 # BaattleCraft｜十字對衝
 
 [在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [目前狀態與待辦](research/STATUS.md) · [開放議題](https://github.com/xdxd-lab/battle_craft/issues) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)

@@ -53,3 +53,10 @@ for version in ('v6-0', 'v6-1'):
         dest = ROOT / f'battle_craft-{version}{suffix}.html'
         dest.write_text(page.replace('<script>/* BUNDLE */</script>', body))
         print(f'{dest} ({dest.stat().st_size:,} bytes)')
+
+# A separate entry point for layout and pricing review; the main v6-1 entry never enables the beacons.
+lab = ROOT / 'battle_craft-special-lab.html'
+lab.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 特殊信標試驗')
+               .replace('data-match="8"', 'data-match="10" data-special-lab="true"')
+               .replace('<script>/* BUNDLE */</script>', scripts))
+print(f'{lab} ({lab.stat().st_size:,} bytes)')
