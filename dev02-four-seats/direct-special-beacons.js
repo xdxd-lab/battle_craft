@@ -42,14 +42,21 @@ export function directBeaconLayout(anchors, bank, frame, scale=1, keepClear=null
     }
   }
   let balance=null, bankCost=Infinity;
-  if(bank && frame.right-frame.left>=bw && frame.bottom-frame.top>=bh)
-    for(const ox of [0,-bw*.56,bw*.56,-bw,bw])for(const oy of [0,-bh,bh,-2*bh,2*bh]){
-      const x=clamp(bank[0]+ox,frame.left+bw/2,frame.right-bw/2),
-        y=clamp(bank[1]+oy,frame.top+bh/2,frame.bottom-bh/2);
+  if(bank && frame.right-frame.left>=bw && frame.bottom-frame.top>=bh){
+    const xs=[0,-bw*.56,bw*.56,-bw,bw].map(x=>x+bank[0]),
+      ys=[0,-bh,bh,-2*bh,2*bh].map(y=>y+bank[1]);
+    for(const a of [keepClear,...(winner?.boxes??[])].filter(Boolean)){
+      xs.push(a.left-bw/2-g,a.right+bw/2+g);
+      ys.push(a.top-bh/2-g,a.bottom+bh/2+g);
+    }
+    for(const px of xs)for(const py of ys){
+      const x=clamp(px,frame.left+bw/2,frame.right-bw/2),
+        y=clamp(py,frame.top+bh/2,frame.bottom-bh/2);
       const b=bounds(x,y,bw,bh), cost=(x-bank[0])**2+(y-bank[1])**2;
-      if(cost>=bankCost || Math.sqrt(cost)>75*scale || (keepClear&&overlaps(b,keepClear)) || winner?.boxes.some(a=>overlaps(a,b)))continue;
+      if(cost>=bankCost || Math.sqrt(cost)>84*scale || (keepClear&&overlaps(b,keepClear)) || winner?.boxes.some(a=>overlaps(a,b)))continue;
       balance=[x,y];bankCost=cost;
     }
+  }
   return {buttons:winner?.points??null,balance};
 }
 
