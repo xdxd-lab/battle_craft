@@ -1,5 +1,7 @@
 # BaattleCraft 四席 2v2｜九兵種人機版
 
+**v6-0（模擬 8）**：[線上入口](battle_craft-v6-0.html)。建置時亦會產生不入庫的 `battle_craft-v6-0-offline.html`；已入庫的 `battle_craft-dev02.html` 是不再重建的 v5-9 歷史快照。以下較早的規則記敘留作歷史。[本版改動、範圍與驗證](../research/BC-V6-0-RELEASE.md)。
+
 離線單檔 `battle_craft-dev02.html`，用瀏覽器開啟即可從選席玩到終局（需 WebGL）。單人加三電腦；根目錄首頁提供線上遊玩與下載入口，v5 保留。
 
 - 建置：`python3 dev02-four-seats/build.py`（或 `npm run build`）。

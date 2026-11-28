@@ -1,5 +1,6 @@
 // 版本 3 的部隊步進：索敵、移動、投射物、彈跳與回盾。傷害順序固定：先抵達的投射物（依編號），再即時攻擊（依射手編號）。
 import * as L from '../dev05-layout/layout.mjs';
+import { motionDisplacement } from './motion.mjs';
 import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
@@ -121,11 +122,17 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   units.forEach((u, i) => {
     const p = plan[i];
     let x = u.x, z = u.z; const n = dist(p.mx, p.mz, 0, 0);
-    if (n > 0) { const k = Math.min(R.unitSpeed, n) / n; x += p.mx * k; z += p.mz * k; u.dx = p.mx / n; u.dz = p.mz / n; }
+    if (state.version >= 8) {
+      const [vx, vz] = motionDisplacement(u, p, frames);
+      x += vx; z += vz;
+    } else if (n > 0) { const k = Math.min(R.unitSpeed, n) / n; x += p.mx * k; z += p.mz * k; u.dx = p.mx / n; u.dz = p.mz / n; }
     else if (p.hit) { const d = dist(p.hit.x, p.hit.z, u.x, u.z) || 1; u.dx = (p.hit.x - u.x) / d; u.dz = (p.hit.z - u.z) / d; }
     const m = dist(p.sx, p.sz, 0, 0);
     if (m > 0) { const k = Math.min(.05, m * .05) / m; x += p.sx * k; z += p.sz * k; }
     p.to = clampWalk(x, z, dim);
+    // Do not store velocity against a blocked arena edge. Formation offsets still run on
+    // all web ticks, and the historical <=7 branch does not gain motion state.
+    if (frames && u.motion && (Math.abs(p.to[0] - x) > 1e-8 || Math.abs(p.to[1] - z) > 1e-8)) u.motion.speed = 0;
   });
   units.forEach((u, i) => { [u.x, u.z] = plan[i].to; });
   state.units = units.filter(u => {

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { detailCommander, detailMaterials } from './detail-models.js';
 import { unitModels } from './unit-models.js';
 import { MAT, seatMats } from '../dev05-layout/world.js';
-import { HZ, RULES } from './sim.mjs';
+import { HZ, PADS, RULES } from './sim.mjs';
 import { KINDS, ATTACKS, ARMORS, FRAME_MS, PLATE } from './roster.mjs';
 
 const describe = {
@@ -16,11 +16,12 @@ const describe = {
   scout: ['飛行', '對地即時光子砲（普通）；對空一次發射兩枚反物質飛彈（指向性爆炸），擅長攔截大型飛行單位。', [3.4, 2.8, 4.0], .4, 25],
   scourge: ['飛行小型', '只攻擊空中目標。貼近後自爆造成 110 點傷害，自己同時陣亡；不攻擊地面與核心。', [1.8, 1.6, 2.4], .5, 25],
 };
+const shop = Object.fromEntries(PADS.filter(pad => !pad.locked).map(pad => [pad.kind, pad]));
 const unitProfile = kind => {
-  const k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
+  const pad = shop[kind], k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
   return {
     name: k.name, english: k.source, role, description, camera, aim, fov,
-    stats: [['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', k.suicide ? '一次性（自爆後陣亡）' : `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
+    stats: [['部署', `${pad.cost} 金／${pad.count} ${kind === 'battlecruiser' ? '艘' : '名'}`], ['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', k.suicide ? '一次性（自爆後陣亡）' : `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
     model: unitModels.high[kind], plain: unitModels.std[kind],
   };
 };

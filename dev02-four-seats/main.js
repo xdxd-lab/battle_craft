@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import * as L from '../dev05-layout/layout.mjs';
 import * as W from '../dev05-layout/world.js';
 import * as S from './sim.mjs';
-import { ARENA, corePos, fitArenaCamera, fitNearCamera } from './arena.mjs';
+import { ARENA_V8 as ARENA, corePos, fitArenaCamera, fitNearCamera } from './arena.mjs';
 import * as SF from './surfaces.js';
 import { createDossier } from './dossier.js';
 import { detailCommander, detailMaterials, triangles } from './detail-models.js';
@@ -22,6 +22,7 @@ let inBattle = false, state = null, record = null, seat = null, queue = [], mode
 let renderer, camera, dossier, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
 
 // ---------- 場景物件 ----------
+const deploymentUnit = kind => kind === 'battlecruiser' ? '艘' : '名';
 const MAX = 128, CORE_MAX = S.coreMax(S.VERSION), dummy = new THREE.Object3D(), markerGroup = new THREE.Group(), padGroup = new THREE.Group(), fallGroup = new THREE.Group();
 const padModels = new THREE.Group(); // 信標上的兵種展示模型：不在單位點選清單內；點到時視同走向該信標
 scene.add(markerGroup, padGroup, fallGroup, padModels);
@@ -314,7 +315,7 @@ function write(e) {
     enter: () => mine && ['info', `進入${e.label}信標，停留期間持續自動購兵。`],
     leave: () => mine && ['info', `離開${e.label}信標，停止購兵。`],
     wait: () => mine && ['warn', `金幣不足（需 ${e.cost} 金）；保持站立，存夠會自動購買。`],
-    buy: () => ['info', `${who}花 ${e.cost} 金，部署 ${e.count} 名${KINDS[e.kind].name}。${mine ? `剩 ${e.gold} 金。` : ''}`],
+    buy: () => ['info', `${who}花 ${e.cost} 金，部署 ${e.count} ${deploymentUnit(e.kind)}${KINDS[e.kind].name}。${mine ? `剩 ${e.gold} 金。` : ''}`],
     core: () => [e.level === 'critical' ? 'critical' : 'warn', `${who}核心${{ first: '開始受損', half: '剩一半', critical: '危急' }[e.level]}，${Math.ceil(e.hp)}／${CORE_MAX}。`],
     fall: () => ['critical', `${who}核心失守，停止購兵；存活部隊續戰。`],
     reroute: () => ['warn', `${who}的 ${e.count} 名部隊經中央改攻${seatName(e.to)}。`],
@@ -376,7 +377,7 @@ function menu() {
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
-  $('shop').innerHTML = seat ? S.PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${i + 1}　${p.label}</b><small>${p.cost} 金<i> → ${p.count} 名</i></small></button>`).join('') : '';
+  $('shop').innerHTML = seat ? S.PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${i + 1}　${p.label}</b><small>${p.cost} 金<i> → ${p.count} ${deploymentUnit(p.kind)}</i></small></button>`).join('') : '';
   for (const b of $('shop').querySelectorAll('button')) b.onclick = () => { gotoPad(+b.dataset.pad); canvas.focus(); };
   placeMsg();
   $('gold-label').textContent = seat ? `${seatName(seat)}金幣` : '金幣'; 
@@ -407,7 +408,15 @@ display.engineering = display.engineering === true;
 for (const k of ['music', 'sfx']) if (![0, 1, 2, 3].includes(display[k])) display[k] = 2;
 // 聲音：瀏覽器要求互動後才能出聲，第一次點擊或按鍵才建立 AudioContext
 const nowPlaying = t => { const e = $('now-playing'); e.hidden = !t; e.textContent = t ? `♪ ${PHASE_NAMES[t.phase]}｜${t.title} — ${t.author}（${t.license}）` : ''; e.title = t?.credit ?? ''; }; // 顯示目前曲名
-const audio = createAudio(display, { tracks: TRACKS.map(t => ({ ...t, data: MUSIC_DATA[t.id] })), onTrack: nowPlaying }); // 開場／激戰各自隨機選曲，只影響呈現，不碰模擬
+// 發聲模組與素材取得分離：線上只載選中的曲，離線直接解內嵌曲。
+const audio = createAudio(display, { tracks: TRACKS.map(t => {
+  const asset = MUSIC_DATA[t.id];
+  return asset.startsWith('../') ? { ...t, load: async () => {
+    const result = await fetch(asset);
+    if (!result.ok) throw new Error(`HTTP ${result.status}`);
+    return result.arrayBuffer();
+  } } : { ...t, data: asset };
+}), onTrack: nowPlaying });
 for (const type of ['pointerdown', 'pointerup', 'keydown']) addEventListener(type, () => audio.unlock(), true);
 function applyDisplay(save) {
   document.body.classList.toggle('no-bars', !display.bars); document.body.classList.toggle('no-log', !display.log);
@@ -549,7 +558,8 @@ $('view').onclick = () => { nextView(); canvas.focus(); };
 $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(); };
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
-$('rules').innerHTML = [`起始 ${S.ECONOMY.startGold} 金、每 ${S.ECONOMY.incomeEvery / S.HZ} 秒 ${S.economyFor(S.VERSION).income ?? 1} 金、陸戰隊 ${S.ECONOMY.costs.marine} 金（版本 7 每次收入×3；版本 5、6 每次 1 金；版本 5 前：12 金／每秒 1 金／5 金）；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。價格與每次一隻為暫定。', `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
+const liveEconomy = S.economyFor(S.VERSION), battlecruiserPad = S.PADS.find(p => p.kind === 'battlecruiser');
+$('rules').innerHTML = [`起始 ${liveEconomy.startGold} 金、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${liveEconomy.income} 金、陸戰隊 ${liveEconomy.costs.marine} 金；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `版本 8：戰鬥巡洋艦每次花 ${battlecruiserPad.cost} 金部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。'].map(t => `<li>${t}</li>`).join('');
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: S.DIM })); buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;

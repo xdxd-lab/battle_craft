@@ -9,9 +9,9 @@ import { TRACKS, BATTLE_AT_SECONDS } from './music-tracks.mjs';
 
 // 三兵種本體三角面
 const stdTri = { marine: 192, dragoon: 148, mutalisk: 160, hydralisk: 216, archon: 196, wraith: 180, battlecruiser: 240, scout: 168, scourge: 242 }, highTri = { marine: 976, dragoon: 756, mutalisk: 436, hydralisk: 704, archon: 776, wraith: 448, battlecruiser: 728, scout: 324, scourge: 576 };
-const E = S.economyFor(S.VERSION), gold = tick => E.startGold + Math.floor(tick / E.incomeEvery) * (E.income ?? 1); // 新對局（版本 7）每次收入 3 金
+const E = S.economyFor(S.VERSION), gold = tick => E.startGold + Math.floor(tick / E.incomeEvery) * (E.income ?? 1); // 累計到期的收入（版本 8 以 18.75 步為週期）
 const here = path.dirname(fileURLToPath(import.meta.url)), SHOTS = process.env.SHOTS;
-const url = pathToFileURL(path.join(here, 'battle_craft-dev02.html')).href;
+const url = pathToFileURL(path.join(here, 'battle_craft-v6-0-offline.html')).href;
 const browser = await launch({ width: 1600, height: 900 }), rows = [];
 const test = async (name, fn) => rows.push({ 案例: name, 摘要: (await fn()) ?? '' });
 async function open(seat, { seed = 7, stepped = true, keep = false, quality = 'std', ...size } = {}) {
@@ -27,6 +27,16 @@ async function open(seat, { seed = 7, stepped = true, keep = false, quality = 's
   return page;
 }
 const same = async page => { const rec = await page.eval('__dev02.record()'), r = S.replay({ ...rec, ticks: (await page.snap()).tick }); assert.equal(r.final, await page.eval('__dev02.digest()'), 'Node 重跑與瀏覽器不同'); assert.deepEqual(r.log.length, (await page.eval('__dev02.log().length'))); return rec.commands.length; };
+
+await test('版本 8：購買列、說明與兵種圖鑑顯示新經濟、核心與戰鬥巡洋艦部署數', async () => {
+  const page = await open('N');
+  const i = S.PADS.findIndex(pad => pad.kind === 'battlecruiser');
+  assert.match(await page.eval(`document.querySelector('#shop button[data-pad="${i}"]').textContent`), /40 金.*3 艘/);
+  assert.match(await page.eval("document.getElementById('rules').textContent"), /每 0\.625 秒 4\.5 金.*核心 2700/);
+  await page.clickOn('[data-profile="battlecruiser"]');
+  assert.match(await page.eval("document.getElementById('dossier').innerText"), /40 金／3 艘/);
+  await page.done();
+});
 
 await test('四席：點信標購兵、HUD 與帳目相符、WASD 依鏡頭方向、數字鍵', async () => {
   for (const id of S.SEAT_IDS) {
@@ -452,7 +462,7 @@ await test('聲音背景與恢復：隱藏／暫停期間戰鬥續跑不發新�
 });
 await test('終局與音樂階段：開場→激戰只切一次並維持到終局、曲名顯示；勝／敗立即停掉戰鬥音效且不再新啟動；只開音樂、只開音效、再來一局', async () => {
   const A = p => p.eval('__dev02.audio()'), total = v => Object.values(v.played).reduce((x, y) => x + y, 0), out = [];
-  for (const [seat, music, sfx, seed, pad] of [['S', true, true, 11], ['N', true, false, 11], ['E', false, true, 3, 4]]) { // 版本 7：東席站破壞能信標、種子 3 會勝（Node 搜尋；閒置在 1–300 皆敗）
+  for (const [seat, music, sfx, seed, pad] of [['S', true, true, 11], ['N', true, false, 11], ['E', false, true, 3, 6]]) { // 版本 8：東席站戰巡信標、種子 3 會勝；另有閒置敗北的對照
     const page = await open(seat, { seed }); if (pad !== undefined) await page.clickOn(`#shop button[data-pad="${pad}"]`);
     if (!sfx) { await page.clickOn('#opt-sfx'); await page.clickOn('#opt-sfx'); } if (!music) { await page.clickOn('#opt-music'); await page.clickOn('#opt-music'); }
     let a = await A(page), busy = 0; const phases = [];

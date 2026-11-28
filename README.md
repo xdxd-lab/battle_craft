@@ -1,5 +1,7 @@
 ![BaattleCraft 原創科幻十字戰場概念橫幅](assets/branding/baattlecraft-banner.png)
 
+**最新版本：[v6-0 線上遊玩](https://xdxd-lab.github.io/battle_craft/dev02-four-seats/battle_craft-v6-0.html)** · [v6-0 改動與驗證](research/BC-V6-0-RELEASE.md) · [四席基準 v5-9（模擬 7）](dev02-four-seats/battle_craft-dev02.html)
+
 # BaattleCraft｜十字對衝
 
 [在 GitHub Pages 遊玩](https://xdxd-lab.github.io/battle_craft/) · [目前狀態與待辦](research/STATUS.md) · [開放議題](https://github.com/xdxd-lab/battle_craft/issues) · [開發交接](research/DEVELOPMENT.md) · [原作歷史、SCX Trigger 與素材調查](research/battle_craft-research.md)

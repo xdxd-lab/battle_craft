@@ -5,7 +5,7 @@ import { GLTFLoader } from '../vendor/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from './DRACOLoader.local.js';
 import * as L from '../dev05-layout/layout.mjs';
 import * as W from '../dev05-layout/world.js';
-import { ARENA as D, corePos } from './arena.mjs';
+import { ARENA_V8 as D, corePos } from './arena.mjs';
 import PROPS from './prop-data.generated.js';
 
 let seed = 5;
@@ -77,10 +77,11 @@ export const props = { status: 'idle', count: 0 };
 // 3D Garden 改造配件：燈具壓暗黃色外框、低亮度；管架壓扁並換成深色金屬。放在購買區與核心平台外側，不上通道。
 async function loadProps() {
   const draco = new DRACOLoader();
-  draco._loadLibrary = file => Promise.resolve(file.endsWith('.wasm') ? bytes(PROPS.wasm) : atob(PROPS.wrapper));
+  if (PROPS.decoder) draco.setDecoderPath(PROPS.decoder);
+  else draco._loadLibrary = file => Promise.resolve(file.endsWith('.wasm') ? bytes(PROPS.wasm) : atob(PROPS.wrapper));
   draco.setWorkerLimit(1);
   const loader = new GLTFLoader().setDRACOLoader(draco);
-  const parse = k => new Promise((ok, no) => loader.parse(bytes(PROPS[k]), '', ok, no));
+  const parse = k => PROPS.decoder ? loader.loadAsync(PROPS[k]) : new Promise((ok, no) => loader.parse(bytes(PROPS[k]), '', ok, no));
   const [lamp, pipes] = await Promise.all([parse('lamp'), parse('pipes')]);
   lamp.scene.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.color.setRGB(.5, .56, .62); o.material.metalness = Math.max(o.material.metalness, .35); } });
   pipes.scene.traverse(o => { if (o.isMesh) o.material = M.frame; });
