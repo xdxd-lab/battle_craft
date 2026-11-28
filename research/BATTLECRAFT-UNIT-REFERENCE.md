@@ -14,9 +14,9 @@
 |---|---|---|---|
 | Marine | Jim Raynor / Universal Soldier - $175；150、12、#9；0 | Marine / Universal Soldier $150；150、15、#12；0 | 小；N/N |
 | 火蝙蝠（Firebat） | Gui Montag / Napalm Strider - $150；150、12、#22；0 | Firebat / Napalm Strider $150；150、15、#26；0 | 小；C＋濺射/— |
-| Goliath | Alan Schezar / Ancient Goliath - $300；300、12、#23；0 | Goliath / Herculean Defender $300；300、12、#27；0 | 大；N/E |
+| 巨人（Goliath） | ★ Alan Schezar（ID 17）／Ancient Goliath - $300；300、12、#23；0 | 普通 Goliath（ID 3）／Herculean Defender $300；300、12、#27；0 | 大；N/E |
 | Wraith | Tom Kazansky / Silent Apparition - $300；300、12、#26；0 | Wraith / Silent Apparition $300；300、8、#30；0 | 大；N/E |
-| 異形蟲（Zergling） | Devouring One / Hell Spawn - $100；100、12、#27；0 | Zergling / Vicious Hellspawn $200；200、25、#31；0 | 小；N/— |
+| 異形蟲（Zergling） | ★ Devouring One（ID 54）／Hell Spawn - $100；100、12、#27；0 | 普通 Zergling（ID 37）／Vicious Hellspawn $200；200、25、#31；0 | 小；N/— |
 | Hydralisk | Hunter Killer / Acid Demon - $175；175、12、#28；0 | Hydralisk / Malevolent Reaper $150；150、15、#32；0 | 中；E/E |
 | Ultralisk | Torrasque / Ultra Behemoth - $200；200、12、#29；0 | Ultralisk / Brutish Behemoth $200；200、12、#33；0 | 大；N/— |
 | Mutalisk | Kukulza / Deadstar Dragon - $300；300、12、#30；0 | Mutalisk / Deadstar Dragon $300；300、8、#34；0 | 小；N/N |
@@ -30,7 +30,7 @@
 
 SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`；#9 生成單位顯示名 $175、要求及扣款均 150。兩者說明不要把 Comment、單位顯示文字或 units.dat 生產成本當實際交易價。SPEED #54 location 名 `Tank`，實際生成 20 隻異形蟲（Zergling）、扣 1000，該單位自訂名 Fast Shit-$1000。v2.91f #29 和 #102 的匯出 location 名為空字串，空名稱不等於無 location；是否可實際觸發要查 MRGN 的 location ID／位置與遊戲測試，不宜直接判無效。
 
-SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
+SPEED 一般列生成英雄、S-列常生成普通型；另有其他購兵點可買地圖強化的普通巨人與普通異形蟲，見[原附件的獨立列](BC-V6-4-UNIT-CANDIDATES.md#地面)。v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
 
 ### 後續候選兵種（2026-11-27／28 名稱已確認；遊戲內實作採 BWAPI 原版值，見 [BC-SIX-UNITS](BC-SIX-UNITS.md)、[BC-NINE-UNITS](BC-NINE-UNITS.md)）
 
