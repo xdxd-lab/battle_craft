@@ -5,6 +5,8 @@ import { ARENA, ARENA_V8 } from './arena.mjs';
 import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, stepRoster } from './combat.mjs';
 export { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, DRAGOON_TRIAL_RANGE, effectiveWeaponRange } from './combat.mjs';
+import { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
+export { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
 
 import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, buyTower } from './defense-tower.mjs';
@@ -86,6 +88,7 @@ GEOMETRY[DEFENSE_TUNING_VERSION] = {...GEOMETRY[VISIBILITY_VERSION],dim:{...GEOM
 GEOMETRY[DRAGOON_TRACK_RANGE_FROM] = GEOMETRY[DEFENSE_TUNING_VERSION]; // 保留 v13 佔位，重騎兵加入短暫的瞄準保持
 GEOMETRY[DRAGOON_RANGE_TRIAL_FROM] = GEOMETRY[DRAGOON_TRACK_RANGE_FROM]; // 只試射程，移動佔位不變
 GEOMETRY[SPECIAL_POWER_VERSION] = GEOMETRY[DRAGOON_RANGE_TRIAL_FROM];
+GEOMETRY[UNIFIED_ATTACK_RANGE_FROM] = GEOMETRY[SPECIAL_POWER_VERSION]; // Geometry of the map and movement stays v16.
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -146,7 +149,7 @@ function defenseOrder(state, s, b, dim, emit) {
       .map(({id,kind,x,z})=>({id,kind,x,z}));
     const pads=padsFor(state.version).map((p,index)=>{const [x,z]=padWorld(s.id,index,dim);return {...p,index,x,z};});
     const [ex,ez]=turn([0,-dim.spawnRadial],L.seatIndex(s.id));
-    const plan=chooseDefense({core:{x,z},commander:s.commander,gold:s.gold,threats,pads,radius,heldPad:b.pad,
+    const plan=chooseDefense({version:state.version,core:{x,z},commander:s.commander,gold:s.gold,threats,pads,radius,heldPad:b.pad,
       entry:{x:ex,z:ez},coreRadius:RULES.coreRadius,padRadius:padRadiusFor(state.version),commanderSpeed:RULES.commanderSpeed});
     if(plan && (b.defense || now>=(b.defenseRest??0))){
       if(!b.defense||plan.pad!==b.pad){

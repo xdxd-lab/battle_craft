@@ -1,6 +1,7 @@
 // Simulation 10 weapon delivery only. Raw flingy.dat positions use 1/256 px.
 // Direct and homing effects outside this pass continue on their older models.
 import { WORLD_PER_PX } from './motion.mjs';
+import { DAT_EXTENTS as EXTENTS, UNIFIED_ATTACK_RANGE_FROM, pointWeaponGapPx, weaponBoxPx } from './combat-reach.mjs';
 const fixed = (muzzle, speed, accel) => ({ mode:'latched', muzzle, speed, accel, angle:Math.PI/8 });
 const WRAITH_GROUND = fixed(45,17067,8533); // Burst Lasers, weapon 16 / flingy 149
 const WRAITH_AIR = fixed(20,8533,667);      // Gemini Missiles, weapon 15 / flingy 144
@@ -41,12 +42,7 @@ export function advanceFixedShot(shot,profile,frames) {
   return false;
 }
 
-// units.dat extents are separate from the damage-size label.
-const EXTENTS = {
-  marine:[8,9,8,10], dragoon:[15,15,16,16], mutalisk:[22,22,21,21],
-  hydralisk:[10,10,10,12], archon:[16,16,15,15], wraith:[19,15,18,14],
-  battlecruiser:[37,29,37,29], scout:[18,16,17,15], scourge:[12,12,11,11],
-};
+// Historical v10 delivery geometry (not the v17 firing-range metric).
 const box = (u,q=1) => {
   const [l,t,r,b]=EXTENTS[u.kind], k=q*WORLD_PER_PX;
   return [u.x-l*k,u.z-t*k,u.x+r*k,u.z+b*k];
@@ -66,7 +62,11 @@ export function targetPoint(shooter,target) {
 }
 export const SCOURGE_CONTACT = 3*WORLD_PER_PX;
 const ARCHON_RINGS = [3,15,30].map(px=>px*WORLD_PER_PX);
-export const shockwaveRing = (u,x,z) => ARCHON_RINGS.findIndex(r=>hitboxDistance(u,x,z)<=r+1e-9);
+export function shockwaveRing(u,x,z,version=10) {
+  if (version < UNIFIED_ATTACK_RANGE_FROM) return ARCHON_RINGS.findIndex(r=>hitboxDistance(u,x,z)<=r+1e-9);
+  const gap=pointWeaponGapPx(weaponBoxPx(u.kind,u.x,u.z),x,z);
+  return gap<=3 ? 0 : gap<=15 ? 1 : gap<=30 ? 2 : -1;
+}
 
 const seeking = (mode, muzzle,speed,accel,turn, lifetime,offset=0) => ({mode,muzzle,speed,accel,turn:turn*Math.PI/128,lifetime,offset,angle: mode==='bounce'?Math.PI/8:offset?Math.PI/4:Math.PI});
 const DRAGOON = seeking('home',0,17067,850,127,255);

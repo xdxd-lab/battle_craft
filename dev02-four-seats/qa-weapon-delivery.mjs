@@ -96,6 +96,43 @@ for(const kind of ['marine','scout']){
   for(let j=0;j<55&&impacts.length<2;j++)impacts.push(...S.step(s).filter(x=>x.type==='impact'&&x.kind==='scout'));
   assert.deepEqual(impacts.map(i=>i.body),[11,11]);assert.equal(t.hp,478);
 }
+// The trial changes firing geometry, not the projectile's ownership or
+// termination rule. Move the same target outside launch range after release.
+for (const kind of ['dragoon','battlecruiser']) {
+  const s=S.createSim({version:17,bots:[]});
+  const source=make(s,'N',kind,0,0), target=make(s,'S','wraith',1.5,0,{cd:1000});
+  const launch=waitFor(s,es=>es.some(e=>e.from===source.id&&e.type==='launch'))
+    .find(e=>e.from===source.id&&e.type==='launch');
+  const shot=s.shots.find(x=>x.id===launch.shot);
+  assert(shot,'an in-flight shot exists after launch');
+  const oldAim=shot.tx;
+  const startHp=target.hp;
+  source.cd=1000;
+  target.x=5; target.z=0; // Well out of current launch reach; still the same target.
+  const hit=waitFor(s,es=>es.some(e=>e.shot===shot.id&&e.type==='impact'))
+    .find(e=>e.shot===shot.id&&e.type==='impact');
+  assert.equal(hit.target,target.id);
+  assert(target.hp<startHp);
+  if(kind==='dragoon') assert(hit.x>4.6,'homing visual followed the original target');
+  else assert.equal(hit.x,oldAim,'non-homing visual retained the original position');
+}
+{
+  const s=S.createSim({version:17,bots:[]});
+  const source=make(s,'N','scout',0,0), target=make(s,'S','battlecruiser',1.55,0,{cd:1000});
+  const launch=waitFor(s,es=>es.some(e=>e.from===source.id&&e.type==='launch'))
+    .filter(e=>e.from===source.id&&e.type==='launch');
+  assert.equal(launch.length,2);
+  source.cd=1000;
+  target.x=15;
+  const hits=[];
+  for(let i=0;i<65&&hits.length<2;i++)hits.push(...S.step(s).filter(e=>e.type==='impact'&&launch.some(x=>x.shot===e.shot)));
+  assert.equal(hits.length,2);
+  for(const hit of hits){
+    assert.equal(hit.target,target.id);
+    assert.equal(hit.body,11);
+    assert(hit.x<target.x-2,'expiry resolves damage with the visual still short of the target');
+  }
+}
 assert.equal(KINDS.wraith.name,'死靈式戰機');
 assert.equal(S.padsFor(10).find(x=>x.kind==='wraith').label,'死靈式戰機');
 assert.equal(S.padsFor(8).find(x=>x.kind==='wraith').label,'死靈戰機');

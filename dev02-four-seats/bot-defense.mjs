@@ -1,5 +1,6 @@
 // Pure local defense policy. The caller supplies only visible hostile units and own
 // shop information; no enemy state (commands, speed, HP, buffs, or gold) is needed.
+import { UNIFIED_ATTACK_RANGE_FROM, effectiveWeaponRange, worldGap } from './combat-reach.mjs';
 import { MOTION, WORLD_PER_PX } from './motion.mjs';
 import { deliveryFor, SCOURGE_CONTACT } from './weapon-delivery.mjs';
 import { ATTACKS, FRAME_MS, KINDS, PLATE, canTarget, weaponOf } from './roster.mjs';
@@ -52,13 +53,13 @@ export function hasDefenseThreat({ core, threats = [], radius = DEFENSE_RADIUS }
   return finitePoint(core) && radius > 0 && threats.some(unit => threatensCore(unit, core, radius));
 }
 
-function coreThreats(threats, core, coreRadius, radius) {
+function coreThreats(threats, core, coreRadius, radius, version) {
   const ranked = [];
   for (const unit of threats) {
     // Air-only attackers cannot hit the core; do not commit gold to a lone Scourge.
     if (!threatensCore(unit, core, radius)) continue;
     const range = distance(unit, core);
-    const weapon = weaponOf(unit.kind, false), eta = Math.max(0, range - coreRadius - weapon.range) / SPEED[unit.kind];
+    const weapon = weaponOf(unit.kind, false), eta = Math.max(0, range - coreRadius - (version>=UNIFIED_ATTACK_RANGE_FROM ? effectiveWeaponRange(version,unit.kind) : weapon.range)) / SPEED[unit.kind];
     ranked.push({ unit, eta, range, dps: weapon.damage / Math.max(weapon.cooldown, 1) });
   }
   return ranked.sort((a, b) => a.eta - b.eta || b.dps - a.dps || a.range - b.range || a.unit.id - b.unit.id);
@@ -93,11 +94,11 @@ function matchup(kind, threat, near) {
  */
 export function chooseDefense({
   core, commander, gold, threats = [], pads = [], radius = DEFENSE_RADIUS, coreRadius = 4.6,
-  entry = core, commanderSpeed = .22, padRadius = 1.35, heldPad = -1,
+  version = 11, entry = core, commanderSpeed = .22, padRadius = 1.35, heldPad = -1,
 }) {
   if (!finitePoint(core) || !finitePoint(commander) || !finitePoint(entry) || !Number.isFinite(gold) || gold <= 0) return null;
   if (!(radius > 0 && commanderSpeed > 0 && padRadius >= 0)) return null;
-  const ranked = coreThreats(threats, core, coreRadius, radius);
+  const ranked = coreThreats(threats, core, coreRadius, radius, version);
   if (ranked.length === 0) return null;
   const primary = ranked[0], main = primary.unit;
   const urgent = ranked.filter(t => t.eta <= primary.eta + 40).slice(0, 8);
@@ -112,8 +113,13 @@ export function chooseDefense({
     const distanceToPad = Math.max(0, distance(commander, p) - padRadius);
     const walk = Number.isFinite(p.ticksToPad) && p.ticksToPad >= 0 ? p.ticksToPad : distanceToPad / commanderSpeed;
     const weapon = weaponOf(kind, target.air);
-    const gap = distance(entry, main), range = me.suicide ? SCOURGE_CONTACT : weapon.range;
-    const intercept = Math.max(0, gap - range) / SPEED[kind] + firstHitTicks(kind, target.air, Math.min(gap, range));
+    const center = distance(entry, main), boxed = version>=UNIFIED_ATTACK_RANGE_FROM;
+    const gap = boxed ? worldGap({kind,x:entry.x,z:entry.z},main) : center;
+    const range = boxed ? effectiveWeaponRange(version,kind,target.air) : me.suicide ? SCOURGE_CONTACT : weapon.range;
+    const advance = Math.max(0,gap-range);
+    // Gap controls when the defender can launch; travel of the launched shot
+    // is separately estimated to the target's position (not the gap).
+    const intercept = advance / SPEED[kind] + firstHitTicks(kind, target.air, boxed ? Math.max(0,center-advance) : Math.min(gap,range));
     const reaction = walk + intercept;
     const late = Math.max(0, reaction - primary.eta);
     // Per-gold efficiency favors affordable responses over hoarding; formations get

@@ -27,9 +27,9 @@ import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortra
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
-// Preserve the old Pages and offline entry points as simulation 8.
+// Select the requested trial while preserving the official and offline entry points.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION, S.UNIFIED_ATTACK_RANGE_FROM].includes(requestedMatch) ? requestedMatch : S.VERSION;
 const DEFENSE_LAB = MATCH_VERSION >= DEFENSE_VERSION;
 const DRAGOON_FX = MATCH_VERSION >= DEFENSE_TUNING_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';

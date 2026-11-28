@@ -43,7 +43,7 @@ try {
       await page.eval('__step(3)');
       await page.until("document.querySelector('#dossier p').textContent.includes('發射瞬間鎖定的位置')");
     }
-    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?16:10,2700]);
+    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?17:10,2700]);
     assert.equal(await page.eval("!!__dev02.specialZones || document.body.textContent.includes('全場清除')"),specialLab);
     if (specialLab) {
       const zones=await page.eval('__dev02.specialZones()');

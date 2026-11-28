@@ -24,14 +24,14 @@ try {
     const page=await browser.open(entry+'#seed=3&quality=std',{stepped:true,w,h});
     await page.until("!!window.__dev02 && !!document.querySelector('[data-seat]')");
     await page.clickOn('[data-seat="N"]');
-    assert.deepEqual(await page.eval('[__dev02.snapshot().version,__dev02.snapshot().seats.N.gold]'),[16,960]);
+    assert.deepEqual(await page.eval('[__dev02.snapshot().version,__dev02.snapshot().seats.N.gold]'),[17,960]);
     await page.clickOn('[data-special-launch]');
     await page.clickOn(`[data-special-action="${power}"]`);
     assert.equal(await page.eval("document.querySelector('[data-special-confirm]').hidden || document.querySelector('[data-special-confirm]').disabled"),true);
     assert.deepEqual(await page.eval('[__dev02.snapshot().seats.N.spent,__dev02.record().commands.length]'),[0,0]);
     await page.eval("document.querySelector('#special-power-dialog').close(); document.getElementById('speed').click()");
     await page.eval(`(async()=>{window.__specialModule=await import(new URL('./dev02-four-seats/special-powers.mjs',location.origin)); window.__specialSim=await import(new URL('./dev02-four-seats/sim.mjs',location.origin)); return 1;})()`);
-    const eligible=`(()=>{const s=__dev02.snapshot(), dim=__specialSim.dimFor(16);return s.units.filter(u=>u.team!==s.seats.N.team&&u.hp>0&&__specialModule.inSpecialPowerZone('${power}',dim,u.x,u.z)).map(u=>u.id)})()`;
+    const eligible=`(()=>{const s=__dev02.snapshot(), dim=__specialSim.dimFor(17);return s.units.filter(u=>u.team!==s.seats.N.team&&u.hp>0&&__specialModule.inSpecialPowerZone('${power}',dim,u.x,u.z)).map(u=>u.id)})()`;
     for (let i=0;i<35;i++) {
       if (await page.eval(`__dev02.snapshot().seats.N.gold>=${cost}`) && (await page.eval(eligible)).length) break;
       await page.eval('__step(10,100)');
