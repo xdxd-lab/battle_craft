@@ -44,3 +44,8 @@ npm test
 - [跨 AI 研究交接快照](research/battle_craft-source-master-handoff.md) · [3D Garden 開發指南快照](research/battle_craft-source-3dgarden-handoff.md)
 - [3D Garden 模型及個別來源](assets/3dgarden/README.md) · [3D Garden 授權](https://www.3dgarden.app/licence)
 - [Three.js MIT 授權](vendor/THREE-LICENSE.txt) · [Draco Apache 2.0 授權](vendor/addons/draco/LICENSE.txt)
+
+## 兵種資料
+
+- [兵種中文名稱對照](research/BC-UNIT-NAMES.md)
+- [v6-4 候選兵種：2009 SPEED 購兵與屬性](research/BC-V6-4-UNIT-CANDIDATES.md)
