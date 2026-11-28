@@ -6,8 +6,8 @@
 
 | 證據 | 可用來核對 | 不據此斷定 |
 | --- | --- | --- |
-| [2009 鐵之狂傲 SCMDraft2 教學](https://www.gamez.com.tw/t/topic/374947) | 當時中文玩家稱「十字對衝」；記錄 SPEED 版買 Marine、區域轉送和持續觸發。搜尋索引可讀，直連附件本輪逾時。 | 附件的位元組身分、所有兵種與實際收入速率。搜尋詞中的 Flashback 不能取代來源中的實際拼法 FastBlack。 |
-| [SCMSCX SPEED 2tzpVkp9](https://scmscx.com/map/2tzpVkp9) 與 [非 SPEED v2.91f 7zGY2kzG](https://scmscx.com/map/7zGY2kzG) | 兩份可重現的 Brood War 地圖，適合比對 Trigger 與 CHK 覆寫。兩份 SCX、CHK、Trigger 匯出均與既有雜湊表相符。 | 兩份同系地圖不能合併為一套數值；未證明哪份是論壇 RAR 內的版本。 |
+| [2009 鐵之狂傲 SCMDraft2 教學](https://www.gamez.com.tw/t/topic/374947) | 當時中文玩家稱「十字對衝」；記錄 SPEED 版買 Marine、區域轉送和持續觸發。已取回並驗證教學附件，見下節。 | 未實測的兵種行為與實際收入速率。搜尋詞中的 Flashback 不能取代來源中的實際拼法 FastBlack。 |
+| [SCMSCX SPEED 2tzpVkp9](https://scmscx.com/map/2tzpVkp9) 與 [非 SPEED v2.91f 7zGY2kzG](https://scmscx.com/map/7zGY2kzG) | 兩份可重現的 Brood War 地圖，適合比對 Trigger 與 CHK 覆寫。兩份 SCX、CHK、Trigger 匯出均與既有雜湊表相符。 | 兩份同系地圖不能合併為一套數值；兩份鏡像與論壇 RAR 內的 SCX 都不是同一份位元組。 |
 | [SC2 重製作者改版紀錄](https://www.curseforge.com/sc2/maps/battlecraft/files/440142) | 2010 到 2012 的改版與 Hyper（收入節奏、單位時間倍率分開改）。[SC2Mapster](https://sc2mapster.wiki.gg/) 可參照編輯器的單位／武器／效果資料拆分；本站本次讀取回 403。 | 不用 SC2 或 Hyper 數值代替 Brood War 舊圖實測。 |
 | [BWAPI 單位陣列](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/UnitType.cpp)／[武器陣列](https://github.com/bwapi/bwapi/blob/d727fed68558c506163048ea889131d8cbb33915/bwapi/BWAPILIB/Source/WeaponType.cpp) | BWAPI 對照的引擎預設資料，含英雄與一般單位的區分。[Blizzard 神民資料](https://classic.battle.net/scc/protoss/pstats.shtml)與[傷害說明](https://classic.battle.net/scc/gs/damage.shtml)可交叉比對。 | 預設值不等於舊圖選區扣款、實際對局數值或已確認的 BaattleCraft 平衡。 |
 | [OpenBW 發彈](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L14674-L14701)／[傷害結算](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L13658-L13738) | 獨立引擎在雙彈條件下建立兩個彈體物件，每次命中各自結算；可據此寫待驗的情境。 | 不是 Blizzard 原生引擎逐幀證據，不由程式推估原版發射間隔、落點時間或飛彈速度。 |
@@ -21,6 +21,13 @@
 ```sh
 python3 research/tools/extract-bwapi-reference.py UnitType.cpp WeaponType.cpp > research/battle_craft-bwapi-engine-reference.csv
 ```
+
+## 2009 年論壇實物附件（2026-11-28 查證，台灣時間）
+
+- [2009-09-28 教學原帖第 11 則](https://www.gamez.com.tw/t/topic/374947/11)的 [BattleCraft-Fastblack-SPEED.rar](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar)：48,068 bytes。實測 SHA-1 `0dbb7509d3a66c88a603388680e7397be3f5e93c` 與 Discourse 公開短網址推得的值一致；SHA-256 `9e291722078a00efc1edc1a2b57e10df2112846ae49442cf2077a2a6cd00daf7`。這確認是現存教學連結指向的附件，不代表已找到所有歷史版本。
+- 壓縮包只有一份 `BattleCraft-Fastblack-SPEED.scx`，47,973 bytes，SHA-256 `2c174ba874184625a0e61dd3eea50f5c11ac0918137212206f20de15e922cd29`。以 scmJS 0.18.0 取出的 CHK SHA-256 為 `c30ae248e68f003bccf10efa0bf2a15ad61995449fd39c62ebfaf2e329cbe16f`，Trigger 純文字匯出 SHA-256 為 `23bcfb659f54da971e68cf0fbde4b33545badea535a4b83b38d9e7601c78e8ea`。
+- 與 SPEED 鏡像 `2tzpVkp9` 比對：SCX、CHK、Trigger 都不同。CHK 的 `UNIT` 與 `TRIG` 資料不同；例如 4,500 礦 Armageddon 在論壇版的兩條路線清除適用所有玩家，鏡像版則限非共享勝利同盟的玩家。論壇版亦沒有鏡像版給 P2–P4 持續扣 10 礦的那段觸發。這些是靜態資料差異，尚未在遊戲中量測；不能當成所有 SPEED 版本共用的行為。
+- 以論壇附圖或教學為重現目標時，優先用這份確證附件；研究其他版本時保留鏡像版本與雜湊。公開庫只留來源連結、指紋與分析，不放附件或完整匯出。[來源追蹤 #5](https://github.com/xdxd-lab/battle_craft/issues/5)狀態未由此文件變更。
 
 ## 神民斥候（Scout）：目前已知、可比與未決
 
@@ -44,7 +51,7 @@ v5-9 現行做法可由 [combat.mjs](../dev02-four-seats/combat.mjs) 和 [qa-ros
 
 ## 缺口／等待同步
 
-- 若手上有論壇原 RAR（或已確定的 SCX／雜湊）、實際使用的對戰錄影與速度設定，先對版本而不是重複整理舊圖。不要把 RAR、SCX、完整 CHK/TRIG 匯出、遊戲圖音或私人對話放進公開庫。
+- 已取得論壇 RAR。若取得實際使用的對戰錄影、速度設定或其他本地副本，先對版本而不是重複整理舊圖。不要把 RAR、SCX、完整 CHK/TRIG 匯出、遊戲圖音或私人對話放進公開庫。
 - 舊交接提到九兵種 QA3／QA4 的完整報告與解析工具未上 GitHub；目前兩份公開鏡像已獨立重取，但不代表所有本地副本都同步。若有 Scout 實機結論、資料來源或已定稿的速度換算，優先交接其檔名、版本、依據與已驗收案例。
 - 材質來源繼續放在 [3D Garden](../assets/3dgarden/README.md)、[Poly Haven](../assets/polyhaven/README.md)；[音樂](../assets/music/README.md)另記來源、署名、授權及處理。新增採用素材才更新清單，本輪沒有把任何歷史參考圖資當作遊戲資產。
 
