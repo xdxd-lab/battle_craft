@@ -4,7 +4,7 @@
 
 ## SC1 教學與原始附件
 
-[鐵之狂傲教學](https://www.gamez.com.tw/t/topic/374947)的搜尋快取保有 2009-09-28 的 SCMDraft2 操作紀錄，可獨立交叉核對 150 礦、12 名 Marine、購入區轉送、兩條道路的攻擊指令，以及下令後等待 1.5 秒的範例。教學的外觀是踩信標，實際檢查的是框在信標上的 Location。教學頁和 [RAR 直連](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar)的即時請求回傳 HTTP 502。Wayback 的精確 URL 索引未列出可下載的成功存檔。本次未取得有效 RAR，無法做與論壇附件的逐位元組認證。
+[鐵之狂傲教學](https://www.gamez.com.tw/t/topic/374947)的搜尋快取保有 2009-09-28 的 SCMDraft2 操作紀錄，可獨立交叉核對 150 礦、12 名 Marine、購入區轉送、兩條道路的攻擊指令，以及下令後等待 1.5 秒的範例。教學的外觀是踩信標，實際檢查的是框在信標上的 Location。初次直讀逾時；2026-11-28（台灣）重試已成功取得並驗證 [RAR 附件](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar)。論壇原 SCX 並不等同於先前核對的兩個鏡像，指紋與差異見 [v6-0 戰鬥資料基準](BC-V6-COMBAT-REFERENCE.md#2009-年論壇實物附件2026-11-28-查證台灣時間)。
 
 ## 實際 SCX／CHK 解析
 
@@ -29,13 +29,13 @@
 | 經濟 | #59 持續觸發 +35 礦，#93 等待 10 後 +75，#94 對 P2–P4 持續 −10。這些是分開的動作；實際頻率受 Brood War 掃描和等待互動影響。#6 是擊殺排行榜，靜態匯出中未找到基準版的擊殺加礦或全員固定起始礦設定。預置有 40 個礦區以及工人，實際採礦影響尚未測。 |
 | 勝負與後期 | #2 檢查非同盟勝利玩家的 Pylon 為零時勝利，#3 檢查自己的 Pylon 為零時敗北。#7–8 在 Elapsed Time 600 後提示並持續把護盾降為零。地圖另有空域限制與特殊能力。 |
 
-SCX 證據讓經濟假說比原交接稿更具體，但無法證明哪個同名樣本是 2009 年 RAR 內的那一份，或給出牆鐘每秒速率。要判定「比某版本快多少」，需要選定同系對照版並在相同遊戲速度下量測。
+SCX 證據讓經濟假說比原交接稿更具體，但不能給出牆鐘每秒速率；後續核對的論壇附件也不能與兩個鏡像混用。要判定「比某版本快多少」，需要選定同系對照版並在相同遊戲速度下量測。
 
 ## SC2 重製版改版紀錄
 
 ### 歷史畫面與介面
 
-- SC1 SPEED 基準鏡像與 FastBlack v2.91f 的 CHK 都使用 96×96 Space Platform。SPEED 的 `COLR` 前四席索引依序為 `0,1,2,3`，v2.91f 為 `0,1,8,4`。這是兩份地圖內的索引紀錄，對局實際配色也取決於遊戲版本與顯示設定。原論壇 RAR 直連本輪重試仍回 502，Wayback Availability API 亦未回傳該短網址的存檔。[SPEED 鏡像](https://scmscx.com/map/2tzpVkp9) · [FastBlack v2.91f](https://scmscx.com/map/7zGY2kzG) · [論壇附件](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar)
+- SC1 SPEED 基準鏡像與 FastBlack v2.91f 的 CHK 都使用 96×96 Space Platform。SPEED 的 `COLR` 前四席索引依序為 `0,1,2,3`，v2.91f 為 `0,1,8,4`。這是兩份地圖內的索引紀錄，對局實際配色也取決於遊戲版本與顯示設定。論壇 RAR 在稍後重試取回；本段兩筆鏡像數據不因此改指向論壇版。[SPEED 鏡像](https://scmscx.com/map/2tzpVkp9) · [FastBlack v2.91f](https://scmscx.com/map/7zGY2kzG) · [論壇附件](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar)
 - 重製作者的圖庫保留一張標為 `sc1bw_bca0.1` 的地圖鳥瞰圖，可看到深色底、淺色平台輪廓、深色行軍帶與成組的信標。該圖的版本標籤不同，畫面也只有地圖，無法據此核對 SPEED 的對局 HUD。[作者圖庫](https://www.curseforge.com/sc2/maps/battlecraft) · [SC1 BCA 鳥瞰](https://media.forgecdn.net/attachments/154/780/bca.jpg)
 - SC2 作者實機圖可見深色金屬網板戰場、左下小地圖、右上計分或投票版面、下方單位與指令資訊。v2.3.5 畫面保留 Score、Income 與按玩家著色的列，購買提示同時顯示價格、用途和攻擊目標。較早的圖可讀到 Life Crystal、Buy Zerg Units 和 Leaderboard；作者說明另列礦物、瓦斯及購兵快捷鍵。這些是 SC2 重製版的介面證據。[SC2 v2.3.5 實機圖](https://media.forgecdn.net/attachments/154/782/bc_2.3.5_igp.jpg) · [較早期 SC2 實機圖](https://media.forgecdn.net/attachments/154/768/bc012.jpg)
 - BaattleCraft 可借用其資訊優先順序。戰場上優先辨認戰線、隊伍、席位與場外購買區，購兵資訊凸顯兵種職責、價格、每批數量及對地／對空能力。套用本專案的半寫實材質與原創介面。四個購買區的逆時鐘位置及雙鏡頭基準屬本輪 Web 設計。
@@ -59,7 +59,7 @@ SCX 證據讓經濟假說比原交接稿更具體，但無法證明哪個同名�
 
 | 網頁 | 可用之處 |
 | --- | --- |
-| [鐵之狂傲地圖製作教學](https://www.gamez.com.tw/t/topic/374947)・[原 RAR](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar) | 最接近使用者記憶的中文原始證據。搜尋快取可交叉核對，附件即時 502。 |
+| [鐵之狂傲地圖製作教學](https://www.gamez.com.tw/t/topic/374947)・[原 RAR](https://www.gamez.com.tw/uploads/short-url/1XtPBgghg6jzzUR5rNLRAceXrnS.rar) | 最接近使用者記憶的中文原始證據。已驗證其公開附件；與先前兩份鏡像不同。 |
 | [SCMSCX FastBlack v2.91f](https://scmscx.com/map/7zGY2kzG)・[同名 SPEED 基準鏡像](https://scmscx.com/map/2tzpVkp9) | SC1 的地圖檔與索引。已拿到真實位元組。用 ID 和雜湊識別版本。 |
 | [SC2 BattleCraft](https://www.curseforge.com/sc2/maps/battlecraft)・[Changelog](https://www.curseforge.com/sc2/maps/battlecraft/files/440142) | 重製者的玩法、署名、版本與平衡設計。適合借鏡可讀性與節奏。 |
 | [SC2 作者單位試算表](https://docs.google.com/spreadsheets/d/1yffV3wtjpGJiqRcktuNPU8TQUSFzTbt-xSIklNTUXZ8/edit) | 找到作者入口，未能讀取內容。無法承諾欄位或資料完整性。 |
@@ -86,7 +86,7 @@ SCX 證據讓經濟假說比原交接稿更具體，但無法證明哪個同名�
 
 ## 2026-11-28 雲端重取
 
-以原提示詞 `battlecraft flashback speed` 找到 [SCMSCX FastBlack 版本索引](https://scmscx.com/map/7zGY2kzG) 和 [SC2 作者改版紀錄](https://www.curseforge.com/sc2/maps/battlecraft/files/440142)，再以史料拼法 `BattleCraft-Fastblack-SPEED` 找到 [2009 鐵之狂傲文章](https://www.gamez.com.tw/t/topic/374947)。文章可從搜尋索引核對；附件從雲端請求逾時，未取得 RAR。這些是三種不同的證據，不當作同一圖的連續版本。
+以原提示詞 `battlecraft flashback speed` 找到 [SCMSCX FastBlack 版本索引](https://scmscx.com/map/7zGY2kzG) 和 [SC2 作者改版紀錄](https://www.curseforge.com/sc2/maps/battlecraft/files/440142)，再以史料拼法 `BattleCraft-Fastblack-SPEED` 找到 [2009 鐵之狂傲文章](https://www.gamez.com.tw/t/topic/374947)。文章可從搜尋索引核對；附件雲端初次請求逾時，同日重試成功。這些是三種不同的證據，不當作同一圖的連續版本。
 
 使用 scmJS 0.18.0 從 SCMSCX 獨立重取 `2tzpVkp9` 和 `7zGY2kzG`。各自的 SCX、CHK、Trigger 匯出三項 SHA-256 均與[樣本表](battle_craft-scx-checksums.csv)相符。研究原件與記錄保存在 Git 忽略的 `research/local-source/cloud-intake-20261128/`，不分發。原始碼與 Web 設定未被地圖檔覆寫。
 
