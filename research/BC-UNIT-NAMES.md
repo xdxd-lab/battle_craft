@@ -13,8 +13,10 @@
 | 禿鷹 | Vulture | 禿鷹車 |
 | 女武神 | Valkyrie | 瓦格雷 |
 | 被感染的人類 | Infested Terran | 感染人類 |
+| 被感染的凱瑞根 | Infested Kerrigan | 感染凱莉根 |
+| 聖甲蟲 | Scarab | — |
 
-神民（Protoss）、刺蛇（Hydralisk）、破壞能（Archon）、死靈式戰機（Wraith）沿用既定用詞。異形蟲（Zergling）與自殺蟲（Scourge）是不同兵種；被感染的人類（Infested Terran）與英雄 Infested Kerrigan 分列。英雄的英文人名保持不變。
+神民（Protoss）、刺蛇（Hydralisk）、破壞能（Archon）、死靈式戰機（Wraith）沿用既定用詞。異形蟲（Zergling）與自殺蟲（Scourge）是不同兵種；被感染的人類（Infested Terran）與英雄被感染的凱瑞根（Infested Kerrigan）分列。聖甲蟲是掠奪者發射的攻擊物件，不是掠奪者的另一個名稱。英雄的英文人名保持不變。
 
 - [v6-4 候選兵種表](BC-V6-4-UNIT-CANDIDATES.md)：依 2009 SPEED 原圖對照單位與英雄。
 - [歷史兵種與購兵區對照](BATTLECRAFT-UNIT-REFERENCE.md)：比較 SPEED 與 FastBlack。
