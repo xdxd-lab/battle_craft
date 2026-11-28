@@ -17,6 +17,12 @@ const shapes = Object.freeze(Object.fromEntries(Object.entries(GROUND_DAT_EXTENT
   [k, Object.freeze(b.map(v => (v + .5) * WORLD_PER_PX))])));
 export const groundExtents = kind => Object.hasOwn(shapes, kind) ? shapes[kind] : null;
 const shapeOf = u => groundExtents(u.kind);
+// Visible spacing in the movement solver only. Weapons continue using DAT
+// dimensions (groundExtents, groundGap), and old records retain the prior solver.
+const DRAGOON_LANE_EXTENTS=Object.freeze(shapes.dragoon.map(v=>v * (.89 / (32 * WORLD_PER_PX))));
+const WIDER_DRAGOON_EXTENTS = Object.freeze(DRAGOON_LANE_EXTENTS.map(v=>v*1.2));
+export const movementExtents = (kind,dim) => dim?.dragoonLaneClearance && kind==='dragoon'
+  ? (dim.dragoonClearanceScale===1.2 ? WIDER_DRAGOON_EXTENTS : DRAGOON_LANE_EXTENTS) : groundExtents(kind);
 const alive = u => u.hp === undefined || u.hp > 0;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(v, hi));
 const sq = v => v * v;
@@ -29,8 +35,8 @@ export function groundGap(a, b) {
   const [bx, bz, br, bb] = toBox(bs, b.x, b.z);
   return Math.hypot(Math.max(0, ax - br, bx - ar), Math.max(0, az - bb, bz - ab));
 }
-export function groundOverlap(a, b) {
-  const as = shapeOf(a), bs = shapeOf(b);
+export function groundOverlap(a, b, dim) {
+  const as = movementExtents(a.kind,dim), bs = movementExtents(b.kind,dim);
   if (!as || !bs) return false;
   const [ax, az, ar, ab] = toBox(as, a.x, a.z);
   const [bx, bz, br, bb] = toBox(bs, b.x, b.z);
@@ -62,7 +68,7 @@ export function createGroundTerrain(dim, rules) {
     return true;
   }
   return { contains, fits(kind,x,z) {
-    const shape = groundExtents(kind);
+    const shape = movementExtents(kind,dim);
     return !!shape && Number.isFinite(x) && Number.isFinite(z) && contains(...toBox(shape,x,z));
   }};
 }
@@ -93,10 +99,12 @@ const STEER = [
 // resolution they must apply the whole returned batch, not just winners.
 export function createGroundOccupancy(units, dim, rules) {
   const terrain = createGroundTerrain(dim,rules), cells = new Map(), bodies = new Map();
+  const usedShape = u => movementExtents(u.kind,dim);
+  const maxExtent = dim.dragoonLaneClearance ? Math.max(MAX_EXTENT,...movementExtents('dragoon',dim)) : MAX_EXTENT;
   const key = (cx,cz) => `${cx},${cz}`;
   const at = (x,z) => key(Math.floor(x/CELL),Math.floor(z/CELL));
   function put(u) {
-    const body = { id:u.id, x:u.x, z:u.z, kind:u.kind, shape:shapeOf(u) };
+    const body = { id:u.id, x:u.x, z:u.z, kind:u.kind, shape:usedShape(u) };
     if (bodies.has(body.id)) throw new RangeError(`Duplicate ground id: ${body.id}`);
     if (!Number.isFinite(body.x) || !Number.isFinite(body.z)) throw new TypeError(`Invalid ground coordinate: ${body.id}`);
     const index = at(body.x,body.z);
@@ -120,8 +128,8 @@ export function createGroundOccupancy(units, dim, rules) {
   }
   function blocked(m,x,z,dx,dz,envelope) {
     const [l,t,r,b] = envelope;
-    for (let cx=Math.floor((l-MAX_EXTENT)/CELL); cx<=Math.floor((r+MAX_EXTENT)/CELL); cx++)
-      for (let cz=Math.floor((t-MAX_EXTENT)/CELL); cz<=Math.floor((b+MAX_EXTENT)/CELL); cz++) {
+    for (let cx=Math.floor((l-maxExtent)/CELL); cx<=Math.floor((r+maxExtent)/CELL); cx++)
+      for (let cz=Math.floor((t-maxExtent)/CELL); cz<=Math.floor((b+maxExtent)/CELL); cz++) {
         const cell = cells.get(key(cx,cz));
         if (cell) for (const u of cell) if (u !== m && crosses(m,x,z,dx,dz,u)) return true;
       }
@@ -137,7 +145,7 @@ export function createGroundOccupancy(units, dim, rules) {
     const box = envelope(m,x,z,dx,dz);
     return terrain.contains(...box) && !blocked(m,x,z,dx,dz,box);
   }
-  for (const u of units) if (shapeOf(u) && alive(u)) put(u);
+  for (const u of units) if (usedShape(u) && alive(u)) put(u);
 
   function result(u,dx,dz,side,isBlocked,mode) {
     change(u,u.x+dx,u.z+dz);
@@ -187,19 +195,20 @@ export function createGroundOccupancy(units, dim, rules) {
         ids.add(d.id);
       }
       for (const d of drafts) {
-        const shape = shapeOf(d);
+        const shape = usedShape(d);
         if (!Number.isFinite(d.x) || !Number.isFinite(d.z)) return rollback();
         if (!shape) { placed.push({x:d.x,z:d.z}); continue; }
         const dir = SEATS.find(s=>s.id===d.seat)?.dir;
         if (!dir) return rollback();
         const [rx,rz] = dir, sx=-rz, sz=rx;
         let found = null;
+        const stride=dim.dragoonLaneClearance && d.kind==='dragoon' ? .46*(dim.dragoonClearanceScale??1) : .43;
         // Row-major, centre-out. Rows alternate away from and towards the arena.
         // Bounded to ~3 world units around the requested entrance, not a teleport.
         for (let i=0; i<=14 && !found; i++) {
-          const f = i===0 ? 0 : Math.ceil(i/2)*(i%2 ? 1 : -1)*.43;
+          const f = i===0 ? 0 : Math.ceil(i/2)*(i%2 ? 1 : -1)*stride;
           for (let j=0; j<=14 && !found; j++) {
-            const k = j===0 ? 0 : Math.ceil(j/2)*(j%2 ? 1 : -1)*.43;
+            const k = j===0 ? 0 : Math.ceil(j/2)*(j%2 ? 1 : -1)*stride;
             const x=d.x+rx*f+sx*k, z=d.z+rz*f+sz*k;
             if (clear({shape},x,z,0,0)) found={x,z};
           }

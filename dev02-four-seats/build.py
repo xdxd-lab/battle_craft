@@ -53,3 +53,25 @@ for version in ('v6-0', 'v6-1'):
         dest = ROOT / f'battle_craft-{version}{suffix}.html'
         dest.write_text(page.replace('<script>/* BUNDLE */</script>', body))
         print(f'{dest} ({dest.stat().st_size:,} bytes)')
+
+# A separate entry point for layout and pricing review; the main v6-1 entry never enables the beacons.
+lab = ROOT / 'battle_craft-special-lab.html'
+lab.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 特殊信標試驗')
+               .replace('data-match="8"', 'data-match="10" data-special-lab="true"')
+               .replace('<script>/* BUNDLE */</script>', scripts))
+print(f'{lab} ({lab.stat().st_size:,} bytes)')
+
+defense = ROOT / 'battle_craft-defense-lab.html'
+defense.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 守城試驗 8')
+                   .replace('data-match="8"', 'data-match="17" data-special-lab="true" data-special-controls="direct"')
+                   .replace('<div id="now-playing"', '<button id="tower-buy" hidden></button><div id="now-playing"')
+                   .replace('<div id="msg"', '<div id="tower-marker" hidden>砲塔</div><div id="msg"')
+                   .replace('</style>', '#tower-marker{position:fixed;z-index:2;pointer-events:none;transform:translate(-50%,-112%);font-size:12px;line-height:1.1;font-weight:750;color:#d9fbff;background:#102931;border:1px solid #92e7ef;border-radius:4px;padding:3px 5px;white-space:nowrap;}#tower-marker:after{content:"";position:absolute;top:100%;left:50%;width:1px;height:5px;background:#92e7ef;}#tower-marker[hidden]{display:none}</style>')
+                   .replace('<script>/* BUNDLE */</script>', scripts))
+print(f'{defense} ({defense.stat().st_size:,} bytes)')
+
+# The official v6-2 entry uses the vetted direct map beacons. Keep both
+# historical versions and the preview entry independently addressable.
+release = ROOT / 'battle_craft-v6-2.html'
+release.write_text(re.sub(r'BaattleCraft 守城試驗 8', 'BaattleCraft v6-2', defense.read_text()))
+print(f'{release} ({release.stat().st_size:,} bytes)')

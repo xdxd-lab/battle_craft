@@ -35,6 +35,7 @@ int main(int argc,char** argv) {
       const std::string motion=argv[4];
       if(motion=="killtarget") f.kill_unit(t);
       else if(motion=="killshooter") f.kill_unit(u);
+      else if(motion=="teleportfar") f.move_unit(t,xy(tx,1504));
       else if(motion=="teleport") f.move_unit(t,xy(tx,1004));
       else f.set_unit_order(t,f.get_order_type(Orders::Move),xy(tx,704+std::stoi(argv[4])));
       changed=true;

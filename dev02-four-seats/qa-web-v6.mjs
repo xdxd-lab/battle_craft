@@ -10,7 +10,10 @@ const root = fileURLToPath(new URL('..', import.meta.url)).replace(/\/$/, '');
 const MIME = { '.html':'text/html', '.js':'text/javascript', '.mjs':'text/javascript', '.jpg':'image/jpeg', '.mp3':'audio/mpeg', '.glb':'model/gltf-binary', '.wasm':'application/wasm' };
 let server, browser;
 const legacy = process.env.BC_LEGACY_V6 === '1';
-const version = legacy ? 'v6-0' : 'v6-1';
+const defenseLab = process.env.BC_DEFENSE_LAB === '1';
+const specialLab = process.env.BC_SPECIAL_LAB === '1' || defenseLab;
+assert(!(legacy && specialLab));
+const version = defenseLab ? 'defense-lab' : specialLab ? 'special-lab' : legacy ? 'v6-0' : 'v6-1';
 try {
   let base = process.env.BC_PAGES_URL;
   if (!base) {
@@ -27,12 +30,12 @@ try {
     base = `http://127.0.0.1:${server.address().port}/`;
   }
   browser = await launch({ width: 1280, height: 820 });
-  for (const [w,h,tier,seat] of [[1280,820,'high','E'],[844,390,'std','N']]) {
+  for (const [w,h,tier,seat] of (process.env.BC_DEFENSE_NARROW ? [[844,390,'std','N']] : [[1280,820,'high','E'],[844,390,'std','N']])) {
     const entry = new URL(`dev02-four-seats/battle_craft-${version}.html`, base);
     entry.hash = `seed=3&quality=${tier}`;
     const page = await browser.open(entry.href, { stepped:true, w, h });
     await page.until("!!window.__dev02 && !!document.querySelector('[data-seat]')");
-    assert.match(await page.eval('document.title'), new RegExp(version));
+    assert.match(await page.eval('document.title'), defenseLab ? /守城試驗/ : specialLab ? /特殊信標試驗/ : new RegExp(version));
     await page.clickOn(`[data-seat="${seat}"]`);
     if (!legacy && tier==='high'){
       assert.match(await page.eval("document.querySelector('[data-profile=wraith]').textContent"),/死靈式戰機/);
@@ -40,10 +43,38 @@ try {
       await page.eval('__step(3)');
       await page.until("document.querySelector('#dossier p').textContent.includes('發射瞬間鎖定的位置')");
     }
-    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:10,2700]);
-    assert.equal(await page.eval("!!__dev02.specialZones || document.body.textContent.includes('全場清除')"),false);
+    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?17:10,2700]);
+    assert.equal(await page.eval("!!__dev02.specialZones || document.body.textContent.includes('全場清除')"),specialLab);
+    if (specialLab) {
+      const zones=await page.eval('__dev02.specialZones()');
+      assert.equal(zones.length,4);
+      assert(zones.every(z=>z.positions.length===2));
+      assert.match(await page.eval("document.querySelector('#rules').textContent"),defenseLab ? /敵對兵清除/ : /未定價，不能購買或發動/);
+      await page.eval('__step(1)');
+      const [x,y]=await page.eval(`(()=>{const z=__dev02.specialZones().find(v=>v.id==='${seat}'); return __dev02.screen(...z.positions[0],.25);})()`);
+      assert(x>=0&&x<w&&y>=0&&y<h,'own reserve platform is in view');
+      await page.click(x,y);
+      await page.eval('__step(3)');
+      assert.deepEqual(await page.eval(`[__dev02.snapshot().seats.${seat}.spent,__dev02.snapshot().seats.${seat}.buys]`),[0,0]);
+      if(defenseLab) await page.eval("document.querySelector('#special-power-dialog[open]')?.close()");
+    }
+    if(defenseLab){
+      const button='#tower-buy';
+      assert.match(await page.eval(`document.querySelector('${button}').textContent`),/建砲塔\s*1[,]?400\s*礦/);
+      assert.equal(await page.eval(`document.querySelector('${button}').disabled`),true);
+      const elapsed=await page.eval("document.querySelector('#speed').click(); __step(10,100); [__dev02.snapshot().tick,document.querySelector('#speed').textContent]");
+      assert.equal(await page.eval(`document.querySelector('${button}').disabled`),false,JSON.stringify(elapsed));
+      await page.clickOn(button);await page.eval('__step(3)');
+      assert.deepEqual(await page.eval(`[__dev02.snapshot().seats.${seat}.tower.hp,__dev02.snapshot().seats.${seat}.spent]`),[180,1400]);
+      assert.equal(await page.eval(`document.querySelector('${button}').disabled`),true);
+      await page.eval("document.querySelector('#speed').click(); document.querySelector('#speed').click()");
+      const marker=await page.eval("(()=>{const m=document.querySelector('#tower-marker'), b=m.getBoundingClientRect();return [m.hidden,b.x,b.y,b.width]})()");
+      assert.equal(marker[0],false,JSON.stringify(marker));
+      assert(marker[1]>0&&marker[1]<w-30&&marker[2]>0&&marker[2]<h-24&&marker[3]>24,JSON.stringify(marker));
+      if(process.env.BC_TOWER_SHOT && (!process.env.BC_DEFENSE_NARROW || tier==='std'))await page.shot(process.env.BC_TOWER_SHOT);
+    }
     assert.equal(await page.eval("document.querySelectorAll('#shop button').length"),9); // no purchasable special pad
-    assert.match(await page.eval("document.querySelector('#shop button[data-pad=\"6\"]').textContent"), /40\s*金\s*→\s*3\s*艘/);
+    assert.match(await page.eval("document.querySelector('#shop button[data-pad=\"6\"]').textContent"), defenseLab ? /800\s*礦\s*→\s*3\s*艘/ : /40\s*金\s*→\s*3\s*艘/);
     await page.clickOn('#shop button[data-pad="6"]');
     await page.eval('__step(10)');
     await page.until('__dev02.audio().musicSource === "track"');
@@ -52,8 +83,8 @@ try {
     const bought = `__dev02.snapshot().units.filter(u=>u.seat==='${seat}' && u.kind==='battlecruiser' && u.motion).length`;
     // Crossing another beacon can also buy it under the original shop rules.
     for (let i=0;i<190 && !(await page.eval(bought));i++) await page.eval('__step(3)');
-    assert.equal(await page.eval(bought), 3);
-    assert(await page.eval(`__dev02.snapshot().seats.${seat}.spent`) >= 40);
+    assert(await page.eval(bought) >= 3);
+    assert(await page.eval(`__dev02.snapshot().seats.${seat}.spent`) >= (defenseLab?800:40));
     assert.equal(await page.eval('__dev02.mode()'), 'play');
     assert.deepEqual(page.errors, []);
     await page.close();
