@@ -62,7 +62,7 @@ lab.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 特殊信標�
 print(f'{lab} ({lab.stat().st_size:,} bytes)')
 
 defense = ROOT / 'battle_craft-defense-lab.html'
-defense.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 守城試驗 6')
+defense.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 守城試驗 7')
                    .replace('data-match="8"', 'data-match="17" data-special-lab="true"')
                    .replace('<div id="now-playing"', '<button id="tower-buy" hidden></button><div id="now-playing"')
                    .replace('<div id="msg"', '<div id="tower-marker" hidden>砲塔</div><div id="msg"')

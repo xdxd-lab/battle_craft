@@ -23,6 +23,7 @@ import { buildSpecialZones } from './special-zone.js';
 import { fitSpecialZoneCamera, specialZoneFor, SPECIAL_BEACONS, SPECIAL_ZONE } from './special-zone-layout.mjs';
 import { SPECIAL_POWER_VERSION, SPECIAL_POWER_COSTS, specialPowerZone, specialPowerTargets } from './special-powers.mjs';
 import { createSpecialPowerUi, formatMinerals, powerResult, SPECIAL_POWER_LABELS } from './special-power-ui.js';
+import { COMPACT_SPECIAL_UI_FROM, createCompactSpecialPowerUi } from './compact-special-power-ui.js';
 import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog, ensureDrawingBuffer, overviewPixelRatio, portraitOverviewScale } from './portrait-overview.js';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
@@ -38,6 +39,7 @@ const TOWER_MUZZLE = MATCH_DIM.visibleTower ? 1.54 : 1.25;
 const MATCH_PADS = S.padsFor(MATCH_VERSION).map(p => p.kind === 'wraith' ? { ...p,label: KINDS.wraith.name } : p);
 const MINERALS = MATCH_VERSION >= SPECIAL_POWER_VERSION;
 const ACTIVE_SPECIAL = MINERALS && SPECIAL_LAB;
+const COMPACT_SPECIAL = ACTIVE_SPECIAL && MATCH_VERSION >= COMPACT_SPECIAL_UI_FROM;
 const liveEconomy=S.economyFor(MATCH_VERSION), matchTowerCost=towerCost(MATCH_VERSION);
 const currency=MINERALS?'礦':'金', amount=MINERALS?formatMinerals:String;
 const price = value => `${amount(value)} ${currency}`;
@@ -239,7 +241,13 @@ function resize() {
 }
 
 // ---------- 輸入 → 指令（每個模擬步取最後一個） ----------
-function command(c) { if (mode === 'play' && seat && state.seats[seat].alive) queue = [{ seat, ...c }]; }
+function command(c) {
+  if(mode!=='play' || !seat || !state.seats[seat].alive)return;
+  const input={seat,...c};
+  // A confirmed real-time ability must not erase an unrelated movement input
+  // (or be erased by the next input) before the deterministic step records it.
+  queue=COMPACT_SPECIAL?[...queue.filter(q=>(q.type==='special')!==(c.type==='special')),input]:[input];
+}
 const keys = new Set(), KEY = { w: [0, 1], arrowup: [0, 1], s: [0, -1], arrowdown: [0, -1], a: [-1, 0], arrowleft: [-1, 0], d: [1, 0], arrowright: [1, 0] };
 function sendKeys() { // 螢幕方向依目前鏡頭換成世界方向
   let x = 0, y = 0; for (const k of keys) { x += KEY[k][0]; y += KEY[k][1]; }
@@ -261,7 +269,9 @@ function openSpecialAt(e) {
   pointRay(e);
   if(!ray.ray.intersectPlane(specialPlane,hit))return false;
   const idx=specialZoneFor(seat,MATCH_DIM).ringPositions.findIndex(([x,z])=>Math.hypot(hit.x-x,hit.z-z)<=SPECIAL_ZONE.beaconRadius+.27);
-  return idx>=0 && specialPowerUi.open(SPECIAL_BEACONS[idx].id);
+  if(idx<0)return false;
+  const power=SPECIAL_BEACONS[idx].id;
+  return COMPACT_SPECIAL?specialPowerUi.showHint(power):specialPowerUi.open(power);
 }
 function unitAt(e) {
   pointRay(e);
@@ -297,7 +307,7 @@ canvas.addEventListener('pointerdown', e => {
   if (!e.isPrimary || e.button !== 0) return;
   canvas.focus();
   if (!state || mode === 'menu') return;
-  if (openSpecialAt(e)) return; // only opens the confirmation UI, never casts
+  if (openSpecialAt(e)) return; // explains or opens the legacy UI; never arms or casts
   if (!display.engineering) {
     const kind = unitAt(e);
     if (kind) { dossier.select(kind); return; }
@@ -311,12 +321,12 @@ canvas.addEventListener('pointerdown', e => {
   command({ type: 'goal', x: hit.x, z: hit.z });
 });
 addEventListener('keydown', e => {
-  if(specialPowerUi?.isOpen())return;
+  if(specialPowerUi?.isOpen?.())return;
   const k = e.key.toLowerCase();
   if (k === ' ' && mode !== 'menu' && !document.activeElement?.closest('button, summary')) { e.preventDefault(); return pause(); }
   if (mode !== 'play' || document.activeElement?.closest('#panel')) return;
   if (KEY[k]) { e.preventDefault(); if (!e.repeat && !keys.has(k)) { keys.add(k); sendKeys(); } }
-  else if (k === 'v' && !e.repeat) nextView();
+  else if (k === 'v' && !e.repeat) { if(COMPACT_SPECIAL)specialPowerUi?.close(); nextView(); }
   else if (!e.repeat && MATCH_PADS[+k - 1] && !MATCH_PADS[+k - 1].locked) gotoPad(+k - 1);
 });
 addEventListener('keyup', e => { if (keys.delete(e.key.toLowerCase())) sendKeys(); });
@@ -327,6 +337,7 @@ function releaseInput(discardPending) {
   if (seat && state.seats[seat].dir) queue.push({ seat, type: 'dir', x: 0, z: 0 });
 }
 function loseFocus() {
+  if(COMPACT_SPECIAL)specialPowerUi?.close();
   if (mode !== 'play' && mode !== 'paused') return;
   mouse = null; dossier?.hover(null);
   releaseInput(true);
@@ -395,6 +406,7 @@ function write(e) {
 
 // ---------- 對局 ----------
 function start(id, seed = (Date.now() ^ (Math.random() * 2 ** 32)) >>> 0) {
+  if(COMPACT_SPECIAL)specialPowerUi?.close();
   seat = L.seatById(id) ? id : null;
   record = { version: MATCH_VERSION, seed, bots: S.SEAT_IDS.filter(x => x !== seat), commands: [] };
   state = S.createSim(record); queue = []; keys.clear(); accumulator = 0; mode = 'play'; speed = DEFAULT_SPEED; logRows = [];
@@ -403,7 +415,7 @@ function start(id, seed = (Date.now() ^ (Math.random() * 2 ** 32)) >>> 0) {
   $('log').replaceChildren(); W.clear(fallGroup); shots.live = []; puffs.live = []; prevPos = new Map(); prevShots = new Map();
   buildPads(); setFraming(false); setView(L.parseView(seat ? `seat:${seat}` : 'team:A'), true); shopUi(); $('cover').hidden = true; canvas.focus(); hud();
 }
-function pause() { if (mode === 'play') {
+function pause() { if(COMPACT_SPECIAL)specialPowerUi?.close(); if (mode === 'play') {
   mode = 'paused'; releaseInput(false);
   say('已暫停。', 'info'); } else if (mode === 'paused') { mode = 'play'; say('繼續。', 'info'); } accumulator = 0; hud(); }
 let prevPos = new Map(), prevShots = new Map();
@@ -460,6 +472,7 @@ function tick() {
   if (state.mode === 'end') finish();
 }
 function finish() {
+  if(COMPACT_SPECIAL)specialPowerUi?.close();
   mode = 'end'; keys.clear(); audio.stopEffects(); record.ticks = state.tick; record.digest = S.digest(state); // 終局立即停掉殘留戰鬥音效；模擬已停，不再觸發新音效，音樂照設定續播
   const won = state.winner === 'draw' ? '平手' : !seat ? `${L.TEAMS[state.winner].name}獲勝` : L.seatById(seat).team === state.winner ? '勝利' : '敗北';
   $('card').innerHTML = `<h3 id="result">${won}</h3><p>${time(state.tick)}　種子 ${state.seed}</p><table><tr><th>席位</th><th>核心</th><th>購買</th><th>花費</th><th>部署</th><th>損失</th><th>擊破</th></tr>${L.SEATS.map(s => { const v = state.seats[s.id]; return `<tr><td>${s.name}席（${relName(s.id)}）</td><td>${v.alive ? Math.ceil(v.hp) : '失守'}</td><td>${v.buys}</td><td>${v.spent}</td><td>${v.deployed}</td><td>${v.lost}</td><td>${v.kills}</td></tr>`; }).join('')}</table><div class="row"><button class="go" id="restart">再來一局</button><button id="look">查看戰場</button></div>`;
@@ -468,7 +481,7 @@ function finish() {
 function menu() {
   specialPowerUi?.close();
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${COMPACT_SPECIAL?'礦夠才能啟用特殊信標；可按確認、再按同一招，或等 3 秒。':ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
@@ -694,7 +707,7 @@ $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
 const battlecruiserPad = MATCH_PADS.find(p => p.kind === 'battlecruiser');
-$('rules').innerHTML = [`起始 ${price(liveEconomy.startGold)}、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${MINERALS?'+':''}${price(liveEconomy.income)}、陸戰隊 ${price(MATCH_PADS.find(p=>p.kind==='marine').cost)}；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈式戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈式戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `${MINERALS?'':'版本 8：'}戰鬥巡洋艦每次花 ${price(battlecruiserPad.cost)}部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。',...(ACTIVE_SPECIAL?[`特殊信標需手動確認：敵對兵清除 ${price(SPECIAL_POWER_COSTS.clear)}，敵對兵控制 ${price(SPECIAL_POWER_COSTS.control)}。只選中央與道路上的敵方部隊，控制為主路長度的 70%。`]:SPECIAL_LAB?['特殊信標（未開放）：各席主城順時鐘側有「全場清除」與「控制單位」。兩招都未定價，不能購買或發動。']:[])].map(t => `<li>${t}</li>`).join('');
+$('rules').innerHTML = [`起始 ${price(liveEconomy.startGold)}、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${MINERALS?'+':''}${price(liveEconomy.income)}、陸戰隊 ${price(MATCH_PADS.find(p=>p.kind==='marine').cost)}；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈式戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈式戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `${MINERALS?'':'版本 8：'}戰鬥巡洋艦每次花 ${price(battlecruiserPad.cost)}部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。',...(ACTIVE_SPECIAL?[`${COMPACT_SPECIAL?'特殊信標（3 秒後自動確認，亦可按確認、連按同一招或取消）':'特殊信標需手動確認'}：敵對兵清除 ${price(SPECIAL_POWER_COSTS.clear)}，敵對兵控制 ${price(SPECIAL_POWER_COSTS.control)}。只選中央與道路上的敵方部隊，控制為主路長度的 70%。`]:SPECIAL_LAB?['特殊信標（未開放）：各席主城順時鐘側有「全場清除」與「控制單位」。兩招都未定價，不能購買或發動。']:[])].map(t => `<li>${t}</li>`).join('');
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: MATCH_DIM }));
   if (SPECIAL_LAB) scene.add(buildSpecialZones(MATCH_DIM,{powers:specialDeckPowers}));
@@ -702,7 +715,21 @@ try {
     towers=towerModels(MATCH_DIM);scene.add(towers.root);
     const b=$('tower-buy');b.title=`單席一座，拆毀後不能重買。試驗價 ${price(matchTowerCost)}。`;
     b.onclick=()=>{command({type:'tower'});canvas.focus();};
-    if(ACTIVE_SPECIAL)specialPowerUi=createSpecialPowerUi({
+    if(COMPACT_SPECIAL){
+      specialPowerUi=createCompactSpecialPowerUi({
+        bar:$('bar'),costs:SPECIAL_POWER_COSTS,
+        context:()=>{const own=state?.seats[seat];return {seat,match:record,mode:document.hidden?'background':mode,alive:!!own?.alive,gold:own?.gold??0};},
+        targets:power=>specialPowerTargets(state,seat,power,MATCH_DIM).length,
+        cast:power=>command({type:'special',power}),notice:message=>say(message,'info'),
+      });
+      addEventListener('pagehide',()=>specialPowerUi.close());
+      document.addEventListener('click',e=>{
+        // Shop / tower purchases and commander movement legitimately change
+        // resources while the prompt is pending. Settings do not.
+        if(e.target.closest('#bar button:not(#tower-buy),#panel summary,#save')
+          && !e.target.closest('.compact-special'))specialPowerUi.close();
+      },true);
+    }else if(ACTIVE_SPECIAL)specialPowerUi=createSpecialPowerUi({
       towerButton:b,costs:SPECIAL_POWER_COSTS,zone:power=>({...specialPowerZone(power,MATCH_DIM),coreDistance:MATCH_DIM.coreDistance,corePlatformRadius:MATCH_DIM.corePlatformRadius}),
       context:()=>{const own=state?.seats[seat];return {seat,mode,alive:!!own?.alive,gold:own?.gold??0};},
       targets:power=>state&&seat?specialPowerTargets(state,seat,power,MATCH_DIM).length:0,
