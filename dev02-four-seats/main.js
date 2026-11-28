@@ -32,7 +32,7 @@ const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W,
 const hash = new URLSearchParams(location.hash.slice(1));
 // Select the requested trial while preserving the official and offline entry points.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION, S.UNIFIED_ATTACK_RANGE_FROM, S.FIELD_CONTROLS_VERSION,S.EXPANSION_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION, S.UNIFIED_ATTACK_RANGE_FROM, S.FIELD_CONTROLS_VERSION,S.EXPANSION_VERSION,S.LONG_SHOP_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
 const EXPANSION = MATCH_VERSION >= S.EXPANSION_VERSION;
 const KIND_IDS = rosterFor(Math.max(7,MATCH_VERSION));
 const FIELD_CONTROLS = MATCH_VERSION >= S.FIELD_CONTROLS_VERSION;
@@ -41,6 +41,7 @@ const DRAGOON_FX = MATCH_VERSION >= DEFENSE_TUNING_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
 const SCENE_SPECIAL_DECK = SPECIAL_LAB && !FIELD_CONTROLS;
 const MATCH_DIM = S.dimFor(MATCH_VERSION);
+const CAMERA_DIM=MATCH_VERSION>=S.LONG_SHOP_VERSION?MATCH_DIM:ARENA;
 const TOWER_MUZZLE = MATCH_DIM.visibleTower ? 1.54 : 1.25;
 const MATCH_PADS = S.padsFor(MATCH_VERSION).map(p => p.kind === 'wraith' ? { ...p,label: KINDS.wraith.name } : p);
 const MINERALS = MATCH_VERSION >= SPECIAL_POWER_VERSION;
@@ -215,7 +216,7 @@ function pose() {
   fittedView = anim === 1 ? view : null; fittedSafe = safe; poseRevision++;
   const to = L.viewAngles(view), k = anim * anim * (3 - 2 * anim);
   if (from && anim < 1) { const turn = Math.atan2(Math.sin(to.az - from.az), Math.cos(to.az - from.az)); angles = { az: from.az + turn * k, el: from.el + (to.el - from.el) * k }; } else angles = to;
-  const base=overview?fitArenaCamera:(a,aspect)=>fitNearCamera(a,aspect,seat,{includeCore:FIELD_CONTROLS});
+  const base=overview?(a,aspect)=>fitArenaCamera(a,aspect,CAMERA_DIM):(a,aspect)=>fitNearCamera(a,aspect,seat,{includeCore:FIELD_CONTROLS,dim:CAMERA_DIM});
   W.poseCamera(camera,portraitAtlas?overviewAngles(angles):angles,safe,(a,aspect)=>{
     const fit=base(a,aspect);
     return SCENE_SPECIAL_DECK ? fitSpecialZoneCamera(fit,a,aspect,MATCH_DIM,{seat,overview}) : fit;
@@ -369,8 +370,9 @@ canvas.addEventListener('pointerdown', e => {
   if (!seat || mode !== 'play') return;
   pointRay(e);
   if (!ray.ray.intersectPlane(plane, hit)) return;
-  const [x, z] = S.toLocal(seat, hit.x, hit.z);
-  if (Math.abs(x) > ARENA.shopWidth / 2 || Math.abs(z) > ARENA.shopDepth / 2) return say('只能在自己的購買區移動。', 'info');
+  const inputDim=MATCH_VERSION>=S.LONG_SHOP_VERSION?MATCH_DIM:ARENA;
+  const [x, z] = S.toLocal(seat, hit.x, hit.z,inputDim);
+  if (Math.abs(x) > inputDim.shopWidth / 2 || Math.abs(z) > inputDim.shopDepth / 2) return say('只能在自己的購買區移動。', 'info');
   command({ type: 'goal', x: hit.x, z: hit.z });
 });
 addEventListener('keydown', e => {

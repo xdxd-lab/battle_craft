@@ -17,6 +17,7 @@ import { WARBRINGER_CAPACITY } from './expansion-weapons.mjs';
 
 export const HZ = 30;
 export const FIELD_CONTROLS_VERSION = 18;
+export const LONG_SHOP_VERSION = 20;
 export const VERSION = 10; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈式戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3；9：佔位、空軍慢慢散開、起手；10：九兵種發射和命中（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
@@ -70,11 +71,16 @@ const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6),
 const PADS_V16 = rosterPads(SPECIAL_POWER_VERSION);
 const TWELVE_PAD_POSITIONS = [5.4, 1.8, -1.8, -5.4].flatMap(z => [3, 0, -3].map(x => [x, z]));
 const PADS_V19 = place(rosterFor(EXPANSION_VERSION).map(kind => rosterPad(EXPANSION_VERSION,kind)),TWELVE_PAD_POSITIONS);
-export const padsFor = version => version >= EXPANSION_VERSION ? PADS_V19 : version >= SPECIAL_POWER_VERSION ? PADS_V16 : version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+// Keep v18's nine physical beacons in place. Extend the outer end a single
+// row pitch, parallel to the road, without moving the court away from its lane.
+const SHOP_ROW_PITCH=4.8;
+const LONG_PAD_POSITIONS=[7.2,2.4,-2.4,-7.2].flatMap(z=>[3,0,-3].map(x=>[x,z]));
+const PADS_V20=place(rosterFor(LONG_SHOP_VERSION).map(kind=>rosterPad(LONG_SHOP_VERSION,kind)),LONG_PAD_POSITIONS);
+export const padsFor = version => version >= LONG_SHOP_VERSION ? PADS_V20 : version >= EXPANSION_VERSION ? PADS_V19 : version >= SPECIAL_POWER_VERSION ? PADS_V16 : version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 8 ? CORE.hp * 3 : version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
-const homeFor = version => version >= EXPANSION_VERSION ? {x:0,z:0} : version >= 7 ? HOME_V7 : version >= 6 ? HOME_V6 : HOME_V2;
+const homeFor = version => version >= LONG_SHOP_VERSION ? {x:0,z:4.8} : version >= EXPANSION_VERSION ? {x:0,z:0} : version >= 7 ? HOME_V7 : version >= 6 ? HOME_V6 : HOME_V2;
 const GEOMETRY = {
   1: { dim: L.DIM, shopBounds: [-4, 5.8, -4.2, 4.2] },
   2: { dim: ARENA, shopBounds: [
@@ -99,6 +105,15 @@ GEOMETRY[SPECIAL_POWER_VERSION] = GEOMETRY[DRAGOON_RANGE_TRIAL_FROM];
 GEOMETRY[UNIFIED_ATTACK_RANGE_FROM] = GEOMETRY[SPECIAL_POWER_VERSION]; // Geometry of the map and movement stays v16.
 GEOMETRY[FIELD_CONTROLS_VERSION] = GEOMETRY[UNIFIED_ATTACK_RANGE_FROM];
 GEOMETRY[EXPANSION_VERSION] = {...GEOMETRY[FIELD_CONTROLS_VERSION],dim:{...GEOMETRY[FIELD_CONTROLS_VERSION].dim,shopPadPositions:TWELVE_PAD_POSITIONS}};
+const LONG_SHOP_DIM={...GEOMETRY[EXPANSION_VERSION].dim,
+  shopDepth:ARENA.shopDepth+SHOP_ROW_PITCH,shopRadial:ARENA.shopRadial+SHOP_ROW_PITCH/2,
+  shopPadPositions:LONG_PAD_POSITIONS,padRadius:padRadiusFor(LONG_SHOP_VERSION)};
+GEOMETRY[LONG_SHOP_VERSION]={
+  dim:LONG_SHOP_DIM,shopBounds:[
+    -LONG_SHOP_DIM.shopWidth/2+.6,LONG_SHOP_DIM.shopWidth/2-.6,
+    -LONG_SHOP_DIM.shopDepth/2+.6,LONG_SHOP_DIM.shopDepth/2-.6,
+  ],
+};
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -147,7 +162,7 @@ function apply(state, c, geometry) {
     const active = s.shopChoice ?? s.pad;
     if (active === c.index) {
       s.shopChoice = -1;
-      const path=shopRetreatPath(toLocal(s.id,s.commander.x,s.commander.z,dim),dim.shopPadPositions,padRadiusFor(state.version),state.version>=EXPANSION_VERSION)
+      const path=shopRetreatPath(toLocal(s.id,s.commander.x,s.commander.z,dim),dim.shopPadPositions,padRadiusFor(state.version),state.version>=LONG_SHOP_VERSION?dim:state.version>=EXPANSION_VERSION)
         .map(([a,b])=>{const [x,z]=toWorld(s.id,a,b,dim);return {x,z};});
       s.goal=path.shift();s.shopPath=path.length?path:null;
     } else {
@@ -271,7 +286,10 @@ function checkBeacon(state, s, emit, dim) {
   const PADS = padsFor(state.version);
   // Cancel takes effect before the commander moves. Even if the straight path
   // touches a neighbouring beacon, a retreat is never a purchase order.
-  const i = s.shopChoice === -1 ? -1 : padAt(s, PADS, dim, padRadiusFor(state.version));
+  let i = s.shopChoice === -1 ? -1 : padAt(s, PADS, dim, padRadiusFor(state.version));
+  // With the longer court, an explicit shop button can cross several older
+  // circles. Buy only at the chosen destination; free movement is unchanged.
+  if(state.version>=LONG_SHOP_VERSION && s.shopChoice>=0 && s.shopChoice!==i)i=-1;
   if (i !== s.pad) {
     if (s.pad >= 0) emit('leave', s.id, { label: PADS[s.pad].label });
     s.pad = i; s.nextBuy = state.tick; s.waiting = false;
