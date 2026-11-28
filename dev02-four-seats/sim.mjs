@@ -3,8 +3,15 @@
 import * as L from '../dev05-layout/layout.mjs';
 import { ARENA, ARENA_V8 } from './arena.mjs';
 import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
-import { stepRoster } from './combat.mjs';
+import { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, stepRoster } from './combat.mjs';
+export { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, DRAGOON_TRIAL_RANGE, effectiveWeaponRange } from './combat.mjs';
+import { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
+export { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
+
+import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, buyTower } from './defense-tower.mjs';
+import { chooseDefense, hasDefenseThreat } from './bot-defense.mjs';
+import { SPECIAL_POWER_VERSION, PLAYABLE_JUNCTION_RADIUS, scaleCoins, applySpecialPower } from './special-powers.mjs';
 
 export const HZ = 30;
 export const VERSION = 10; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈式戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3；9：佔位、空軍慢慢散開、起手；10：九兵種發射和命中（舊版保留供重播）
@@ -16,7 +23,7 @@ export const RULES = {
   aggro: 5,           // 平面距離內主動接敵
   spacing: .95,       // 部隊間距
   overtimeAt: 30 * 60 * 8, overtimeEvery: 60, // 8 分鐘起所有核心每 2 秒過載扣 1，保證終局
-  coreRadius: 4.6, spawnRadial: ARENA.spawnRadial, laneHalf: 3.6, junction: 8.2, platform: ARENA.platformWalkRadius,
+  coreRadius: 4.6, spawnRadial: ARENA.spawnRadial, laneHalf: 3.6, junction: PLAYABLE_JUNCTION_RADIUS, platform: ARENA.platformWalkRadius,
 };
 // 信標位置以北席本地座標相對購買區中心
 const place = (pads, positions = ARENA.shopPadPositions) => pads.map((pad, i) => {
@@ -34,7 +41,15 @@ export const ECONOMY = { startGold: RULES.startGold * 4, incomeEvery: RULES.inco
 const ECONOMY_V7 = { ...ECONOMY, income: 3 }; // 版本 7：每次發放金額×3（間隔、起始金幣不變）
 // 版本 8 以舊版 15 步 × 5/4 = 18.75 步為週期，不把每次間隔單獨取整。
 const ECONOMY_V8 = { ...ECONOMY_V7, income: ECONOMY_V7.income * 1.5, incomeEvery: ECONOMY_V7.incomeEvery * 1.25 };
-export const economyFor = version => version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+// v16 redenominates the ongoing economy; payout cadence and purchase cooldown stay intact.
+const ECONOMY_V16 = {
+  ...ECONOMY_V8,
+  startGold: scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.startGold),
+  income: scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.income),
+  costs: Object.fromEntries(rosterFor(SPECIAL_POWER_VERSION).map(kind =>
+    [kind, scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.costs[kind] ?? KINDS[kind].cost)])),
+};
+export const economyFor = version => version >= SPECIAL_POWER_VERSION ? ECONOMY_V16 : version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
 export const padRadiusFor = version => version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
 const LEGACY_WRAITH = '死靈戰機'; // 保留 v1–9 歷史重播的事件字串
 const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: version >= 8 && kind === 'battlecruiser' ? 3 : KINDS[kind].count, label: kind === 'wraith' && version < 10 ? LEGACY_WRAITH : KINDS[kind].name });
@@ -46,7 +61,8 @@ const rosterPads = version => version >= 7 ? place(rosterFor(version).map(kind =
   : version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
   : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
 const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7), PADS_V8 = rosterPads(8), PADS_V10 = rosterPads(10);
-export const padsFor = version => version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const PADS_V16 = rosterPads(SPECIAL_POWER_VERSION);
+export const padsFor = version => version >= SPECIAL_POWER_VERSION ? PADS_V16 : version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 8 ? CORE.hp * 3 : version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
@@ -66,6 +82,13 @@ GEOMETRY[7] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: NIN
 GEOMETRY[8] = { ...GEOMETRY[7], dim: { ...GEOMETRY[7].dim, ...ARENA_V8, shopPadPositions: NINE_PAD_POSITIONS } };
 GEOMETRY[9] = GEOMETRY[8]; // development-only combat candidate; NEW MATCH keeps 8 until the candidate is released
 GEOMETRY[10] = GEOMETRY[9];
+GEOMETRY[DEFENSE_VERSION] = GEOMETRY[10];
+GEOMETRY[VISIBILITY_VERSION] = {...GEOMETRY[10],dim:{...GEOMETRY[10].dim,visibleTower:true,dragoonLaneClearance:true}};
+GEOMETRY[DEFENSE_TUNING_VERSION] = {...GEOMETRY[VISIBILITY_VERSION],dim:{...GEOMETRY[VISIBILITY_VERSION].dim,dragoonClearanceScale:1.2}};
+GEOMETRY[DRAGOON_TRACK_RANGE_FROM] = GEOMETRY[DEFENSE_TUNING_VERSION]; // 保留 v13 佔位，重騎兵加入短暫的瞄準保持
+GEOMETRY[DRAGOON_RANGE_TRIAL_FROM] = GEOMETRY[DRAGOON_TRACK_RANGE_FROM]; // 只試射程，移動佔位不變
+GEOMETRY[SPECIAL_POWER_VERSION] = GEOMETRY[DRAGOON_RANGE_TRIAL_FROM];
+GEOMETRY[UNIFIED_ATTACK_RANGE_FROM] = GEOMETRY[SPECIAL_POWER_VERSION]; // Geometry of the map and movement stays v16.
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -117,13 +140,46 @@ function apply(state, c, geometry) {
 const BOT_V6 = [26, 42, 56, 76, 86, 100];
 // 版本 7（暫定）：陸戰隊 18、重騎兵 12、飛螳 10、刺蛇 14、破壞能 8、死靈式戰機 10、戰鬥巡洋艦 6、斥候 10、自殺蟲 12
 const BOT_V7 = [18, 30, 40, 54, 62, 72, 78, 88, 100];
-function botCommands(state, dim) {
+function defenseOrder(state, s, b, dim, emit) {
+  const now=state.tick;
+  if(now>=(b.checkDefense??0)){
+    b.checkDefense=now+10; // Check roughly 3 times/sec, not once per combat step.
+    const [x,z]=L.corePos(s.id,dim), radius=13;
+    const threats=state.units.filter(u=>u.hp>0&&u.team!==s.team&&dist(x,z,u.x,u.z)<=radius)
+      .map(({id,kind,x,z})=>({id,kind,x,z}));
+    const pads=padsFor(state.version).map((p,index)=>{const [x,z]=padWorld(s.id,index,dim);return {...p,index,x,z};});
+    const [ex,ez]=turn([0,-dim.spawnRadial],L.seatIndex(s.id));
+    const plan=chooseDefense({version:state.version,core:{x,z},commander:s.commander,gold:s.gold,threats,pads,radius,heldPad:b.pad,
+      entry:{x:ex,z:ez},coreRadius:RULES.coreRadius,padRadius:padRadiusFor(state.version),commanderSpeed:RULES.commanderSpeed});
+    if(plan && (b.defense || now>=(b.defenseRest??0))){
+      if(!b.defense||plan.pad!==b.pad){
+        b.defense=true;b.pad=plan.pad;b.seen=s.buys;b.left=plan.exchanges;
+        emit('npc-defense',s.id,{kind:plan.kind,threat:plan.threatId,limit:plan.exchanges});
+        const p=pads[plan.pad];return {seat:s.id,type:'goal',x:p.x,z:p.z};
+      }
+    } else if(b.defense || (!plan && hasDefenseThreat({core:{x,z},threats,radius}))) {
+      b.defense=false;b.pad=-1;b.defenseRest=b.until=now+10;
+      const [x,z]=toWorld(s.id,0,2.4,dim);return {seat:s.id,type:'goal',x,z};
+    }
+  }
+  if(!b.defense)return null;
+  if(s.buys-b.seen<b.left)return false;
+  b.defense=false;b.pad=-1;b.defenseRest=b.until=now+12;b.checkDefense=b.defenseRest;
+  const [x,z]=toWorld(s.id,0,2.4,dim);return {seat:s.id,type:'goal',x,z};
+}
+
+function botCommands(state, dim, emit) {
   const out = [];
   for (const id of SEAT_IDS) {
     const b = state.bots[id], s = state.seats[id];
     if (!b || !s.alive) continue;
     const roll = n => { b.rng = nextRandom(b.rng); return b.rng % n; };
-    if (state.tick === 1) { b.until = 60 + roll(60); continue; }
+    if (state.tick === 1) { b.until = 60 + roll(60); if(state.version<DEFENSE_VERSION)continue; }
+    if(state.version>=DEFENSE_VERSION){
+      const order=defenseOrder(state,s,b,dim,emit);
+      if(order){out.push(order);continue;}
+      if(order===false||state.tick===1)continue;
+    }
     if (b.pad >= 0) {
       if (s.buys - b.seen < b.left) continue;
       b.pad = -1; b.until = state.tick + roll(60);
@@ -151,7 +207,13 @@ function recruit(state, s, p, emit, dim) {
   let spots = null;
   if (state.version >= 9 && !KINDS[p.kind].air) {
     const drafts = Array.from({length:p.count}, (_,i) => {
-      const [x,z] = turn([((s.deployed+i)%5-2)*1.25, -dim.spawnRadial-i*.4],index);
+      // Keep wider Dragoons in ranks toward the road instead of putting the
+      // end of a large batch behind the first rank and against the solid core.
+      const rank = Math.floor(i/4), width = Math.min(4,p.count-rank*4);
+      const draft = dim.dragoonLaneClearance && p.kind==='dragoon' && p.count>1
+        ? [(i%4-(width-1)/2)*.98*(dim.dragoonClearanceScale??1),-dim.spawnRadial+rank*.97*(dim.dragoonClearanceScale??1)]
+        : [((s.deployed+i)%5-2)*1.25,-dim.spawnRadial-i*.4];
+      const [x,z] = turn(draft,index);
       return {id:state.serial+i+1,seat:s.id,kind:p.kind,x,z};
     });
     // Do not spend, increment serials or start the cooldown when the whole wave
@@ -181,6 +243,10 @@ function checkBeacon(state, s, emit, dim) {
     if (i >= 0) emit('enter', s.id, { label: PADS[i].label });
   }
   if (i < 0) return;
+  // A defensive path may cross another circle. Don't spend the saved gold on a
+  // different unit before reaching the chosen defensive pad.
+  const bot=state.version>=DEFENSE_VERSION?state.bots[s.id]:null;
+  if((bot?.defense&&i!==bot.pad) || bot?.defenseRest>state.tick)return;
   const p = PADS[i];
   if (s.gold < p.cost) { if (!s.waiting) { s.waiting = true; emit('wait', s.id, { cost: p.cost, gold: s.gold }); } return; }
   if (state.tick < s.nextBuy) return;
@@ -301,7 +367,7 @@ export function step(state, commands = []) {
   if (state.tick === 1) emit('start', null, { seed: state.seed });
   const geometry = GEOMETRY[state.version], { dim } = geometry;
   for (const c of commands) apply(state, c, geometry);
-  for (const c of botCommands(state, dim)) apply(state, c, geometry);
+  for (const c of botCommands(state, dim, emit)) apply(state, c, geometry);
   const live = SEAT_IDS.map(id => state.seats[id]).filter(s => s.alive);
   live.forEach(s => moveCommander(s, geometry));
   const econ = economyFor(state.version);
@@ -310,6 +376,11 @@ export function step(state, commands = []) {
     ? Math.floor(state.tick / econ.incomeEvery) > Math.floor((state.tick - 1) / econ.incomeEvery)
     : state.tick % econ.incomeEvery === 0;
   if (pays) for (const s of live) s.gold += econ.income ?? 1;
+  if (state.version >= DEFENSE_VERSION) for (const c of commands) {
+    if (c?.type === 'tower') buyTower(state,state.seats[c.seat],dim,emit);
+    else if (state.version >= SPECIAL_POWER_VERSION && c?.type === 'special')
+      applySpecialPower(state,c.seat,c.power,dim,targetOf,emit);
+  }
   for (const s of live) checkBeacon(state, s, emit, dim);
   if (state.version >= 3) stepCores(state, stepRoster(state, emit, dim, { RULES, waypoint, clampWalk }), emit);
   else stepUnits(state, emit, dim);

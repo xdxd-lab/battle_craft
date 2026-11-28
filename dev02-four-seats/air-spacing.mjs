@@ -1,3 +1,4 @@
+import { weaponBoxPx, weaponGapPx, rangeInPixels } from './combat-reach.mjs';
 // Candidate v9: a bounded, gradual offset, never an occupancy constraint.
 // Both allied seats may pass over one another; only soft attraction to space is
 // considered. Enemies do not provide a push that could cancel a dive.
@@ -25,6 +26,16 @@ export function airDisperse(u,p,frames,frame) {
   let {x,z}=s;
   // Near an already-locked opposing unit, don't let dispersion alone steal the
   // attack position. It can still push tangentially and the foe can move away.
+  if (p.weaponBoxRange) {
+    // v17: a legal edge-to-edge attack position may already be outside the
+    // old center-radius circle. Never snap the flyer toward the target.
+    const limit = rangeInPixels(p.hitRange);
+    const allowed = (dx,dz) => weaponGapPx(weaponBoxPx(u.kind,u.x+dx,u.z+dz),p.weaponBoxRange)<=limit;
+    if (allowed(x,z)) return [x,z];
+    if (x && allowed(x,0)) return [x,0];
+    if (z && allowed(0,z)) return [0,z];
+    return [0,0];
+  }
   if(p.hit && p.hitRange!==undefined && Math.hypot(u.x-p.hit.x+x,u.z-p.hit.z+z)>p.hitRange){
     const ax=u.x-p.hit.x,az=u.z-p.hit.z,n=Math.hypot(ax,az);
     const outward=n>0?(x*ax+z*az)/n:0;
