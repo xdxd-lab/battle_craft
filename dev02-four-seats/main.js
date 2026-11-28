@@ -7,6 +7,7 @@ import { ARENA_V8 as ARENA, corePos, fitArenaCamera, fitNearCamera } from './are
 import * as SF from './surfaces.js';
 import { createDossier } from './dossier.js';
 import { detailCommander, detailMaterials, triangles } from './detail-models.js';
+import { compactDragoonModels } from './compact-dragoon.js';
 import { refreshedModels, refreshedMaterials } from './unit-art-refresh.js';
 import { unitModels, FLY_HEIGHT, WING_HINGE, HOVER_HEIGHT } from './unit-models.js';
 import { createAudio, LEVEL_NAMES } from './audio.js';
@@ -16,7 +17,7 @@ import { KINDS, KIND_IDS, ATTACKS, CORE, FRAME_MS } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
 import { attackPose } from './combat-phases.mjs';
-import { DEFENSE_VERSION, TOWER } from './defense-tower.mjs';
+import { DEFENSE_VERSION, VISIBILITY_VERSION, TOWER } from './defense-tower.mjs';
 import { towerModels } from './defense-tower-view.js';
 import { buildSpecialZones } from './special-zone.js';
 import { fitSpecialZoneCamera, specialZoneFor } from './special-zone-layout.mjs';
@@ -25,10 +26,11 @@ const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W,
 const hash = new URLSearchParams(location.hash.slice(1));
 // Preserve the old Pages and offline entry points as simulation 8.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
-const DEFENSE_LAB = MATCH_VERSION === DEFENSE_VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const DEFENSE_LAB = MATCH_VERSION >= DEFENSE_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
 const MATCH_DIM = S.dimFor(MATCH_VERSION);
+const TOWER_MUZZLE = MATCH_DIM.visibleTower ? 1.54 : 1.25;
 const MATCH_PADS = S.padsFor(MATCH_VERSION).map(p => p.kind === 'wraith' ? { ...p,label: KINDS.wraith.name } : p);
 const SPEEDS = [1, 2, 4], DEFAULT_SPEED = 1;
 let inBattle = false, state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
@@ -57,7 +59,7 @@ function buildActors() {
     dark: new THREE.CylinderGeometry(.4, .4, .6, 12).translate(0, 2.1, 0),
     lamp: new THREE.BoxGeometry(.6, .16, .3).translate(0, 2.15, .28),
   };
-  const build = q => Object.fromEntries(KIND_IDS.map(k => [k, ((DEFENSE_LAB && refreshedModels[q][k]) || unitModels[q][k])()]));
+  const build = q => Object.fromEntries(KIND_IDS.map(k => [k, ((MATCH_VERSION>=VISIBILITY_VERSION && k==='dragoon' && compactDragoonModels[q]) || (DEFENSE_LAB && refreshedModels[q][k]) || unitModels[q][k])()]));
   looks.std = { ...build('std'), commander }; looks.high = { ...build('high'), commander: detailCommander() };
   squads = {}; commanders = {};
   for (const s of L.SEATS) {
@@ -377,7 +379,7 @@ function tick() {
   const before = new Map(state.units.map(u => [u.id, u]));
   for (const e of S.step(state, now)) {
     if(e.type==='tower-fire'){
-      shots.live.push({a:[e.x,1.25,e.z], b:[e.tx,heightOf(before.get(e.to)),e.tz],life:.18,color:'#aeeaff'});
+      shots.live.push({a:[e.x,TOWER_MUZZLE,e.z], b:[e.tx,heightOf(before.get(e.to)),e.tz],life:.18,color:'#aeeaff'});
       puffs.live.push({x:e.tx,z:e.tz,y:heightOf(before.get(e.to)),size:.42,life:.18,color:'#aeeaff'});
       continue;
     }
@@ -389,7 +391,7 @@ function tick() {
       const u = before.get(e.from);
       if (u) {
         audio.play(u.kind);
-        const y = e.tower ? 1.15 : e.core ? 2.5 : heightOf(before.get(e.to)), ink=L.seatById(e.seat).secondary;
+        const y = e.tower ? TOWER_MUZZLE : e.core ? 2.5 : heightOf(before.get(e.to)), ink=L.seatById(e.seat).secondary;
         if (e.atTarget) {
           // Needle Spines: a brief muzzle visual plus target effect, not a beam spanning the gap.
           const dx=e.x-u.x,dz=e.z-u.z,n=Math.hypot(dx,dz)||1;
@@ -403,7 +405,7 @@ function tick() {
       continue;
     }
     if (e.type === 'impact') {
-      const y=e.tower?1.15:e.kind==='battlecruiser'||(e.kind==='wraith'&&MATCH_VERSION>=10) ? (typeof e.target==='string'?2.5:heightOf(before.get(e.target))) : LOOK[e.kind].puff[0];
+      const y=e.tower?TOWER_MUZZLE:e.kind==='battlecruiser'||(e.kind==='wraith'&&MATCH_VERSION>=10) ? (typeof e.target==='string'?2.5:heightOf(before.get(e.target))) : LOOK[e.kind].puff[0];
       puffs.live.push({x:e.x,z:e.z,y,size:LOOK[e.kind].puff[1],life:.25,color:L.seatById(e.seat).secondary});
       continue;
     }
@@ -567,7 +569,7 @@ function draw(dt, k) {
   for (const s of L.SEATS) {
     for (const kind of KIND_IDS) squads[s.id][kind].forEach(m => { m.count = counts[s.id][kind]; m.instanceMatrix.needsUpdate = true; });
     const v = state?.seats[s.id]; if (!v) { commanders[s.id].visible = false; continue; }
-    if(towers){const t=v.tower,g=towers.by[s.id];g.visible=!!(v.alive&&t?.hp>0);if(g.visible)bar(t.x,1.86,t.z,1,.14,t.hp/TOWER.hp,relColor(s.id));}
+    if(towers){const t=v.tower,g=towers.by[s.id];g.visible=!!(v.alive&&t?.hp>0);if(g.visible)bar(t.x,MATCH_DIM.visibleTower?2.24:1.86,t.z,1,.14,t.hp/TOWER.hp,relColor(s.id));}
     const c = commanders[s.id]; c.visible = v.alive; c.position.set(v.commander.x, .1, v.commander.z); if (v.commander.dx || v.commander.dz) c.rotation.y = Math.atan2(v.commander.dx, v.commander.dz);
     bar(...coreStatus.barAt(s.id), 6, .55, v.hp / CORE_MAX, relColor(s.id));
   }
@@ -578,7 +580,7 @@ function draw(dt, k) {
     const [mesh, y] = PROJ[s.kind], i = flying[s.kind]; if (i >= 128) continue; flying[s.kind]++;
     const p = prevShots.get(s.id) ?? [s.x, s.z], x = p[0] + (s.x - p[0]) * k, z = p[1] + (s.z - p[1]) * k;
     const pct=s.fixedFlight && s.length>0 ? 1-s.remaining/s.length : 0;
-    const targetY=s.tower?1.15:s.airTarget ? FLY_HEIGHT+.6 : s.core ? 2.5 : .8;
+    const targetY=s.tower?TOWER_MUZZLE:s.airTarget ? FLY_HEIGHT+.6 : s.core ? 2.5 : .8;
     const height=s.fixedFlight ? THREE.MathUtils.lerp(y,targetY,pct) : y;
     dummy.position.set(x,height,z);
     const followsDirection=mesh===darts||mesh===missiles||mesh===bolts||mesh===cruiserPulse;
@@ -594,6 +596,14 @@ function draw(dt, k) {
   fx(puffs, e => { dummy.position.set(e.x, e.y, e.z); dummy.quaternion.identity(); dummy.scale.setScalar((.6 + Math.max(0, .4 - e.life) * 5) * e.size); });
   for (const o of padGroup.children) if (!o.isSprite) o.scale.setScalar(state?.seats[seat]?.pad === o.userData.pad ? 1.12 : 1);
   for (const g of padModels.children) { g.rotation.y = g.userData.facing + ((state?.tick ?? 0) + k) * .017; g.visible = state?.seats[g.userData.seat]?.pad !== g.userData.pad; } // 該席指揮官站上時隱藏 // 展示模型隨模擬 tick 緩慢自轉（暫停即停）
+  if (DEFENSE_LAB && MATCH_DIM.visibleTower) {
+    const marker=$('tower-marker'), t=state?.seats[seat]?.tower;
+    const point=t?.hp>0 && new THREE.Vector3(t.x,2.05,t.z).project(camera);
+    // Fixed CSS pixels keep our tower label legible from a phone's far camera.
+    const show=state?.seats[seat]?.alive&&point&&Math.abs(point.x)<1&&Math.abs(point.y)<1&&Math.abs(point.z)<1;
+    marker.hidden=!show;
+    if(show){marker.style.left=`${(point.x+1)*canvas.clientWidth/2}px`;marker.style.top=`${(1-point.y)*canvas.clientHeight/2}px`;}
+  }
   renderer.render(scene, camera);
 }
 function advance(dt) {
@@ -642,7 +652,7 @@ try {
   }
   buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;
-  dossier = createDossier(renderer, $('dossier'), $('panel'), () => display.quality, MATCH_VERSION>=10, DEFENSE_LAB);
+  dossier = createDossier(renderer, $('dossier'), $('panel'), () => display.quality, MATCH_VERSION>=10, DEFENSE_LAB, MATCH_VERSION>=VISIBILITY_VERSION);
   applyDisplay(false); applyQuality();
   applySurface();
   const watch = new ResizeObserver(resize); [canvas, $('panel'), $('bar')].forEach(o => watch.observe(o)); $('panel').addEventListener('toggle', resize);

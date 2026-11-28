@@ -3,11 +3,13 @@ import { ccw, corePos, seatById } from '../dev05-layout/layout.mjs';
 import { KINDS, PLATE, applyDamage } from './roster.mjs';
 
 export const DEFENSE_VERSION = 11;
+export const VISIBILITY_VERSION = 12;
 export const TOWER = Object.freeze({ cost: 70, hp: 180, range: 3.2, hitRadius: .50, damage: 55, period: 34, plate: 1 });
 
 export function towerPosition(id, dim) {
   const [cx,cz] = corePos(id,dim), [dx,dz] = seatById(id).dir, [sx,sz]=ccw([dx,dz]);
-  return [cx-dx*4.7+sx*1.9,cz-dz*4.7+sz*1.9];
+  const [front,side] = dim.visibleTower ? [6,3.15] : [4.7,1.9];
+  return [cx-dx*front+sx*side,cz-dz*front+sz*side];
 }
 
 export function buyTower(state, seat, dim, emit) {

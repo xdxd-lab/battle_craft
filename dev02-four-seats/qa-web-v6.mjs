@@ -43,7 +43,7 @@ try {
       await page.eval('__step(3)');
       await page.until("document.querySelector('#dossier p').textContent.includes('發射瞬間鎖定的位置')");
     }
-    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?11:10,2700]);
+    assert.deepEqual(await page.eval(`[__dev02.snapshot().version,__dev02.snapshot().seats.${seat}.hp]`), [legacy?8:defenseLab?12:10,2700]);
     assert.equal(await page.eval("!!__dev02.specialZones || document.body.textContent.includes('全場清除')"),specialLab);
     if (specialLab) {
       const zones=await page.eval('__dev02.specialZones()');
@@ -67,6 +67,9 @@ try {
       assert.deepEqual(await page.eval(`[__dev02.snapshot().seats.${seat}.tower.hp,__dev02.snapshot().seats.${seat}.spent]`),[180,70]);
       assert.equal(await page.eval(`document.querySelector('${button}').disabled`),true);
       await page.eval("document.querySelector('#speed').click(); document.querySelector('#speed').click()");
+      const marker=await page.eval("(()=>{const m=document.querySelector('#tower-marker'), b=m.getBoundingClientRect();return [m.hidden,b.x,b.y,b.width]})()");
+      assert.equal(marker[0],false,JSON.stringify(marker));
+      assert(marker[1]>0&&marker[1]<w-30&&marker[2]>0&&marker[2]<h-24&&marker[3]>24,JSON.stringify(marker));
       if(process.env.BC_TOWER_SHOT && (!process.env.BC_DEFENSE_NARROW || tier==='std'))await page.shot(process.env.BC_TOWER_SHOT);
     }
     assert.equal(await page.eval("document.querySelectorAll('#shop button').length"),9); // no purchasable special pad

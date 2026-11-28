@@ -6,7 +6,7 @@ import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
 import { createGroundOccupancy } from './ground-occupancy.mjs';
 
-import { DEFENSE_VERSION, buyTower } from './defense-tower.mjs';
+import { DEFENSE_VERSION, VISIBILITY_VERSION, buyTower } from './defense-tower.mjs';
 import { chooseDefense, hasDefenseThreat } from './bot-defense.mjs';
 
 export const HZ = 30;
@@ -70,6 +70,7 @@ GEOMETRY[8] = { ...GEOMETRY[7], dim: { ...GEOMETRY[7].dim, ...ARENA_V8, shopPadP
 GEOMETRY[9] = GEOMETRY[8]; // development-only combat candidate; NEW MATCH keeps 8 until the candidate is released
 GEOMETRY[10] = GEOMETRY[9];
 GEOMETRY[DEFENSE_VERSION] = GEOMETRY[10];
+GEOMETRY[VISIBILITY_VERSION] = {...GEOMETRY[10],dim:{...GEOMETRY[10].dim,visibleTower:true,dragoonLaneClearance:true}};
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -188,7 +189,13 @@ function recruit(state, s, p, emit, dim) {
   let spots = null;
   if (state.version >= 9 && !KINDS[p.kind].air) {
     const drafts = Array.from({length:p.count}, (_,i) => {
-      const [x,z] = turn([((s.deployed+i)%5-2)*1.25, -dim.spawnRadial-i*.4],index);
+      // Keep wider Dragoons in ranks toward the road instead of putting the
+      // end of a large batch behind the first rank and against the solid core.
+      const rank = Math.floor(i/4), width = Math.min(4,p.count-rank*4);
+      const draft = dim.dragoonLaneClearance && p.kind==='dragoon' && p.count>1
+        ? [(i%4-(width-1)/2)*.98,-dim.spawnRadial+rank*.97]
+        : [((s.deployed+i)%5-2)*1.25,-dim.spawnRadial-i*.4];
+      const [x,z] = turn(draft,index);
       return {id:state.serial+i+1,seat:s.id,kind:p.kind,x,z};
     });
     // Do not spend, increment serials or start the cooldown when the whole wave

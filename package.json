@@ -5,7 +5,7 @@
     "build": "python3 v3/build.py && python3 v4/build.py && python3 v5/build.py && python3 dev05-layout/build.py && python3 dev02-four-seats/build.py",
     "test": "node v5/qa-exact-functions.cjs && node dev05-layout/qa-layout.mjs && node dev02-four-seats/qa-sim.mjs && node dev02-four-seats/qa-roster.mjs && node dev02-four-seats/qa-motion.mjs && node dev02-four-seats/qa-audio.mjs && node dev02-four-seats/qa-audio-play.mjs",
     "test:combat": "node dev02-four-seats/qa-combat-v9.mjs && node dev02-four-seats/qa-ground-occupancy.mjs && node dev02-four-seats/qa-weapon-delivery.mjs",
-    "test:defense": "node dev02-four-seats/qa-bot-defense.mjs && node dev02-four-seats/qa-defense-integration.mjs && node dev02-four-seats/qa-defense-tower.mjs && node dev02-four-seats/qa-unit-art-refresh.mjs",
+    "test:defense": "node dev02-four-seats/qa-bot-defense.mjs && node dev02-four-seats/qa-defense-integration.mjs && node dev02-four-seats/qa-defense-tower.mjs && node dev02-four-seats/qa-unit-art-refresh.mjs && node dev02-four-seats/qa-compact-dragoon.mjs && node dev02-four-seats/qa-defense-visibility.mjs",
     "test:browser": "node dev02-four-seats/qa-hud-overlap.mjs && node v5/qa-browser.mjs && node dev02-four-seats/qa-browser.mjs"
   },
   "devDependencies": {

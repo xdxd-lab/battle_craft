@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { detailCommander, detailMaterials } from './detail-models.js';
+import { compactDragoonModels } from './compact-dragoon.js';
 import { refreshedModels, refreshedMaterials } from './unit-art-refresh.js';
 import { unitModels } from './unit-models.js';
 import { MAT, seatMats } from '../dev05-layout/world.js';
@@ -37,9 +38,9 @@ const profiles = {
 };
 
 const plainCommander = () => ({ hull: new THREE.CylinderGeometry(.5, .75, 1.7, 8).translate(0, .95, 0), dark: new THREE.CylinderGeometry(.4, .4, .6, 12).translate(0, 2.1, 0), lamp: new THREE.BoxGeometry(.6, .16, .3).translate(0, 2.15, .28) });
-function portrait(renderer, kind, quality, art) {
+function portrait(renderer, kind, quality, art, compact) {
   const { model, plain = plainCommander, camera: position, aim: oldAim, fov } = profiles[kind], high = quality === 'high';
-  const geometries = ((art && refreshedModels[quality][kind]) || (high ? model : plain))(), paint = seatMats.N;
+  const geometries = ((compact && kind==='dragoon' && compactDragoonModels[quality]) || (art && refreshedModels[quality][kind]) || (high ? model : plain))(), paint = seatMats.N;
   const studio = new THREE.Scene();
   studio.background = new THREE.Color(0x19252e);
   const lens = new THREE.PerspectiveCamera(fov, 2, .1, 20);
@@ -92,7 +93,7 @@ const deliveryDescriptions = {
   wraith: '對地短程雷射（普通），對空 Gemini 飛彈（指向性爆炸）。兩者飛向發射瞬間鎖定的位置，不追更新座標。隱形未實作。',
   battlecruiser: '主力艦，對地與對空各有雷射砲台，先飛行再結算。基礎護甲 3；大和砲未實作。',
 };
-export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false, art = false) {
+export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false, art = false, compact = false) {
   const name = card.querySelector('h2'), role = card.querySelector('.profile-role');
   const description = card.querySelector('p'), stats = card.querySelector('dl'), image = card.querySelector('img');
   const buttons = [...card.querySelectorAll('[data-profile]')], images = {};
@@ -111,7 +112,7 @@ export function createDossier(renderer, card, panel, quality = () => 'std', fait
     }));
     for (const button of buttons) button.setAttribute('aria-pressed', button.dataset.profile === kind);
     const key = `${quality()}:${kind}`;
-    images[key] ??= portrait(renderer, kind, quality(), art);
+    images[key] ??= portrait(renderer, kind, quality(), art, compact);
     image.src = images[key];
     card.dataset.unit = kind;
   }
