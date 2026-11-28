@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-Hant" data-match="20" data-special-lab="true" data-special-controls="dock">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BaattleCraft v6-4｜四席 2v2</title>
+<style>
+:root{color-scheme:dark;--ink:#e9edf0;--muted:#9eabb4;--panel:#10161be6;--line:#3a464e;--hot:#ffe9a8}
+[hidden]{display:none!important}*{box-sizing:border-box}html,body{margin:0;height:100%;background:#0a0f14;color:var(--ink);font:14px/1.5 "PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;overflow:hidden}
+#stage{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#bar{position:fixed;left:max(12px,env(safe-area-inset-left));top:12px;display:grid;gap:8px;width:190px}
+h1{font-size:16px;margin:0;line-height:1.25}h1 small{display:block;color:var(--hot);font-size:12px;font-weight:500}
+.box{border:1px solid var(--line);background:var(--panel);padding:8px;display:grid;gap:6px}
+.row{display:flex;gap:6px}.row>*{flex:1 1 0}
+button{font:inherit;color:inherit;background:#222c33;border:1px solid #4c5a63;min-height:38px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+button[aria-pressed=true],button.go{background:#e9edf0;color:#0a0f14;font-weight:700}button:disabled{opacity:.45;cursor:default}button:focus-visible,summary:focus-visible{outline:3px solid var(--hot);outline-offset:2px}
+#clock{font:700 26px/1 ui-monospace,Menlo,monospace}#gold{font-weight:800;font-size:26px;line-height:1;color:var(--hot)}.row small{display:block;color:var(--muted);font-size:11px}
+#cores{display:grid;gap:5px}.core{display:grid;grid-template-columns:24px 1fr auto;gap:6px;align-items:center;font-size:12px}.core b{width:24px;height:24px;display:grid;place-items:center;border:2px solid;font-size:13px;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000}
+.core .hp{height:8px;background:#05080b;border:1px solid #44505a}.core .hp i{display:block;height:100%;background:currentColor}.core.down{opacity:.45;text-decoration:line-through}.core span{min-width:66px;text-align:right}
+#shop{position:fixed;left:50%;bottom:max(10px,env(safe-area-inset-bottom));transform:translateX(-50%);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:stretch;max-width:calc(100% - 24px)}
+#shop button{min-width:112px;line-height:1.25;background:var(--panel)}#shop button.on{border-color:var(--hot);box-shadow:inset 0 0 0 2px var(--hot)}#shop small{display:block;color:var(--muted)}#shop i{font-style:normal}
+#msg{position:fixed;left:50%;bottom:74px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);padding:3px 12px;font-size:13px;text-align:center;max-width:calc(100% - 24px);pointer-events:none}
+#msg[data-level=warn]{border-color:var(--hot)}#msg[data-level=critical]{border-color:#ff6bf0;color:#ffd9fb}
+.compass{position:fixed;left:max(16px,env(safe-area-inset-left));bottom:14px;width:56px;height:56px;border:1px solid var(--line);border-radius:50%;background:var(--panel);display:grid;place-items:center}#needle{width:42px;height:42px}
+#panel{position:fixed;right:max(12px,env(safe-area-inset-right));top:12px;width:280px;max-height:calc(100% - 112px);overflow:auto;background:var(--panel);border:1px solid var(--line)}#panel:not([open]){width:auto}summary{padding:7px 12px;cursor:pointer;font-weight:700}
+#panel>div{padding:0 12px 12px}#log{max-height:min(46vh,420px);overflow:auto;font-size:12px;display:grid;gap:2px}.log{display:grid;grid-template-columns:38px 46px 1fr;gap:5px;border-top:1px solid #2a343b;padding:2px 0}.log time{color:var(--muted)}.log.warn{background:#3a30121f}.log.critical{font-weight:700;background:#4a123f3d}
+body.no-bars .core .hp{visibility:hidden}body.no-log #log{display:none}
+#opt-bars,#opt-log,#opt-engineering,#opt-quality,#opt-music,#opt-sfx{font-size:12px}#now-playing{font-size:11px;line-height:1.3;color:#c3ced6;overflow-wrap:anywhere}@media(max-height:400px){#now-playing{font-size:10px;line-height:1.2}}button[id^=opt-][aria-pressed=false]{color:#d5dde2;background:#161d22;border:1px dashed #8a979f}
+.box .row>button{padding-inline:3px;min-width:0}
+#engineering-panel button{width:100%;margin-top:8px}
+#panel>#dossier{border-top:1px solid var(--line);padding:10px 12px 12px}
+#dossier nav{display:grid;grid-template-columns:1fr 1fr}#dossier nav button{min-height:40px;line-height:1.15;min-width:0;padding-inline:2px}#dossier nav small{display:block;font-size:10px;font-weight:500;opacity:.75}
+#dossier img{display:block;width:100%;height:auto;aspect-ratio:2;margin-top:10px;border:1px solid var(--line);background:#19252e}
+#dossier h2{margin:2px 0 4px;color:var(--ink);font-size:18px;line-height:1.2}
+.profile-role{display:block;margin-top:10px;color:var(--hot);font-size:11px}
+#dossier dl{display:grid;grid-template-columns:1fr auto;gap:3px 12px;margin:9px 0 0;padding-top:7px;border-top:1px solid var(--line);font-size:12px}
+#dossier dt{color:var(--muted)}#dossier dd{margin:0;text-align:right}
+@media(max-width:1099px),(max-height:560px){#panel[open]{width:min(222px,46vw)}#dossier img{max-height:100px;object-fit:contain}}
+h2{font-size:12px;color:var(--hot);margin:12px 0 4px}#panel p,#panel li{font-size:12px;color:#c5ced4;margin:3px 0}#panel ul{padding-left:16px;margin:0}
+#cover{position:fixed;inset:0;display:grid;place-items:center;background:#05080bb8;overflow:auto;padding:12px}#cover[hidden]{display:none}.card{background:#10161bf5;border:1px solid var(--line);padding:18px 20px;width:min(560px,100%);display:grid;gap:12px}.card h3{margin:0;font-size:22px}.card p{margin:0;color:#c5ced4;font-size:13px}.credit-links{display:flex;flex-wrap:wrap;gap:8px}.credit-links a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;border:1px solid var(--line);color:#99d9f4;font-size:12px;text-decoration:none}
+#pick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}#pick button{display:grid;gap:2px;justify-items:center;padding:8px 4px}#pick i{width:30px;height:30px;border:4px solid}#pick small{color:inherit;opacity:.8;font-size:11px}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-top:1px solid #2a343b;padding:3px 6px;text-align:right}td:first-child,th:first-child{text-align:left}
+@media(max-height:560px){#bar{top:6px;gap:4px;width:150px}h1{font-size:13px}h1 small{font-size:10px}.box{padding:5px;gap:4px}button{min-height:30px;font-size:12px;padding:2px 6px}#clock,#gold{font-size:18px}.core{font-size:10px;grid-template-columns:18px 1fr auto;gap:4px}.core b{width:18px;height:18px;font-size:10px}.core span{min-width:52px}#shop button{min-width:96px}#shop{bottom:4px}#msg{bottom:44px;font-size:11px;max-width:46%}.compass{display:none}#panel{top:6px;width:250px;max-height:calc(100% - 60px)}.card{padding:10px 14px;gap:6px}.card h3{font-size:17px}}
+@media(max-height:560px){#shop{gap:4px}#shop button{min-width:92px;padding:2px 5px}#shop small{font-size:10px}}
+@media(max-height:400px){h1 small{display:none}#bar{top:4px;gap:3px}.box{padding:3px 5px;gap:3px}button{min-height:26px;line-height:1.2}#cores{gap:2px}.core b{width:15px;height:15px;border-width:1px}.core{line-height:1.25}}
+@media(orientation:landscape){
+  #shop,#msg{left:auto;right:max(12px,env(safe-area-inset-right));transform:none}
+  #shop{grid-template-columns:repeat(5,minmax(0,1fr))}
+  #msg{max-width:min(360px,46vw)}
+}
+@media(orientation:landscape) and (max-height:560px){
+  #shop{grid-template-columns:repeat(5,auto);gap:3px}#shop button{min-width:0;min-height:30px;padding:1px 6px;display:flex;gap:5px;align-items:baseline;white-space:nowrap}#shop small{display:inline}#shop i{display:none}
+  #panel[open]{width:150px;max-height:calc(100% - 104px)}
+  #panel>#dossier{padding-top:7px}
+  #dossier nav{gap:4px}#dossier nav button{min-height:28px;font-size:11px;line-height:1.1}#dossier nav small{font-size:9px}
+  #dossier img{margin-top:6px}
+  #dossier h2{font-size:13px}
+  .profile-role,#dossier dl{margin-top:5px}
+  #dossier p,#dossier dl{line-height:1.35}
+  .log{grid-template-columns:auto 1fr}.log span{grid-column:1 / -1}
+}
+@media(orientation:landscape) and (max-width:700px) and (max-height:560px){
+  #shop{width:calc(100% - 186px);grid-template-columns:repeat(5,minmax(0,1fr))}
+  #shop button{min-height:38px;display:block;padding:2px;line-height:1.1;font-size:11px;white-space:normal}
+  #shop small{display:block;font-size:9px;white-space:nowrap}
+  #msg{bottom:90px}
+}
+@media(orientation:portrait) and (max-width:700px){#bar{width:calc(100% - 24px)}#cores{grid-template-columns:1fr 1fr}#panel{top:auto;bottom:118px;max-height:40%}.compass{display:none}#pick{grid-template-columns:1fr 1fr}}
+#tower-marker{position:fixed;z-index:2;pointer-events:none;transform:translate(-50%,-112%);font-size:12px;line-height:1.1;font-weight:750;color:#d9fbff;background:#102931;border:1px solid #92e7ef;border-radius:4px;padding:3px 5px;white-space:nowrap;}#tower-marker:after{content:"";position:absolute;top:100%;left:50%;width:1px;height:5px;background:#92e7ef;}#tower-marker[hidden]{display:none}@media(orientation:landscape){#v18-field-dock > #shop{grid-template-columns:repeat(6,minmax(0,1fr))}} #v18-field-dock > #shop button{touch-action:manipulation}</style>
+</head>
+<body>
+<canvas id="stage" tabindex="0" aria-label="四席十字戰場。點購買區地面或用方向鍵移動指揮官，站上信標自動購兵"></canvas>
+<div id="bar">
+  <h1>BaattleCraft v6-4<small>四席 2v2 · 十二兵種</small></h1>
+  <div class="box"><div class="row"><div><small>時間</small><span id="clock">00:00</span></div><div><small id="gold-label">金幣</small><span id="gold">48</span></div></div></div>
+  <div class="box" id="cores" aria-label="四席核心血量"></div>
+  <div class="box"><div class="row"><button id="pause">暫停</button><button id="speed" aria-label="遊戲速度 1×，切換速度">1×</button></div><div class="row"><button id="framing" title="在近景與四席全景間切換">切全景</button><button id="opt-bars" aria-pressed="true">血條</button></div><div class="row"><button id="view">隊伍視角</button><button id="again">重新選席</button></div></div>
+  <div class="box" role="group" aria-label="顯示與聲音設定"><div class="row"><button id="opt-quality" aria-pressed="true" title="高與標準：模型、地表、遠景、配件、解析度">畫質：高</button><button id="opt-engineering" aria-pressed="false" aria-controls="panel" title="開啟後切換視窗或分頁會暫停">工程模式</button></div><div class="row"><button id="opt-music" aria-pressed="true" title="背景音樂音量：關／小／中／大">音樂：中</button><button id="opt-sfx" aria-pressed="true" title="攻擊音效音量：關／小／中／大">音效：中</button></div><button id="tower-buy" hidden></button><div id="now-playing" role="status" aria-live="polite" hidden></div></div>
+</div>
+<details id="panel" open><summary id="panel-title">單位介紹</summary>
+<div id="dossier" aria-labelledby="profile-name">
+  <nav class="row" aria-label="選擇介紹單位">
+    <button data-profile="marine" aria-pressed="true">陸戰隊</button>
+    <button data-profile="dragoon" aria-pressed="false">重騎兵</button>
+    <button data-profile="mutalisk" aria-pressed="false">飛螳</button>
+    <button data-profile="hydralisk" aria-pressed="false">刺蛇</button>
+    <button data-profile="archon" aria-pressed="false">破壞能</button>
+    <button data-profile="wraith" aria-pressed="false">死靈戰機</button>
+    <button data-profile="battlecruiser" aria-pressed="false">戰鬥巡洋艦</button>
+    <button data-profile="scout" aria-pressed="false">斥候</button>
+    <button data-profile="scourge" aria-pressed="false">自殺蟲</button>
+    <button data-profile="commander" aria-pressed="false">指揮官</button>
+  <button data-profile="guardian">守護者</button><button data-profile="valkyrie">女武神</button><button data-profile="warbringer">掠奪者</button></nav>
+  <img width="480" height="240" alt="">
+  <span class="profile-role"></span>
+  <h2 id="profile-name"></h2>
+  <p></p><dl></dl>
+</div>
+<div id="engineering-panel" hidden>
+  <button id="opt-log" aria-pressed="true" title="顯示詳細事件紀錄">事件紀錄</button>
+  <div id="log" role="log" aria-live="off"></div>
+  <h2>暫定規則</h2><ul id="rules"></ul>
+  <button id="save">下載本局輸入紀錄</button>
+</div></details>
+<div id="tower-marker" hidden>砲塔</div><div id="msg" role="status"></div>
+<div id="shop" aria-label="走向信標"></div>
+<div class="compass" title="世界北向"><svg id="needle" viewBox="-24 -24 48 48" aria-hidden="true"><path d="M0-12 6 10 0 5-6 10z" fill="#e9edf0"/><text y="-13" text-anchor="middle" fill="#ffe9a8" font-size="11" font-weight="700">北</text></svg></div>
+<div id="cover"><div class="card" id="card"></div></div>
+<script type="importmap">{
+  "imports": {
+    "three": "../vendor/three.module.js",
+    "./surface-data.generated.js": "./web-surfaces.mjs",
+    "./music-data.generated.js": "./web-music.mjs",
+    "./prop-data.generated.js": "./web-props.mjs",
+    "./DRACOLoader.local.js": "../vendor/addons/loaders/DRACOLoader.js"
+  }
+}</script>
+<script type="module" src="./main.js"></script>
+</body>
+</html>

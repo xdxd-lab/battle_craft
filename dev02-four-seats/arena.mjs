@@ -25,21 +25,21 @@ export const ARENA = {
 export const ARENA_V8 = { ...ARENA, laneWidth: 10.6, laneHalf: 4.75 };
 export const corePos = id => L.corePos(id, ARENA_V8);
 
-export function fitArenaCamera(angles, aspect) {
+export function fitArenaCamera(angles, aspect, dim=ARENA_V8) {
   const reference = L.fitAngles(angles, aspect);
-  return L.fitAngles(angles, aspect, .98, ARENA_V8, reference.distance / CAMERA_SCALE);
+  return L.fitAngles(angles, aspect, .98, dim, reference.distance / CAMERA_SCALE);
 }
 
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-export function fitNearCamera(angles, aspect, seat, {includeCore=false}={}) {
+export function fitNearCamera(angles, aspect, seat, {includeCore=false,dim=ARENA_V8}={}) {
   const reference = L.fitAngles(angles, aspect);
   const { forward, up, right } = reference;
   const distance = reference.distance / CAMERA_SCALE;
   const tan = Math.tan(L.FOV * Math.PI / 360) * .96;
   const points = [[0, 0, 0]];
   if (seat) {
-    for (const [x, z] of L.shopCorners(seat, ARENA_V8)) points.push([x, 0, z], [x, 4.8, z]);
+    for (const [x, z] of L.shopCorners(seat, dim)) points.push([x, 0, z], [x, 4.8, z]);
     // The button dock removes the old deck's bounding box. v18 instead keeps
     // the real own core (and its mineral readout) in the available near view.
     if(includeCore){
@@ -64,7 +64,7 @@ export function fitNearCamera(angles, aspect, seat, {includeCore=false}={}) {
   }
   const pan = offset(right, tan * aspect, 0);
   const lift = offset(up, tan, dot(reference.position, up));
-  if (pan === null || lift === null) return fitArenaCamera(angles, aspect);
+  if (pan === null || lift === null) return fitArenaCamera(angles, aspect, dim);
   const position = forward.map((v, i) => right[i] * pan + up[i] * lift - v * distance);
   return { position, forward, up, right, distance };
 }

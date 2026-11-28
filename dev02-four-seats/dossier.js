@@ -17,29 +17,28 @@ const describe = {
   battlecruiser: ['飛行重型', '主力艦，雷射砲台即時射擊地面與空中；基礎護甲 3，低傷害武器效果大減。大和砲未實作。', [4.4, 3.4, 5.2], .4, 26],
   scout: ['飛行', '對地即時光子砲（普通）；對空一次發射兩枚反物質飛彈（指向性爆炸），擅長攔截大型飛行單位。', [3.4, 2.8, 4.0], .4, 25],
   scourge: ['飛行小型', '只攻擊空中目標。貼近後自爆造成 110 點傷害，自己同時陣亡；不攻擊地面與核心。', [1.8, 1.6, 2.4], .5, 25],
+  guardian: ['飛行攻城', '厚甲懸浮生物，以遠程孢子攻擊地面目標，不能攻擊空軍。', [3.5, 3.4, 4.5], .72, 25],
+  valkyrie: ['飛行防空', '四次齊射共八枚火箭，追蹤空中目標附近不同落點。逐枚濺射，不能攻擊地面。', [3.7, 2.7, 4.6], .52, 25],
+  warbringer: ['英雄・地面攻城', '掠奪者的英雄型，以聖甲蟲攻擊地面目標。出場有 10 枚聖甲蟲；每次發射一枚，在地面追到目標旁爆炸。金色細條是庫存，能一邊打、一邊較慢地補產。', [3.7, 3.2, 4.9], .72, 25],
 };
-const shop = Object.fromEntries(PADS.filter(pad => !pad.locked).map(pad => [pad.kind, pad]));
-const unitProfile = kind => {
-  const pad = shop[kind], k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
+const unitProfile = (pad,currency) => {
+  const kind = pad.kind, k = KINDS[kind], [role, description, camera, aim, fov] = describe[kind];
   return {
     name: k.name, english: k.source, role, description, camera, aim, fov,
-    stats: [['部署', `${pad.cost} 金／${pad.count} ${kind === 'battlecruiser' ? '艘' : '名'}`], ['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', k.suicide ? '一次性（自爆後陣亡）' : `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash ? [['濺射', '100／50／25%']] : [])],
+    stats: [['部署', `${pad.cost} ${currency}／${pad.count} ${(kind === 'battlecruiser'||kind === 'valkyrie') ? '艘' : '名'}`], ['耐久', k.hp], ['護盾', k.shield || '無'], ['裝甲', ARMORS[k.armor]], ['攻擊', ATTACKS[k.attack].name], ['基礎護甲', PLATE[kind]], ['單次傷害', kind==='valkyrie'?k.damage+'／枚，8 枚／輪':k.vsAir ? `對地 ${k.damage}／對空 ${k.vsAir.damage}${k.vsAir.hits ? `×${k.vsAir.hits}` : ''}` : k.suicide ? `${k.damage}（自爆）` : k.damage], ['攻擊間隔', k.suicide ? '一次性（自爆後陣亡）' : `約 ${(k.cooldown * FRAME_MS / 1000).toFixed(2)} 秒${k.vsAir ? `／對空 ${(k.vsAir.cooldown * FRAME_MS / 1000).toFixed(2)} 秒` : ''}`], ...(k.splash?.parts ? [['濺射', k.splash.parts.map(f=>Math.round(f*100)).join('／')+'%']] : [])],
     model: unitModels.high[kind], plain: unitModels.std[kind],
   };
 };
-const profiles = {
-  ...Object.fromEntries(Object.keys(describe).map(k => [k, unitProfile(k)])),
-  commander: {
-    name: '指揮官', english: 'Commander', role: '購買區操作',
-    description: '在自己的購買區移動，站上信標即可持續用金幣部署部隊。',
-    stats: [['移動速度', `${RULES.commanderSpeed * HZ} 世界單位／秒`], ['部署間隔', `${RULES.purchaseGap / HZ} 秒`]],
-    model: detailCommander, camera: [3.5, 2.55, 4.5], aim: 1.08, fov: 23,
-  },
+const commanderProfile = {
+  name: '指揮官', english: 'Commander', role: '購買區操作',
+  description: '在自己的購買區移動，站上信標即可持續用資源部署部隊。',
+  stats: [['移動速度', `${RULES.commanderSpeed * HZ} 世界單位／秒`], ['部署間隔', `${RULES.purchaseGap / HZ} 秒`]],
+  model: detailCommander, camera: [3.5, 2.55, 4.5], aim: 1.08, fov: 23,
 };
 
 const plainCommander = () => ({ hull: new THREE.CylinderGeometry(.5, .75, 1.7, 8).translate(0, .95, 0), dark: new THREE.CylinderGeometry(.4, .4, .6, 12).translate(0, 2.1, 0), lamp: new THREE.BoxGeometry(.6, .16, .3).translate(0, 2.15, .28) });
-function portrait(renderer, kind, quality, art, compact) {
-  const { model, plain = plainCommander, camera: position, aim: oldAim, fov } = profiles[kind], high = quality === 'high';
+function portrait(renderer, kind, profile, quality, art, compact) {
+  const { model, plain = plainCommander, camera: position, aim: oldAim, fov } = profile, high = quality === 'high';
   const geometries = ((compact && kind==='dragoon' && compactDragoonModels[quality]) || (art && refreshedModels[quality][kind]) || (high ? model : plain))(), paint = seatMats.N;
   const studio = new THREE.Scene();
   studio.background = new THREE.Color(0x19252e);
@@ -93,7 +92,11 @@ const deliveryDescriptions = {
   wraith: '對地短程雷射（普通），對空 Gemini 飛彈（指向性爆炸）。兩者飛向發射瞬間鎖定的位置，不追更新座標。隱形未實作。',
   battlecruiser: '主力艦，對地與對空各有雷射砲台，先飛行再結算。基礎護甲 3；大和砲未實作。',
 };
-export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false, art = false, compact = false) {
+export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false, art = false, compact = false, activePads = PADS, currency = '金') {
+  // Profiles follow the current entry's shop rather than pulling candidate
+  // figures into historical pages or duplicating live prices in art data.
+  const profiles = {commander:commanderProfile};
+  for(const pad of activePads) if(!pad.locked && describe[pad.kind] && KINDS[pad.kind]) profiles[pad.kind] = unitProfile(pad,currency);
   const name = card.querySelector('h2'), role = card.querySelector('.profile-role');
   const description = card.querySelector('p'), stats = card.querySelector('dl'), image = card.querySelector('img');
   const buttons = [...card.querySelectorAll('[data-profile]')], images = {};
@@ -102,8 +105,9 @@ export function createDossier(renderer, card, panel, quality = () => 'std', fait
     if (card.hidden || !panel.open) return;
     const kind = hovered || selected;
     if (kind === visible) return;
-    visible = kind;
     const data = profiles[kind];
+    if (!data) return;
+    visible = kind;
     name.textContent = `${data.name}（${data.english}）`; role.textContent = data.role; description.textContent = (faithfulDelivery && deliveryDescriptions[kind]) || data.description;
     stats.replaceChildren(...data.stats.flatMap(([label, value]) => {
       const term = document.createElement('dt'), detail = document.createElement('dd');
@@ -112,12 +116,14 @@ export function createDossier(renderer, card, panel, quality = () => 'std', fait
     }));
     for (const button of buttons) button.setAttribute('aria-pressed', button.dataset.profile === kind);
     const key = `${quality()}:${kind}`;
-    images[key] ??= portrait(renderer, kind, quality(), art, compact);
+    images[key] ??= portrait(renderer, kind, data, quality(), art, compact);
     image.src = images[key];
     card.dataset.unit = kind;
   }
   for (const button of buttons) { // 中文在上、英文在下
-    const data = profiles[button.dataset.profile], english = document.createElement('small');
+    const data = profiles[button.dataset.profile];
+    if (!data) { button.hidden = true; continue; }
+    const english = document.createElement('small');
     english.textContent = data.english; english.lang = 'en'; button.replaceChildren(data.name, english);
   }
   for (const button of buttons) button.onclick = () => { selected = button.dataset.profile; hovered = null; update(); };

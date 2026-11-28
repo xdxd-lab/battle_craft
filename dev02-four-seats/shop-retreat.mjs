@@ -3,10 +3,15 @@
 const X=[-1.5,1.5], Z=[-6.45,-2.4,2.4,6.45];
 const length=(a,b)=>Math.hypot(b[0]-a[0],b[1]-a[1]);
 
-export function shopRetreatPath(start,pads,r) {
-  const inner=(x,z)=>Math.abs(x)===1.5&&Math.abs(z)===2.4;
-  const nodes=[start,...X.flatMap(x=>Z.map(z=>[x,z])),
-    ...X.map(x=>[x,start[1]]),...Z.map(z=>[start[0],z])];
+export function shopRetreatPath(start,pads,r,expanded=false) {
+  const long=typeof expanded==='object';
+  const rows=long?[...new Set(pads.map(([,z])=>z))].sort((a,b)=>a-b):[];
+  const gaps=rows.slice(1).map((z,i)=>(z+rows[i])/2);
+  const edge=long?expanded.shopDepth/2-.7:0;
+  const Zs=long?[-edge,...gaps,edge]:expanded?[-6.85,-3.6,0,3.6,6.85]:Z;
+  const inner=(x,z)=>Math.abs(x)===1.5&&(long?gaps.includes(z):expanded?Math.abs(z)<=3.6:Math.abs(z)===2.4);
+  const nodes=[start,...X.flatMap(x=>Zs.map(z=>[x,z])),
+    ...X.map(x=>[x,start[1]]),...Zs.map(z=>[start[0],z])];
   const clear=(a,b,first)=>{
     const x=b[0]-a[0], z=b[1]-a[1], d=x*x+z*z;
     return pads.every(([px,pz])=>{
@@ -37,5 +42,5 @@ export function shopRetreatPath(start,pads,r) {
   }
   // Even an unsupported future pad arrangement must still cancel purchases
   // immediately; the engine suppresses purchases throughout this retreat.
-  return [[start[0]<0?-1.5:1.5,start[1]<0?-2.4:2.4]];
+  return [[start[0]<0?-1.5:1.5,expanded?0:start[1]<0?-2.4:2.4]];
 }

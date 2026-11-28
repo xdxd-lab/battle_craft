@@ -13,7 +13,7 @@ export const GROUND_DAT_EXTENTS = Object.freeze({
   hydralisk: Object.freeze([10, 10, 10, 12]),
   archon: Object.freeze([16, 16, 15, 15]),
 });
-const shapes = Object.freeze(Object.fromEntries(Object.entries(GROUND_DAT_EXTENTS).map(([k, b]) =>
+const shapes = Object.freeze(Object.fromEntries(Object.entries({...GROUND_DAT_EXTENTS,warbringer:[16,16,15,15]}).map(([k, b]) =>
   [k, Object.freeze(b.map(v => (v + .5) * WORLD_PER_PX))])));
 export const groundExtents = kind => Object.hasOwn(shapes, kind) ? shapes[kind] : null;
 const shapeOf = u => groundExtents(u.kind);

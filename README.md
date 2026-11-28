@@ -1,6 +1,6 @@
 ![BaattleCraft 原創科幻十字戰場概念橫幅](assets/branding/baattlecraft-banner.png)
 
-**最新版本：[v6-3 線上遊玩](https://xdxd-lab.github.io/battle_craft/dev02-four-seats/battle_craft-v6-3.html)** · [改動與待辦](research/BC-V6-3-FIELD-CONTROLS.md) · [v6-2](dev02-four-seats/battle_craft-v6-2.html) · [v6-1](dev02-four-seats/battle_craft-v6-1.html) · [v6-0](dev02-four-seats/battle_craft-v6-0.html) · [v5-9](dev02-four-seats/battle_craft-dev02.html)
+**最新版本：[v6-4 線上遊玩](https://xdxd-lab.github.io/battle_craft/dev02-four-seats/battle_craft-v6-4.html)** · [v6-4 改動](research/BC-V6-4-WEAPONS.md) · [v6-3](dev02-four-seats/battle_craft-v6-3.html) · [v6-2](dev02-four-seats/battle_craft-v6-2.html) · [v6-1](dev02-four-seats/battle_craft-v6-1.html) · [v6-0](dev02-four-seats/battle_craft-v6-0.html) · [v5-9](dev02-four-seats/battle_craft-dev02.html)
 
 [守城試驗：NPC、砲塔與三種兵外觀](research/BC-V6-DEFENSE-LAB.md)。暫存試驗：[特殊信標與九兵種售價試算](research/BC-V6-PRICING-COMPARISON.md)。
 # BaattleCraft｜十字對衝
@@ -44,3 +44,8 @@ npm test
 - [跨 AI 研究交接快照](research/battle_craft-source-master-handoff.md) · [3D Garden 開發指南快照](research/battle_craft-source-3dgarden-handoff.md)
 - [3D Garden 模型及個別來源](assets/3dgarden/README.md) · [3D Garden 授權](https://www.3dgarden.app/licence)
 - [Three.js MIT 授權](vendor/THREE-LICENSE.txt) · [Draco Apache 2.0 授權](vendor/addons/draco/LICENSE.txt)
+
+## 兵種資料
+
+- [兵種中文名稱對照](research/BC-UNIT-NAMES.md)
+- [v6-4 候選兵種：2009 SPEED 購兵與屬性](research/BC-V6-4-UNIT-CANDIDATES.md)

@@ -17,6 +17,10 @@ v5 保留血條，最新訊息和事件紀錄帶對局時間。顏色區分我�
 - 模型載入失敗時保留原物件或程序模型。切換場景或丟棄過期載入結果時，清理幾何、材質和貼圖；單一模型失敗應可各自回退。
 - [歷史版本與素材調查](battle_craft-research.md) 有來源及篩選理由。SC1、SC2 和 Web 試作的購兵條件與數值各自保留來源。3D 戰場優先維持半寫實／寫實材質與清楚的兵種輪廓，並保留辨識敵我、路線和信標所需的對比。
 
+## v6-4 文件用語（2026-11-29，台灣時間）
+
+專案自寫文件與兵種對照表採用[兵種中文名稱對照](BC-UNIT-NAMES.md)。英文名稱、原圖字串和歷史快照保留。[候選兵種表](BC-V6-4-UNIT-CANDIDATES.md)是原圖對照，未加入正式版。
+
 ## 重要開發知識來源
 
 - [SC2Mapster Wiki](https://sc2mapster.wiki.gg/) 是 StarCraft II 地圖編輯的社群知識庫。從 [Triggers](https://sc2mapster.wiki.gg/wiki/Triggers) 查事件、條件、動作與 Galaxy 腳本，從 [Data Editor](https://sc2mapster.wiki.gg/wiki/Data) 查單位、武器、效果與行為的資料結構。

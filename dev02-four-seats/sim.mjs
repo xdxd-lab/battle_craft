@@ -2,7 +2,7 @@
 // 同一組設定與指令在任何地方重跑都得到相同狀態；呈現層只讀不寫。
 import * as L from '../dev05-layout/layout.mjs';
 import { ARENA, ARENA_V8 } from './arena.mjs';
-import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
+import { KINDS, CORE, unitStats, rosterFor, EXPANSION_VERSION } from './roster.mjs';
 import { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, stepRoster } from './combat.mjs';
 export { DRAGOON_TRACK_RANGE_FROM, DRAGOON_RANGE_TRIAL_FROM, DRAGOON_TRIAL_RANGE, effectiveWeaponRange } from './combat.mjs';
 import { UNIFIED_ATTACK_RANGE_FROM } from './combat-reach.mjs';
@@ -13,9 +13,11 @@ import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER_VARI
 import { chooseDefense, hasDefenseThreat } from './bot-defense.mjs';
 import { SPECIAL_POWER_VERSION, PLAYABLE_JUNCTION_RADIUS, scaleCoins, applySpecialPower } from './special-powers.mjs';
 import { shopRetreatPath } from './shop-retreat.mjs';
+import { WARBRINGER_CAPACITY } from './expansion-weapons.mjs';
 
 export const HZ = 30;
 export const FIELD_CONTROLS_VERSION = 18;
+export const LONG_SHOP_VERSION = 20;
 export const VERSION = 10; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈式戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3；9：佔位、空軍慢慢散開、起手；10：九兵種發射和命中（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
@@ -51,8 +53,11 @@ const ECONOMY_V16 = {
   costs: Object.fromEntries(rosterFor(SPECIAL_POWER_VERSION).map(kind =>
     [kind, scaleCoins(SPECIAL_POWER_VERSION, ECONOMY_V8.costs[kind] ?? KINDS[kind].cost)])),
 };
-export const economyFor = version => version >= SPECIAL_POWER_VERSION ? ECONOMY_V16 : version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
-export const padRadiusFor = version => version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
+const ECONOMY_V19 = {...ECONOMY_V16,costs:Object.fromEntries(rosterFor(EXPANSION_VERSION).map(kind =>
+  [kind, ECONOMY_V16.costs[kind] ?? scaleCoins(EXPANSION_VERSION,KINDS[kind].cost)]))};
+export { EXPANSION_VERSION };
+export const economyFor = version => version >= EXPANSION_VERSION ? ECONOMY_V19 : version >= SPECIAL_POWER_VERSION ? ECONOMY_V16 : version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
+export const padRadiusFor = version => version >= EXPANSION_VERSION ? 1.2 : version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
 const LEGACY_WRAITH = '死靈戰機'; // 保留 v1–9 歷史重播的事件字串
 const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: version >= 8 && kind === 'battlecruiser' ? 3 : KINDS[kind].count, label: kind === 'wraith' && version < 10 ? LEGACY_WRAITH : KINDS[kind].name });
 // 版本 6：購買區 9×15 內兩欄三列，信標中心相距 4.4／4.8（大於兩倍 padRadius），皆在指揮官可走範圍內（暫定）
@@ -64,11 +69,18 @@ const rosterPads = version => version >= 7 ? place(rosterFor(version).map(kind =
   : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
 const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7), PADS_V8 = rosterPads(8), PADS_V10 = rosterPads(10);
 const PADS_V16 = rosterPads(SPECIAL_POWER_VERSION);
-export const padsFor = version => version >= SPECIAL_POWER_VERSION ? PADS_V16 : version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const TWELVE_PAD_POSITIONS = [5.4, 1.8, -1.8, -5.4].flatMap(z => [3, 0, -3].map(x => [x, z]));
+const PADS_V19 = place(rosterFor(EXPANSION_VERSION).map(kind => rosterPad(EXPANSION_VERSION,kind)),TWELVE_PAD_POSITIONS);
+// Keep v18's nine physical beacons in place. Extend the outer end a single
+// row pitch, parallel to the road, without moving the court away from its lane.
+const SHOP_ROW_PITCH=4.8;
+const LONG_PAD_POSITIONS=[7.2,2.4,-2.4,-7.2].flatMap(z=>[3,0,-3].map(x=>[x,z]));
+const PADS_V20=place(rosterFor(LONG_SHOP_VERSION).map(kind=>rosterPad(LONG_SHOP_VERSION,kind)),LONG_PAD_POSITIONS);
+export const padsFor = version => version >= LONG_SHOP_VERSION ? PADS_V20 : version >= EXPANSION_VERSION ? PADS_V19 : version >= SPECIAL_POWER_VERSION ? PADS_V16 : version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 8 ? CORE.hp * 3 : version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
-const homeFor = version => version >= 7 ? HOME_V7 : version >= 6 ? HOME_V6 : HOME_V2;
+const homeFor = version => version >= LONG_SHOP_VERSION ? {x:0,z:4.8} : version >= EXPANSION_VERSION ? {x:0,z:0} : version >= 7 ? HOME_V7 : version >= 6 ? HOME_V6 : HOME_V2;
 const GEOMETRY = {
   1: { dim: L.DIM, shopBounds: [-4, 5.8, -4.2, 4.2] },
   2: { dim: ARENA, shopBounds: [
@@ -92,6 +104,16 @@ GEOMETRY[DRAGOON_RANGE_TRIAL_FROM] = GEOMETRY[DRAGOON_TRACK_RANGE_FROM]; // 只�
 GEOMETRY[SPECIAL_POWER_VERSION] = GEOMETRY[DRAGOON_RANGE_TRIAL_FROM];
 GEOMETRY[UNIFIED_ATTACK_RANGE_FROM] = GEOMETRY[SPECIAL_POWER_VERSION]; // Geometry of the map and movement stays v16.
 GEOMETRY[FIELD_CONTROLS_VERSION] = GEOMETRY[UNIFIED_ATTACK_RANGE_FROM];
+GEOMETRY[EXPANSION_VERSION] = {...GEOMETRY[FIELD_CONTROLS_VERSION],dim:{...GEOMETRY[FIELD_CONTROLS_VERSION].dim,shopPadPositions:TWELVE_PAD_POSITIONS}};
+const LONG_SHOP_DIM={...GEOMETRY[EXPANSION_VERSION].dim,
+  shopDepth:ARENA.shopDepth+SHOP_ROW_PITCH,shopRadial:ARENA.shopRadial+SHOP_ROW_PITCH/2,
+  shopPadPositions:LONG_PAD_POSITIONS,padRadius:padRadiusFor(LONG_SHOP_VERSION)};
+GEOMETRY[LONG_SHOP_VERSION]={
+  dim:LONG_SHOP_DIM,shopBounds:[
+    -LONG_SHOP_DIM.shopWidth/2+.6,LONG_SHOP_DIM.shopWidth/2-.6,
+    -LONG_SHOP_DIM.shopDepth/2+.6,LONG_SHOP_DIM.shopDepth/2-.6,
+  ],
+};
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -140,7 +162,7 @@ function apply(state, c, geometry) {
     const active = s.shopChoice ?? s.pad;
     if (active === c.index) {
       s.shopChoice = -1;
-      const path=shopRetreatPath(toLocal(s.id,s.commander.x,s.commander.z,dim),dim.shopPadPositions,padRadiusFor(state.version))
+      const path=shopRetreatPath(toLocal(s.id,s.commander.x,s.commander.z,dim),dim.shopPadPositions,padRadiusFor(state.version),state.version>=LONG_SHOP_VERSION?dim:state.version>=EXPANSION_VERSION)
         .map(([a,b])=>{const [x,z]=toWorld(s.id,a,b,dim);return {x,z};});
       s.goal=path.shift();s.shopPath=path.length?path:null;
     } else {
@@ -164,6 +186,7 @@ function apply(state, c, geometry) {
 const BOT_V6 = [26, 42, 56, 76, 86, 100];
 // 版本 7（暫定）：陸戰隊 18、重騎兵 12、飛螳 10、刺蛇 14、破壞能 8、死靈式戰機 10、戰鬥巡洋艦 6、斥候 10、自殺蟲 12
 const BOT_V7 = [18, 30, 40, 54, 62, 72, 78, 88, 100];
+const BOT_V19 = [15,25,34,45,52,60,66,75,84,89,95,100];
 function defenseOrder(state, s, b, dim, emit) {
   const now=state.tick;
   if(now>=(b.checkDefense??0)){
@@ -209,7 +232,7 @@ function botCommands(state, dim, emit) {
       b.pad = -1; b.until = state.tick + roll(60);
       const home = homeFor(state.version), [x, z] = toWorld(id, home.x, home.z, dim); out.push({ seat: id, type: 'goal', x, z });
     } else if (state.tick >= b.until) {
-      if (state.version >= 6) { const n = roll(100); b.pad = (state.version >= 7 ? BOT_V7 : BOT_V6).findIndex(c => n < c); b.left = b.pad ? 1 : 1 + roll(3); }
+      if (state.version >= 6) { const n = roll(100); b.pad = (state.version >= EXPANSION_VERSION ? BOT_V19 : state.version >= 7 ? BOT_V7 : BOT_V6).findIndex(c => n < c); b.left = b.pad ? 1 : 1 + roll(3); }
       else if (state.version >= 3) { const n = roll(100); b.pad = n < 45 ? 0 : n < 73 ? 1 : 2; b.left = b.pad ? 1 : 1 + roll(3); }
       else { b.pad = roll(100) < 35 ? 0 : 1; b.left = b.pad ? 1 + roll(2) : 1 + roll(3); }
       b.seen = s.buys;
@@ -249,7 +272,7 @@ function recruit(state, s, p, emit, dim) {
   for (let i = 0; i < p.count; i++) {
     const id = ++state.serial, lat = (s.deployed % 5 - 2) * 1.25; s.deployed++;
     const [x, z] = spots ? [spots[i].x,spots[i].z] : turn([lat, -dim.spawnRadial - i * .4], index);
-    state.units.push({ id, seat: s.id, team: s.team, x, z, hp: RULES.unitHp, cd: 0, lat, target, foe: 0, dx: 0, dz: 0, ...(p.kind ? unitStats(p.kind) : {}) });
+    state.units.push({ id, seat: s.id, team: s.team, x, z, hp: RULES.unitHp, cd: 0, lat, target, foe: 0, dx: 0, dz: 0, ...(p.kind ? unitStats(p.kind) : {}), ...(p.kind==='warbringer' ? {scarabs:WARBRINGER_CAPACITY,scarabDue:null} : {}) });
     ids.push(id);
   }
   emit('buy', s.id, { cost: p.cost, count: p.count, gold: s.gold, label: p.label, units: ids, ...(p.kind ? { kind: p.kind } : {}) });
@@ -263,7 +286,10 @@ function checkBeacon(state, s, emit, dim) {
   const PADS = padsFor(state.version);
   // Cancel takes effect before the commander moves. Even if the straight path
   // touches a neighbouring beacon, a retreat is never a purchase order.
-  const i = s.shopChoice === -1 ? -1 : padAt(s, PADS, dim, padRadiusFor(state.version));
+  let i = s.shopChoice === -1 ? -1 : padAt(s, PADS, dim, padRadiusFor(state.version));
+  // With the longer court, an explicit shop button can cross several older
+  // circles. Buy only at the chosen destination; free movement is unchanged.
+  if(state.version>=LONG_SHOP_VERSION && s.shopChoice>=0 && s.shopChoice!==i)i=-1;
   if (i !== s.pad) {
     if (s.pad >= 0) emit('leave', s.id, { label: PADS[s.pad].label });
     s.pad = i; s.nextBuy = state.tick; s.waiting = false;

@@ -4,6 +4,8 @@
 
 畫面字詞、實際扣款、生成單位 ID 與引擎攻擊類型應各自核對。現階段可借鏡對地、對空、雙用途、濺射等職責，正式兵種名稱、資產與平衡數值由 BaattleCraft 自行設計。本專案中文稱 Protoss 為「神民」；表內英文單位名、Trigger 字串與外部來源名稱照原文保留。
 
+現行自寫文件使用[兵種中文名稱對照](BC-UNIT-NAMES.md)。2009 論壇原附件後續查證見 [v6-4 候選兵種表](BC-V6-4-UNIT-CANDIDATES.md)。
+
 ## 購兵比對：Trigger、顯示名稱、護甲、攻擊方式
 
 表中價格為 Trigger 實際扣除的礦；數量為該 Trigger 所有 Create Unit 動作的合計，代表計畫建立數而非引擎成功生成的實測數。# 為完整匯出順序、從 1 起算（含空 Trigger）。名稱是 CHK `UNIx` 指向 STR 的自訂單位名稱，已移除顏色控制碼。購兵 Location 和 Trigger Comment 各有自己的欄位。護甲取各版 `UNIx` 中實際生成的單位類型之值，不含升級或遊戲狀態。尺寸和地／空攻擊類型由 [Blizzard 官方普通單位表](https://classic.battle.net/scc/gs/damage.shtml)提供的對應普通單位作**參考**：SPEED 的英雄型是否每個尺寸／武器屬性與普通型一致，尚未對照實際 units.dat/weapons.dat，不能當作已驗證的英雄屬性。N 普通、C 震盪、E 爆炸、— 無普通攻擊；濺射、彈數和法術另計。
@@ -11,10 +13,10 @@
 | 購兵區類型 | SPEED：生成類型／自訂名稱；礦、數、#；護甲 | v2.91f：生成類型／自訂名稱；礦、數、#；護甲 | 普通版官方尺寸；地／空 |
 |---|---|---|---|
 | Marine | Jim Raynor / Universal Soldier - $175；150、12、#9；0 | Marine / Universal Soldier $150；150、15、#12；0 | 小；N/N |
-| Firebat | Gui Montag / Napalm Strider - $150；150、12、#22；0 | Firebat / Napalm Strider $150；150、15、#26；0 | 小；C＋濺射/— |
-| Goliath | Alan Schezar / Ancient Goliath - $300；300、12、#23；0 | Goliath / Herculean Defender $300；300、12、#27；0 | 大；N/E |
+| 火蝙蝠（Firebat） | Gui Montag / Napalm Strider - $150；150、12、#22；0 | Firebat / Napalm Strider $150；150、15、#26；0 | 小；C＋濺射/— |
+| 巨人（Goliath） | ★ Alan Schezar（ID 17）／Ancient Goliath - $300；300、12、#23；0 | 普通 Goliath（ID 3）／Herculean Defender $300；300、12、#27；0 | 大；N/E |
 | Wraith | Tom Kazansky / Silent Apparition - $300；300、12、#26；0 | Wraith / Silent Apparition $300；300、8、#30；0 | 大；N/E |
-| Zergling | Devouring One / Hell Spawn - $100；100、12、#27；0 | Zergling / Vicious Hellspawn $200；200、25、#31；0 | 小；N/— |
+| 異形蟲（Zergling） | ★ Devouring One（ID 54）／Hell Spawn - $100；100、12、#27；0 | 普通 Zergling（ID 37）／Vicious Hellspawn $200；200、25、#31；0 | 小；N/— |
 | Hydralisk | Hunter Killer / Acid Demon - $175；175、12、#28；0 | Hydralisk / Malevolent Reaper $150；150、15、#32；0 | 中；E/E |
 | Ultralisk | Torrasque / Ultra Behemoth - $200；200、12、#29；0 | Ultralisk / Brutish Behemoth $200；200、12、#33；0 | 大；N/— |
 | Mutalisk | Kukulza / Deadstar Dragon - $300；300、12、#30；0 | Mutalisk / Deadstar Dragon $300；300、8、#34；0 | 小；N/N |
@@ -23,12 +25,12 @@
 | Zealot | Fenix / Ultima Paladin - $100；100、12、#33；0 | Zealot / Heroic Paladin $150；150、15、#37；0 | 小；N/— |
 | Scout | Artanis / Heaven Sentinal - $300；300、12、#34；0 | Scout / Heaven Sentinel $300；300、8、#38；0 | 大；N/E |
 | 特殊 Scourge | Scourge / Suicide Flies-$750；750、35、#86；10 | Scourge / Raging Kamikaze $200；200、20、#104；0 | 小；—/N；接觸自爆 |
-| 特殊 Corsair | Corsair / Anti Air Alien-$750；750、10、#77；1 | Corsair / Forsaken Annihilator $1500；1500、35、#101；0 | 中；—/E＋濺射 |
-| 特殊 Valkyrie | Valkyrie / Anti Air Human-$650；650、10、#78；2 | Valkyrie / Enigmatic Phantom $300；300、9、#102；0 | 大；—/E＋濺射 |
+| 特殊 私掠者（Corsair） | Corsair / Anti Air Alien-$750；750、10、#77；1 | Corsair / Forsaken Annihilator $1500；1500、35、#101；0 | 中；—/E＋濺射 |
+| 特殊 女武神（Valkyrie） | Valkyrie / Anti Air Human-$650；650、10、#78；2 | Valkyrie / Enigmatic Phantom $300；300、9、#102；0 | 大；—/E＋濺射 |
 
-SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`；#9 生成單位顯示名 $175、要求及扣款均 150。兩者說明不要把 Comment、單位顯示文字或 units.dat 生產成本當實際交易價。SPEED #54 location 名 `Tank`，實際生成 20 Zergling、扣 1000，該單位自訂名 Fast Shit-$1000。v2.91f #29 和 #102 的匯出 location 名為空字串，空名稱不等於無 location；是否可實際觸發要查 MRGN 的 location ID／位置與遊戲測試，不宜直接判無效。
+SPEED #81 的 SCV 要求且扣 600、生成 2，但 Comment 寫 `Darkstar-$1500`；#9 生成單位顯示名 $175、要求及扣款均 150。兩者說明不要把 Comment、單位顯示文字或 units.dat 生產成本當實際交易價。SPEED #54 location 名 `Tank`，實際生成 20 隻異形蟲（Zergling）、扣 1000，該單位自訂名 Fast Shit-$1000。v2.91f #29 和 #102 的匯出 location 名為空字串，空名稱不等於無 location；是否可實際觸發要查 MRGN 的 location ID／位置與遊戲測試，不宜直接判無效。
 
-SPEED 一般列生成英雄、S-列常生成普通型；v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
+SPEED 一般列生成英雄、S-列常生成普通型；另有其他購兵點可買地圖強化的普通巨人與普通異形蟲，見[原附件的獨立列](BC-V6-4-UNIT-CANDIDATES.md#地面)。v2.91f 一般列生成普通、S-列常生成英雄。對應兵種名字一樣也不能假設數值、技能或武器相同。SPEED 以 Civilian 及 Dark Templar 踩選區；v2.91f 以上例子以 Devouring One 踩選區。SPEED #9、22–41 保留 Trigger；條件精確為一個選擇者，持續站立且資源足夠可重複觸發，不能推算牆鐘頻率。v2.91f 的 5 個生成位置與 SPEED 的集中 Purchased Units 再轉移也不同。
 
 ### 後續候選兵種（2026-11-27／28 名稱已確認；遊戲內實作採 BWAPI 原版值，見 [BC-SIX-UNITS](BC-SIX-UNITS.md)、[BC-NINE-UNITS](BC-NINE-UNITS.md)）
 

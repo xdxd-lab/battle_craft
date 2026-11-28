@@ -1,6 +1,7 @@
 // BC01（模擬版本 3）兵種與傷害規則。純資料與純函式，不碰 DOM、亂數或三角函式。
 // 規格與證據：../research/BC01-ROSTER-DAMAGE.md。標「引擎」者沿用原版引擎預設，標「暫定」者尚未定案。
 
+export const EXPANSION_VERSION = 19;
 export const FRAME_MS = 42;        // 暫定：以 Fastest 的 42 ms／frame 換算 30 Hz，未驗證
 export const framesAt = tick => Math.floor(tick * 1000 / (30 * FRAME_MS));
 export const SHIELD_REGEN = 7;     // 引擎：每 frame 回 7/256 點，受擊不中斷
@@ -41,9 +42,13 @@ export const KINDS = {
     vsAir: { attack: 'E', damage: 14, hits: 2, cooldown: 22, range: 1.62, projectile: .25 } },
   // 自殺蟲 Suicide Scourge：只打空中，N 110，接觸即自爆（自己陣亡、不算對方擊殺）；原版一次孵化 2 隻，本作每次 1 隻（暫定）
   scourge: { name: '自殺蟲', source: 'Scourge', armor: 'light', attack: 'N', hp: 25, shield: 0, damage: 110, cooldown: 0, range: .5, air: true, targets: ['air'], projectile: 0, bounces: 0, cost: 6, count: 1, suicide: true },
+  // 試玩數值和現有九兵種同尺度，原地圖的自訂傷害與每批數量不直接搬入。
+  guardian: {name:'守護者',source:'Guardian',armor:'heavy',attack:'N',hp:150,shield:0,damage:20,cooldown:30,range:3.24,air:true,targets:['ground'],projectile:.2,bounces:0,cost:50,count:1},
+  valkyrie: {name:'女武神',source:'Valkyrie',armor:'heavy',attack:'E',hp:200,shield:0,damage:6,cooldown:64,range:2.43,air:true,targets:['air'],projectile:.2,bounces:0,cost:32.5,count:1},
+  warbringer: {name:'掠奪者 ★',source:'Warbringer (Reaver)',armor:'heavy',attack:'N',hp:200,shield:400,damage:100,cooldown:60,range:3.24,air:false,targets:['ground'],projectile:.2,bounces:0,cost:30,count:1},
 };
 // 基礎護甲（BWAPI defaultArmor），只在模擬版本 7 起生效；版本 3–6 不扣護甲以保持重播
-export const PLATE = { marine: 0, dragoon: 1, mutalisk: 0, hydralisk: 0, archon: 0, wraith: 0, battlecruiser: 3, scout: 0, scourge: 0 };
+export const PLATE = { marine: 0, dragoon: 1, mutalisk: 0, hydralisk: 0, archon: 0, wraith: 0, battlecruiser: 3, scout: 0, scourge: 0, guardian: 2, valkyrie: 2, warbringer: 3 };
 export const KIND_IDS = Object.keys(KINDS);
 export const canTarget = (spec, air) => spec.targets.includes(air ? 'air' : 'ground');
 // 依目標所在高度層選武器；沒有 vsAir 的兵種一律用本體數值（版本 3–5 行為不變）
@@ -56,7 +61,8 @@ export const weaponOf = (kind, air) => {
 // 各模擬版本開放的兵種（購兵區順序）
 export const ROSTER = { 3: ['marine', 'dragoon', 'mutalisk'], 6: ['marine', 'dragoon', 'mutalisk', 'hydralisk', 'archon', 'wraith'] };
 ROSTER[7] = [...ROSTER[6], 'battlecruiser', 'scout', 'scourge'];
-export const rosterFor = version => version >= 7 ? ROSTER[7] : version >= 6 ? ROSTER[6] : ROSTER[3];
+ROSTER[EXPANSION_VERSION] = [...ROSTER[7], 'guardian', 'valkyrie', 'warbringer'];
+export const rosterFor = version => version >= EXPANSION_VERSION ? ROSTER[EXPANSION_VERSION] : version >= 7 ? ROSTER[7] : version >= 6 ? ROSTER[6] : ROSTER[3];
 
 // 一發傷害，依原版引擎順序；內部全用 1/256 定點整數。target 的 hp、sh 是 1/256 的整數倍。
 // 彈跳除數 → 整發下限 0.5 → 盾 ≥ 1 才吸收原始傷害 → 剩餘扣基礎護甲 plate（版本 7 起）→ 乘本體倍率（捨去）→ 完全沒扣到盾時本體下限 0.5

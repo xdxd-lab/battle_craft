@@ -50,12 +50,12 @@
 | 原 StarCraft 物件 | FastBlack 自訂名稱 | 顯示文字 |
 |---|---|---|
 | Marine | Universal Soldier | $150 |
-| Ghost | Elite Sniper | $150 |
+| 鬼子（Ghost） | Elite Sniper | $150 |
 | Zealot | Heroic Paladin | $150 |
 | Dragoon | Foreboding Colossus | $200 |
 | Archon | Mystic Titan | $300 |
 | Goliath | Herculean Defender | $300 |
-| Reaver | Merciless Subjugator | $300 |
+| 掠奪者（Reaver） | Merciless Subjugator | $300 |
 | Battlecruiser | Nuclear Deathship | $500 |
 | 特殊項 | Super Zergling | $1,000 |
 | 特殊項 | Construct Stronghold | $600 |

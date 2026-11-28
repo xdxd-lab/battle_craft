@@ -9,6 +9,7 @@ const WINDUP = {
 };
 
 export const shotTarget = p => p.hit?.id ?? (p.tower ? 'tower:' + p.core + (p.towerId===undefined?'':':'+p.towerId) : p.core) ?? null;
+const EXPANSION_WINDUP = {guardian:{first:1,repeat:1,stationary:false},valkyrie:{first:1,repeat:1,stationary:false},warbringer:{first:1,repeat:1,stationary:true}};
 const FLYING_WINDUP = { first:1, repeat:1, stationary:false };
 export function attackReady(u, p, frame, hasFrame, version=9) {
   if (p.dragoonHold !== undefined) {
@@ -17,7 +18,7 @@ export function attackReady(u, p, frame, hasFrame, version=9) {
     if (hasFrame && u.fight?.target === p.dragoonHold) u.fight.due++;
     return false;
   }
-  const target = shotTarget(p), profile = WINDUP[u.kind] ?? (version>=10&&(u.kind==='battlecruiser'||u.kind==='wraith'||u.kind==='scout'||u.kind==='mutalisk') ? FLYING_WINDUP : null);
+  const target = shotTarget(p), profile = WINDUP[u.kind] ?? EXPANSION_WINDUP[u.kind] ?? (version>=10&&(u.kind==='battlecruiser'||u.kind==='wraith'||u.kind==='scout'||u.kind==='mutalisk') ? FLYING_WINDUP : null);
   if (u.fight?.target != null && (u.fight.target !== target || (profile?.stationary && u.motion?.speed > .001))) {
     u.fight.target = null;
   }

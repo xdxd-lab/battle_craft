@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { RATE, SOUNDS, MUSIC, renderSound, renderMusic } from './audio-synth.mjs';
-import { KIND_IDS } from './roster.mjs';
+import { rosterFor } from './roster.mjs';
+const KIND_IDS = rosterFor(7);
 import { loopRange, TRIM_LIMIT } from './audio.js';
 import { TRACKS, PHASES, BATTLE_AT_SECONDS, battleDue } from './music-tracks.mjs';
 

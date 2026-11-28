@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
 import { armor, edged, hex, oct } from './detail-models.js';
+import { v64UnitModels } from './v64-unit-models.js';
 
 const box = (w, h, d, x, y, z, rz = 0, ry = 0) => new THREE.BoxGeometry(w, h, d).rotateZ(rz).rotateY(ry).translate(x, y, z);
 const cone = (r, h, n, x, y, z) => new THREE.ConeGeometry(r, h, n).rotateX(Math.PI / 2).translate(x, y, z);
@@ -164,8 +165,8 @@ function highScourge() {
 }
 
 export const unitModels = {
-  std: { marine: plainMarine, dragoon: plainDragoon, mutalisk: plainMutalisk, hydralisk: plainHydralisk, archon: plainArchon, wraith: plainWraith, battlecruiser: plainBattlecruiser, scout: plainScout, scourge: plainScourge },
-  high: { marine: highMarine, dragoon: highDragoon, mutalisk: highMutalisk, hydralisk: highHydralisk, archon: highArchon, wraith: highWraith, battlecruiser: highBattlecruiser, scout: highScout, scourge: highScourge },
+  std: { marine: plainMarine, dragoon: plainDragoon, mutalisk: plainMutalisk, hydralisk: plainHydralisk, archon: plainArchon, wraith: plainWraith, battlecruiser: plainBattlecruiser, scout: plainScout, scourge: plainScourge, ...v64UnitModels.std },
+  high: { marine: highMarine, dragoon: highDragoon, mutalisk: highMutalisk, hydralisk: highHydralisk, archon: highArchon, wraith: highWraith, battlecruiser: highBattlecruiser, scout: highScout, scourge: highScourge, ...v64UnitModels.high },
 };
 export const HOVER_HEIGHT = .35; // 破壞能懸浮（純視覺，模擬上屬地面層）
 export const FLY_HEIGHT = 1.7;
