@@ -1,5 +1,5 @@
 // 六兵種的原創程序模型（+z 為車頭／頭部方向）。陸戰隊為太空裝甲人形步兵；重騎兵為四足重型機，飛螳為展翼飛行體；
-// 刺蛇為直立節肢生物，破壞能為懸浮能量核心，死靈戰機為前掠翼雙尾撐戰機（版本 6 起）；戰鬥巡洋艦為楔狀主艦、斥候為三角翼長莢艙戰機、自殺蟲為短翼球狀生物彈頭（版本 7 起）。
+// 刺蛇為直立節肢生物，破壞能為懸浮能量核心，死靈式戰機為前掠翼雙尾撐戰機（版本 6 起）；戰鬥巡洋艦為楔狀主艦、斥候為三角翼長莢艙戰機、自殺蟲為短翼球狀生物彈頭（版本 7 起）。
 // 部件鍵：材質[:L|:R]。帶 L／R 的是翅膀，呈現層繞翅根拍動；標準與高細節的鍵必須一致。
 import * as THREE from 'three';
 import { mergeGeometries } from '../vendor/addons/utils/BufferGeometryUtils.js';
@@ -99,7 +99,7 @@ function highArchon() {
     dark.push(armor(hex, x * .84, .5, z * .84, .16, .2, 1.1, .02), tube(.09, .14, .16, 8, x * .84, .42, z * .84), tube(.14, .09, .16, 8, x * .84, 1.7, z * .84)); }
   return { hull: edged(group(hull)), dark: edged(group(dark)), lamp: group([new THREE.IcosahedronGeometry(.56, 2).translate(0, 1.05, 0), new THREE.IcosahedronGeometry(.16, 1).translate(0, 1.92, 0)]) };
 }
-// 死靈戰機：前掠主翼、雙尾撐與垂直尾翼、前置座艙
+// 死靈式戰機：前掠主翼、雙尾撐與垂直尾翼、前置座艙
 const fore = [[0, -.4], [.95, .1], [.9, .32], [.2, .2], [0, .45]];
 function plainWraith() {
   const hull = [cone(.22, 1.3, 6, 0, .4, .35), armor(side(fore, -1), -.12, .32, -.1, 1, .9, .05, .01), armor(fore, .12, .32, -.1, 1, .9, .05, .01)];

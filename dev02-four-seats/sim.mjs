@@ -4,9 +4,10 @@ import * as L from '../dev05-layout/layout.mjs';
 import { ARENA, ARENA_V8 } from './arena.mjs';
 import { KINDS, CORE, unitStats, rosterFor } from './roster.mjs';
 import { stepRoster } from './combat.mjs';
+import { createGroundOccupancy } from './ground-occupancy.mjs';
 
 export const HZ = 30;
-export const VERSION = 8; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3（舊版保留供重播）
+export const VERSION = 10; // 1、2：單一突擊機；3：BC01 三兵種；4：同 3，可通行道路加寬 10%；5：同 4，開場金幣×4、收入×2、陸戰隊售價×1.5；6：同 5，加刺蛇、破壞能、死靈式戰機，每席六座信標；7：同 6，加戰鬥巡洋艦、斥候、自殺蟲，九座信標、每次收入×3、基礎護甲生效；8：戰鬥巡洋艦每次 3 艘、收入 4.5 金／0.625 秒、核心耐久×3；9：佔位、空軍慢慢散開、起手；10：九兵種發射和命中（舊版保留供重播）
 // 以下皆為原型數值。標 v5 者沿用 v5，其餘為本輪暫定。
 export const RULES = {
   startGold: 12, incomeEvery: 30, purchaseGap: 15, // v5：12 金起始、每秒 1 金、兩次購買至少 0.5 秒
@@ -35,7 +36,8 @@ const ECONOMY_V7 = { ...ECONOMY, income: 3 }; // 版本 7：每次發放金額×
 const ECONOMY_V8 = { ...ECONOMY_V7, income: ECONOMY_V7.income * 1.5, incomeEvery: ECONOMY_V7.incomeEvery * 1.25 };
 export const economyFor = version => version >= 8 ? ECONOMY_V8 : version >= 7 ? ECONOMY_V7 : version >= 5 ? ECONOMY : { startGold: RULES.startGold, incomeEvery: RULES.incomeEvery, costs: {} };
 export const padRadiusFor = version => version >= 7 ? 1.35 : RULES.padRadius; // 版本 7 三欄放不下 1.6：|x|＋r＜4.5 且欄距 3＞2r
-const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: version >= 8 && kind === 'battlecruiser' ? 3 : KINDS[kind].count, label: KINDS[kind].name });
+const LEGACY_WRAITH = '死靈戰機'; // 保留 v1–9 歷史重播的事件字串
+const rosterPad = (version, kind) => ({ kind, cost: economyFor(version).costs[kind] ?? KINDS[kind].cost, count: version >= 8 && kind === 'battlecruiser' ? 3 : KINDS[kind].count, label: kind === 'wraith' && version < 10 ? LEGACY_WRAITH : KINDS[kind].name });
 // 版本 6：購買區 9×15 內兩欄三列，信標中心相距 4.4／4.8（大於兩倍 padRadius），皆在指揮官可走範圍內（暫定）
 export const SIX_PAD_POSITIONS = [[2.2, 4.8], [-2.2, 4.8], [2.2, 0], [-2.2, 0], [2.2, -4.8], [-2.2, -4.8]];
 // 版本 7：三欄三列，欄 x＝3／0／−3、列 z＝4.8／0／−4.8（由上而下、由左而右），中心相距 3／4.8（暫定）
@@ -43,8 +45,8 @@ export const NINE_PAD_POSITIONS = [4.8, 0, -4.8].flatMap(z => [3, 0, -3].map(x =
 const rosterPads = version => version >= 7 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), NINE_PAD_POSITIONS)
   : version >= 6 ? place(rosterFor(version).map(kind => rosterPad(version, kind)), SIX_PAD_POSITIONS)
   : place([...rosterFor(version).map(kind => rosterPad(version, kind)), { locked: true, label: '未開放' }]);
-const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7), PADS_V8 = rosterPads(8);
-export const padsFor = version => version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
+const PADS_V3 = rosterPads(3), PADS_V5 = rosterPads(5), PADS_V6 = rosterPads(6), PADS_V7 = rosterPads(7), PADS_V8 = rosterPads(8), PADS_V10 = rosterPads(10);
+export const padsFor = version => version >= 10 ? PADS_V10 : version >= 8 ? PADS_V8 : version >= 7 ? PADS_V7 : version >= 6 ? PADS_V6 : version >= 5 ? PADS_V5 : version >= 3 ? PADS_V3 : PADS_V2;
 export const PADS = padsFor(VERSION); // 新對局使用
 export const coreMax = version => version >= 8 ? CORE.hp * 3 : version >= 3 ? CORE.hp : RULES.coreHp;
 const HOME_V2 = { x: .9, z: 0 }, HOME_V6 = { x: 0, z: 0 }, HOME_V7 = { x: 0, z: 2.4 }; // 版本 6 置中，避開中列信標；版本 7 中央是信標，改站上、中兩列之間
@@ -62,6 +64,8 @@ GEOMETRY[5] = GEOMETRY[4];
 GEOMETRY[6] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: SIX_PAD_POSITIONS } };
 GEOMETRY[7] = { ...GEOMETRY[5], dim: { ...GEOMETRY[5].dim, shopPadPositions: NINE_PAD_POSITIONS } };
 GEOMETRY[8] = { ...GEOMETRY[7], dim: { ...GEOMETRY[7].dim, ...ARENA_V8, shopPadPositions: NINE_PAD_POSITIONS } };
+GEOMETRY[9] = GEOMETRY[8]; // development-only combat candidate; NEW MATCH keeps 8 until the candidate is released
+GEOMETRY[10] = GEOMETRY[9];
 export const dimFor = version => GEOMETRY[version].dim;
 export const DIM = dimFor(VERSION); // 新對局的場地（呈現層用）
 export const SEAT_IDS = L.SEATS.map(s => s.id);
@@ -109,9 +113,9 @@ function apply(state, c, geometry) {
 }
 
 // 電腦只決定走向哪座信標，購兵走同一套規則；只看自己的資料
-// 版本 6 電腦選信標的累計機率（%，暫定）：陸戰隊 26、重騎兵 16、飛螳 14、刺蛇 20、破壞能 10、死靈戰機 14
+// 版本 6 電腦選信標的累計機率（%，暫定）：陸戰隊 26、重騎兵 16、飛螳 14、刺蛇 20、破壞能 10、死靈式戰機 14
 const BOT_V6 = [26, 42, 56, 76, 86, 100];
-// 版本 7（暫定）：陸戰隊 18、重騎兵 12、飛螳 10、刺蛇 14、破壞能 8、死靈戰機 10、戰鬥巡洋艦 6、斥候 10、自殺蟲 12
+// 版本 7（暫定）：陸戰隊 18、重騎兵 12、飛螳 10、刺蛇 14、破壞能 8、死靈式戰機 10、戰鬥巡洋艦 6、斥候 10、自殺蟲 12
 const BOT_V7 = [18, 30, 40, 54, 62, 72, 78, 88, 100];
 function botCommands(state, dim) {
   const out = [];
@@ -143,11 +147,22 @@ export function targetOf(state, seat) { // 對側核心；失守後改為另一�
 }
 function recruit(state, s, p, emit, dim) {
   if (s.gold < p.cost) return false;
+  const ids = [], target = targetOf(state,s.id), index = L.seatIndex(s.id);
+  let spots = null;
+  if (state.version >= 9 && !KINDS[p.kind].air) {
+    const drafts = Array.from({length:p.count}, (_,i) => {
+      const [x,z] = turn([((s.deployed+i)%5-2)*1.25, -dim.spawnRadial-i*.4],index);
+      return {id:state.serial+i+1,seat:s.id,kind:p.kind,x,z};
+    });
+    // Do not spend, increment serials or start the cooldown when the whole wave
+    // cannot fit. Since seats are visited in order, earlier successful waves reserve their own space.
+    spots = createGroundOccupancy(state.units,dim,RULES).reserveWave(drafts);
+    if (!spots) return false;
+  }
   s.gold -= p.cost; s.spent += p.cost; s.buys++;
-  const ids = [], target = targetOf(state, s.id), index = L.seatIndex(s.id);
   for (let i = 0; i < p.count; i++) {
     const id = ++state.serial, lat = (s.deployed % 5 - 2) * 1.25; s.deployed++;
-    const [x, z] = turn([lat, -dim.spawnRadial - i * .4], index);
+    const [x, z] = spots ? [spots[i].x,spots[i].z] : turn([lat, -dim.spawnRadial - i * .4], index);
     state.units.push({ id, seat: s.id, team: s.team, x, z, hp: RULES.unitHp, cd: 0, lat, target, foe: 0, dx: 0, dz: 0, ...(p.kind ? unitStats(p.kind) : {}) });
     ids.push(id);
   }

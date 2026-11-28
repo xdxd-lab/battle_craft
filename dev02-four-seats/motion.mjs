@@ -41,7 +41,7 @@ export function motionDisplacement(u, p, frames) {
   }
   const m = u.motion, dist = Math.hypot(p.mx, p.mz) / WORLD_PER_PX;
   const aim = dist > 0 ? Math.atan2(p.mz, p.mx)
-    : p.hit && (u.x !== p.hit.x || u.z !== p.hit.z) ? Math.atan2(p.hit.z - u.z, p.hit.x - u.x) : m.heading;
+    : p.attackAngle !== undefined ? p.attackAngle : p.hit && (u.x !== p.hit.x || u.z !== p.hit.z) ? Math.atan2(p.hit.z - u.z, p.hit.x - u.x) : m.heading;
   m.heading = turnToward(m.heading, aim, k.turn);
   u.dx = Math.cos(m.heading); u.dz = Math.sin(m.heading);
 

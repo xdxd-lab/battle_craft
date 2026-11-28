@@ -7,7 +7,7 @@ export const SOUNDS = {
   mutalisk: { name: '飛螳：顫音拋射聲', seconds: .24, gain: .55 },
   hydralisk: { name: '刺蛇：濕性噴刺聲', seconds: .18, gain: .5 },
   archon: { name: '破壞能：靈能電弧爆裂', seconds: .4, gain: .6 },
-  wraith: { name: '死靈戰機：三連短雷射', seconds: .22, gain: .45 },
+  wraith: { name: '死靈式戰機：三連短雷射', seconds: .22, gain: .45 },
   battlecruiser: { name: '戰鬥巡洋艦：低頻重砲台雙響', seconds: .42, gain: .7 },
   scout: { name: '斥候：雙發光子短脈衝', seconds: .2, gain: .45 },
   scourge: { name: '自殺蟲：濕性爆裂', seconds: .32, gain: .65 },
