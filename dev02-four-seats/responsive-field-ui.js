@@ -8,7 +8,7 @@ const TOWER_SCOPE = {photon:'對地、對空',spore:'只對空',sunken:'只對�
 const POWER_SCOPE = {clear:'清除道路及交會區內的敵對兵',control:'接管中央與主道路內側 70% 的敵對兵'};
 const active = c=>!!(c?.seat && c?.alive && c.mode==='play');
 const costText = n=>`${formatMinerals(n)} 礦`;
-const idOf = element=>element?.closest?.('button[data-v18-power],button[data-tower-kind]') ?? null;
+const idOf = element=>element?.closest?.('button[data-v18-power],button[data-tower-kind],button[data-pad]') ?? null;
 
 const CSS = `
 #v18-field-dock {
@@ -68,6 +68,11 @@ const CSS = `
  #v18-field-dock > #shop button[aria-pressed=true] small{color:HighlightText}
 }
 #v18-field-actions button small{flex:none;white-space:nowrap;color:#d6dfe5;font-size:.87em;font-variant-numeric:tabular-nums}
+#v18-field-dock[data-dock-minerals] > #shop button{touch-action:manipulation}
+#v18-field-dock #v18-core-minerals{
+ position:static;transform:none;justify-self:start;width:auto;min-width:calc(82px * var(--field-ui));
+ max-width:100%;padding:0 calc(8px * var(--field-ui));
+}
 #v18-core-minerals{
  --field-ui:1;position:fixed;z-index:1;pointer-events:none;transform:translate(-50%,-50%);
  display:grid;place-items:center;width:calc(82px * var(--field-ui));height:calc(23px * var(--field-ui));
@@ -99,7 +104,7 @@ const CSS = `
 }
 `;
 
-export function createResponsiveFieldUi({shop,costs,towerCosts,context,projection,cast,purchaseTower,notice,scale=()=>1}) {
+export function createResponsiveFieldUi({shop,costs,towerCosts,context,projection,cast,purchaseTower,notice,onShop,scale=()=>1}) {
   const css=document.createElement('style');css.id='responsive-field-style';css.textContent=CSS;document.head.append(css);
   document.documentElement.classList.add('field-controls-v18');
   const dock=document.createElement('section');dock.id='v18-field-dock';dock.hidden=true;dock.setAttribute('aria-label','本席戰場操作');
@@ -109,7 +114,22 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
   };
   const powerRow=makeRow('特殊能力','powerRow'),towerRow=makeRow('購買砲塔','towerRow');
   shop.before(dock);dock.append(actions,shop);
-  const amount=document.createElement('span');amount.id='v18-core-minerals';amount.hidden=true;amount.dataset.coreMinerals='';document.body.append(amount);
+  const amount=document.createElement('span');amount.id='v18-core-minerals';amount.hidden=true;amount.dataset.coreMinerals='';
+  if(onShop){dock.dataset.dockMinerals='';dock.insertBefore(amount,shop);}
+  else document.body.append(amount);
+  const optionOf=button=>button&&onShop&&shop.contains(button)&&button.dataset.pad!==undefined?Number(button.dataset.pad):null;
+  function shopClick(e){
+    if(e.detail===0 && !e.pointerType && !e.sourceCapabilities?.firesTouchEvents){
+      const i=optionOf(idOf(e.target));
+      if(i!==null && active(context()))onShop(i,false);
+    }
+  }
+  if(onShop){
+    shop.addEventListener('click',shopClick);
+    shop.addEventListener('keydown',e=>{
+      if(e.repeat&&(e.key==='Enter'||e.key===' '))e.preventDefault();
+    });
+  }
   const buttons=[], tapTimers=new Map();
   // Acknowledges the physical tap, not a successful cast. Never call the
   // command from a transition, and never leave a one-shot action selected.
@@ -157,7 +177,7 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
   window.addEventListener('pointerdown',e=>{
     if(e.pointerType==='touch'){touches.add(e.pointerId);if(touches.size>1)clearPress();}
     const c=context(), button=idOf(e.target);
-    if(!active(c)||!button||!actions.contains(button)||!e.isPrimary||e.button!==0||touches.size>1)return;
+    if(!active(c)||!button||button.disabled||(!actions.contains(button)&&optionOf(button)===null)||!e.isPrimary||e.button!==0||touches.size>1)return;
     clearPress();
     intent={button,seat:c.seat,match:c.match,id:e.pointerId,x:e.clientX,y:e.clientY};
     button.dataset.pressing='';
@@ -169,6 +189,8 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
     const wanted=intent,c=context(), drag=wandered(e);clearPress();
     if(drag||touches.size||!active(c)||c.seat!==wanted.seat||c.match!==wanted.match||
       idOf(document.elementFromPoint(e.clientX,e.clientY))!==wanted.button)return;
+    const i=optionOf(wanted.button);
+    if(i!==null){onShop(i,true);return;}
     buttons.find(b=>b.button===wanted.button)?.trigger();
   },true);
   window.addEventListener('pointercancel',e=>{touches.delete(e.pointerId);if(intent?.id===e.pointerId)clearPress();},true);
@@ -181,7 +203,8 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
     const show=!!(c.seat && c.mode!=='menu');
     if(!active(c)){clearPress();clearTaps();}
     dock.hidden=!show;
-    if(!show||!c.alive||c.mode==='end')amount.hidden=true;
+    if(onShop)amount.hidden=!show||!c.alive||c.mode==='end';
+    else if(!show||!c.alive||c.mode==='end')amount.hidden=true;
     if(!show){lastPose=-1;return;}
     for(const {button,key,get,tower} of buttons){
       const {enabled,affordable}=get();
@@ -199,6 +222,7 @@ export function createResponsiveFieldUi({shop,costs,towerCosts,context,projectio
     lastSeat=c.seat;lastPose=revision;
     const s=Math.max(1,scale());
     if(s!==visibleScale){visibleScale=s;for(const e of [dock,amount])e.style.setProperty('--field-ui',String(s));}
+    if(onShop)return; // The balance is laid out by the dock, never over the arena or status line.
     const p=projection(c.seat);
     const b=p&&coreBalancePlacement(p.bank,frame,s,p.keepClear?[p.keepClear]:[]);
     amount.hidden=!b;

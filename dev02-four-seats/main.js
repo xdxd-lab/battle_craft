@@ -551,14 +551,14 @@ function finish() {
 function menu() {
   specialPowerUi?.close();
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。${EXPANSION?'十二座信標沿用九種兵，再加入守護者、女武神和英雄掠奪者。':'九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。'}</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9${EXPANSION?'（新增三種用 0、-、=）':''}或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${FIELD_CONTROLS?'特殊能力與砲塔都使用畫面下方的按鈕，礦量顯示在自己主城旁。再按一次已選的兵種，指揮官會退到信標之間，停止買兵。':DIRECT_SPECIAL?'本席礦量在主城旁。點自己的清除／控制信標，礦量足夠就直接發動。':COMPACT_SPECIAL?'礦夠才能啟用特殊信標；可按確認、再按同一招，或等 3 秒。':ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。${EXPANSION?'十二座信標沿用九種兵，再加入守護者、女武神和英雄掠奪者。':'九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。'}</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9${EXPANSION?'（新增三種用 0、-、=）':''}或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${FIELD_CONTROLS?(MATCH_VERSION>=S.LONG_SHOP_VERSION?'特殊能力與砲塔在下方，礦量在砲塔按鈕下側。再按一次已選的兵種即可停止買兵。':'特殊能力與砲塔都使用畫面下方的按鈕，礦量顯示在自己主城旁。再按一次已選的兵種，指揮官會退到信標之間，停止買兵。'):DIRECT_SPECIAL?'本席礦量在主城旁。點自己的清除／控制信標，礦量足夠就直接發動。':COMPACT_SPECIAL?'礦夠才能啟用特殊信標；可按確認、再按同一招，或等 3 秒。':ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
   $('shop').innerHTML = seat ? MATCH_PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${EXPANSION?'1234567890-='[i]:i+1}　${p.label}</b><small>${price(p.cost)}<i> → ${p.count} ${deploymentUnit(p.kind)}</i></small></button>`).join('') : '';
   for (const b of $('shop').querySelectorAll('button')) {
     if(FIELD_CONTROLS)b.setAttribute('aria-pressed','false');
-    b.onclick = () => { toggleShopPad(+b.dataset.pad); canvas.focus(); };
+    if(MATCH_VERSION<S.LONG_SHOP_VERSION)b.onclick = () => { toggleShopPad(+b.dataset.pad); canvas.focus(); };
   }
   placeMsg();
   const label=MINERALS?'礦量':'金幣';
@@ -836,6 +836,7 @@ try {
         context:()=>{const own=state?.seats[seat];return {seat,match:record,mode:document.hidden?'background':mode,
           alive:!!own?.alive,gold:own?.gold??0,tower:own?.tower?.hp>0?own.tower.kind:null};},
         cast:power=>command({type:'special',power}),purchaseTower:kind=>command({type:'tower',kind}),
+        onShop:MATCH_VERSION>=S.LONG_SHOP_VERSION?(index,pointer)=>{toggleShopPad(index);if(pointer)canvas.focus({preventScroll:true});}:undefined,
         notice:text=>say(text,'warn'),scale:()=>portraitOverviewScale(canvas.clientWidth,canvas.clientHeight),
       });
     }else if(DIRECT_SPECIAL){

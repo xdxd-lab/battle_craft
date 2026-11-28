@@ -88,7 +88,7 @@ field_release = ROOT / 'battle_craft-v6-3.html'
 field_release.write_text(field.read_text().replace('BaattleCraft v6-3 戰地試玩', 'BaattleCraft v6-3'))
 print(f'{field_release} ({field_release.stat().st_size:,} bytes)')
 
-# Preview-only: never point the published index at the candidate simulation.
+# Keep v6-4 preview and official entries independently addressable.
 expansion = ROOT / 'battle_craft-v6-4-lab.html'
 expansion.write_text(field.read_text().replace('BaattleCraft v6-3 戰地試玩','BaattleCraft v6-4 新兵種試玩')
                      .replace('data-match="18"','data-match="20"')
@@ -96,3 +96,7 @@ expansion.write_text(field.read_text().replace('BaattleCraft v6-3 戰地試玩',
                      .replace('</style>','@media(orientation:landscape){#v18-field-dock > #shop{grid-template-columns:repeat(6,minmax(0,1fr))}} #v18-field-dock > #shop button{touch-action:manipulation}</style>')
                      .replace('</nav>','<button data-profile="guardian">守護者</button><button data-profile="valkyrie">女武神</button><button data-profile="warbringer">掠奪者</button></nav>',1))
 print(f'{expansion} ({expansion.stat().st_size:,} bytes)')
+
+expansion_release = ROOT / 'battle_craft-v6-4.html'
+expansion_release.write_text(expansion.read_text().replace('BaattleCraft v6-4 新兵種試玩','BaattleCraft v6-4'))
+print(f'{expansion_release} ({expansion_release.stat().st_size:,} bytes)')
