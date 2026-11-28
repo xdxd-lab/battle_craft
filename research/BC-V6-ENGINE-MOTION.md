@@ -45,6 +45,6 @@ units.dat SHA-256 `da2ee6f116b77329048ec6be9e02721a527fde23d4b05b1b1336e634490ab
 
 ### 重現與下一關
 
-1. 在合法取得的來源中備好 patch_rt.mpq、BrooDat.mpq、StarDat.mpq（研究程式讀當前目錄的 StarEdit/ 並依此順序）。使用固定版 OpenBW `4b046d5f65302b10cb0a745f0fecd37ec85b20a8`，不需安裝 UI。以 scmJS 0.18.0 執行 `scmjs map new motion-lab.scx --size 64x64 --tileset badlands --players 2`（測圖 SHA-256 `bee65dab73e545d857ad463cbca4a0f2e6986dc8b1cbcf1141b2be39d6801fbd`）。
+1. 在合法取得的來源中備好 patch_rt.mpq、BrooDat.mpq、StarDat.mpq（研究程式讀當前目錄的 StarEdit/ 並依此順序）。使用固定版 OpenBW `4b046d5f65302b10cb0a745f0fecd37ec85b20a8`，不需安裝 UI。以 scmJS 0.18.0 執行 `scmjs map new motion-lab.scx --name badlands --size 64x64 --tileset badlands --players 2`（測圖 SHA-256 `bee65dab73e545d857ad463cbca4a0f2e6986dc8b1cbcf1141b2be39d6801fbd`）。
 2. `g++ -std=c++17 -O1 -I/path/to/openbw research/tools/openbw-motion-probe.cpp -o motion-probe`；從含測圖和 StarEdit/ 的工作目錄執行，例 `/path/to/motion-probe 66 attack > dragoon-attack.csv`，情境 `stop`／`turn90`／`turn180`／`arrival`／`attack`。地面靶為 Medic，自殺蟲空中靶為 Science Vessel。資料在每次 next_frame 前採樣，是離散觀察。
 3. 原生版下一步：用合法安裝的固定遊戲版和原生 BWAPI 或可逐幀觀察的重播，固定同版地圖、速度、升級、朝向；先同樣的單兵案例，再跑原 SPEED AttackMove 與波次。捕捉命令發出和生效、位置差、速度、機頭、飛彈和目標生命。沒有本輪能用的原生客戶端；StarEdit ZIP 只有編輯器與資料，不等於原生遊戲實測。[AAAI 既有原生運動實測](https://cdn.aaai.org/ojs/12811/12811-52-16328-1-2-20201228.pdf)也把命令延遲、移動與攻擊分開，不能把該研究的常數當本專案預設。
