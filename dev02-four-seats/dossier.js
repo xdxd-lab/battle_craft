@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { detailCommander, detailMaterials } from './detail-models.js';
+import { refreshedModels, refreshedMaterials } from './unit-art-refresh.js';
 import { unitModels } from './unit-models.js';
 import { MAT, seatMats } from '../dev05-layout/world.js';
 import { HZ, PADS, RULES } from './sim.mjs';
@@ -36,15 +37,16 @@ const profiles = {
 };
 
 const plainCommander = () => ({ hull: new THREE.CylinderGeometry(.5, .75, 1.7, 8).translate(0, .95, 0), dark: new THREE.CylinderGeometry(.4, .4, .6, 12).translate(0, 2.1, 0), lamp: new THREE.BoxGeometry(.6, .16, .3).translate(0, 2.15, .28) });
-function portrait(renderer, kind, quality) {
-  const { model, plain = plainCommander, camera: position, aim, fov } = profiles[kind], high = quality === 'high';
-  const geometries = (high ? model : plain)(), paint = seatMats.N;
+function portrait(renderer, kind, quality, art) {
+  const { model, plain = plainCommander, camera: position, aim: oldAim, fov } = profiles[kind], high = quality === 'high';
+  const geometries = ((art && refreshedModels[quality][kind]) || (high ? model : plain))(), paint = seatMats.N;
   const studio = new THREE.Scene();
   studio.background = new THREE.Color(0x19252e);
   const lens = new THREE.PerspectiveCamera(fov, 2, .1, 20);
+  const aim = art && kind==='hydralisk' ? .98 : art && kind==='archon' ? 1.14 : oldAim;
   lens.position.set(...position); lens.lookAt(0, aim, 0);
   const shade = kind === 'commander' ? MAT.steel : MAT.black, [hull, dark] = high ? detailMaterials(paint.paint, shade) : [paint.paint, shade];
-  const mats = { hull, dark, lamp: paint.glow };
+  const mats = (art && refreshedMaterials(kind)) || { hull, dark, lamp: paint.glow };
   if (high) { // 圖卡展示台與地面環，讓輪廓與反光讀得出來
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.5, .12, 48), new THREE.MeshStandardMaterial({ color: 0x2b3943, metalness: .8, roughness: .35 })); base.position.y = -.02;
     const halo = new THREE.Mesh(new THREE.TorusGeometry(1.2, .018, 8, 64), new THREE.MeshBasicMaterial({ color: 0xa9ccff })); halo.rotation.x = Math.PI / 2; halo.position.y = .06; studio.add(base, halo);
@@ -90,7 +92,7 @@ const deliveryDescriptions = {
   wraith: '對地短程雷射（普通），對空 Gemini 飛彈（指向性爆炸）。兩者飛向發射瞬間鎖定的位置，不追更新座標。隱形未實作。',
   battlecruiser: '主力艦，對地與對空各有雷射砲台，先飛行再結算。基礎護甲 3；大和砲未實作。',
 };
-export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false) {
+export function createDossier(renderer, card, panel, quality = () => 'std', faithfulDelivery = false, art = false) {
   const name = card.querySelector('h2'), role = card.querySelector('.profile-role');
   const description = card.querySelector('p'), stats = card.querySelector('dl'), image = card.querySelector('img');
   const buttons = [...card.querySelectorAll('[data-profile]')], images = {};
@@ -109,7 +111,7 @@ export function createDossier(renderer, card, panel, quality = () => 'std', fait
     }));
     for (const button of buttons) button.setAttribute('aria-pressed', button.dataset.profile === kind);
     const key = `${quality()}:${kind}`;
-    images[key] ??= portrait(renderer, kind, quality());
+    images[key] ??= portrait(renderer, kind, quality(), art);
     image.src = images[key];
     card.dataset.unit = kind;
   }

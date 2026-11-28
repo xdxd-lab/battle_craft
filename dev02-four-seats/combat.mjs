@@ -8,6 +8,8 @@ import { deliveryFor, placeFixedShot, advanceFixedShot, placeSeekingShot, advanc
   firstBounceTarget, unitGap, shockwaveRing, SCOURGE_CONTACT, targetPoint } from './weapon-delivery.mjs';
 import { KINDS, CORE, PLATE, BOUNCE_RADIUS, SHIELD_REGEN, framesAt, canTarget, applyDamage, weaponOf } from './roster.mjs';
 
+import { DEFENSE_VERSION, TOWER, hitTower, fireTowers } from './defense-tower.mjs';
+
 const dist = (ax, az, bx, bz) => Math.sqrt((ax - bx) * (ax - bx) + (az - bz) * (az - bz));
 export const armorOf = u => u.armor ?? KINDS[u.kind].armor;
 
@@ -51,7 +53,11 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     else if (foe) { p.mx = foe.x - u.x; p.mz = foe.z - u.z; }
     else if (u.target) {
       const [cx, cz] = L.corePos(u.target, dim);
-      if (dist(u.x, u.z, cx, cz) <= R.coreRadius + spec.range) { if (canTarget(spec, false)) p.core = u.target; } // 只打空中者（自殺蟲）到核心旁待命
+      const tower=state.version>=DEFENSE_VERSION?state.seats[u.target]?.tower:null;
+      // Mobile enemies still take priority. In its firing envelope the turret is a
+      // separate target, not a pool of extra core health or a global damage shield.
+      if(tower?.hp>0&&canTarget(spec,false)&&dist(u.x,u.z,tower.x,tower.z)<=spec.range+TOWER.hitRadius) {p.core=u.target;p.tower=true;}
+      else if (dist(u.x, u.z, cx, cz) <= R.coreRadius + spec.range) { if (canTarget(spec, false)) p.core = u.target; } // 只打空中者（自殺蟲）到核心旁待命
       else { const [wx, wz] = waypoint(u, dim); p.mx = wx - u.x; p.mz = wz - u.z; }
     }
     for (const o of units) { // 隊形分離只在同一高度層
@@ -80,7 +86,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     }
     const foe = s.core ? null : alive.get(s.target);
     if (foe) { s.tx = foe.x; s.tz = foe.z; }
-    const speed = weaponOf(s.kind, !!s.w).projectile, d = dist(s.x, s.z, s.tx, s.tz), left = d - (s.core ? R.coreRadius : 0);
+    const speed = weaponOf(s.kind, !!s.w).projectile, d = dist(s.x, s.z, s.tx, s.tz), left = d - (s.tower ? TOWER.hitRadius : s.core ? R.coreRadius : 0);
     if (left <= speed) {
       if (d > 0 && left > 0) { s.x += (s.tx - s.x) / d * left; s.z += (s.tz - s.z) / d * left; }
       arrived.push(s);
@@ -93,7 +99,10 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     const p = plan[i];
     if (!p.hit && !p.core) { if (experimental) attackReady(u,p,frame,frames); return; }
     const vsAir = !p.core && !!KINDS[u.kind].vsAir && KINDS[p.hit.kind].air, spec = weaponOf(u.kind, vsAir);
-    const [x, z] = p.core ? L.corePos(p.core, dim) : [p.hit.x, p.hit.z];
+    const tower=p.tower?state.seats[p.core].tower:null;
+    const [x, z] = tower ? [tower.x,tower.z] : p.core ? L.corePos(p.core, dim) : [p.hit.x, p.hit.z];
+    const radius=p.tower?TOWER.hitRadius:p.core?R.coreRadius:0;
+    const mark=p.tower?{tower:true}:{};
     const delivery = deliveryFor(state.version,u.kind,!p.core && KINDS[p.hit.kind].air);
     if (experimental) {
       p.attackAngle = Math.atan2(z-u.z,x-u.x);
@@ -104,8 +113,8 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     } else if (u.cd) return;
     u.cd = spec.cooldown;
     if (delivery?.mode === 'latched') {
-      const shot = {id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,hop:0,prev:null,...(vsAir?{w:1}:{})};
-      placeFixedShot(shot,delivery,u.x,u.z,x,z,p.core?R.coreRadius:0,!p.core&&KINDS[p.hit.kind].air);
+      const shot = {id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,prev:null,...(vsAir?{w:1}:{})};
+      placeFixedShot(shot,delivery,u.x,u.z,x,z,radius,!p.core&&KINDS[p.hit.kind].air);
       emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind},true);
       // The launch frame already takes the first movement step in the source traces.
       if (advanceFixedShot(shot,delivery,frames)) arrived.push(shot);
@@ -113,15 +122,15 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
     } else if(delivery?.mode==='home'||delivery?.mode==='bounce'){
       const sideOptions=u.kind==='scout'&&vsAir ? [-1,1] : [0], pair=state.shotSerial+1;
       for(const side of sideOptions){
-        const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,hop:0,prev:null,...(vsAir?{w:1}:{}),...(side?{salvo:pair,side,hits:1}:{})};
-        placeSeekingShot(shot,delivery,u,x,z,p.core?R.coreRadius:0,side);
+        const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,prev:null,...(vsAir?{w:1}:{}),...(side?{salvo:pair,side,hits:1}:{})};
+        placeSeekingShot(shot,delivery,u,x,z,radius,side);
         emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,...(side?{salvo:pair,secondary:side===1}:{})},true);
         if(advanceSeekingShot(shot,delivery,frames)) arrived.push(shot);
         else state.shots.push(shot);
       }
     } else if(delivery?.mode==='effect'||delivery?.mode==='suicide'){
       const [ix,iz]=delivery.mode==='suicide' ? [u.x,u.z] : p.core?[x,z]:targetPoint(u,p.hit);
-      const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,hop:0,effect:delivery.mode,x:ix,z:iz,due:frame+delivery.delay};
+      const shot={id:++state.shotSerial,kind:u.kind,seat:u.seat,team:u.team,from:u.id,target:p.core?0:p.hit.id,core:p.core,...mark,hop:0,effect:delivery.mode,x:ix,z:iz,due:frame+delivery.delay};
       state.shots.push(shot);
       if(delivery.mode==='suicide'){u.hp=0;u.boom=1;}
       emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,effect:shot.effect,x:ix,z:iz,target:shot.target},true);
@@ -133,15 +142,15 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       for (const side of split ? [-1,1] : [0]) {
         const fore = split ? 8*WORLD_PER_PX : 0, lateral = side*9*WORLD_PER_PX;
         const [sx,sz] = split ? [u.x+Math.cos(heading)*fore-Math.sin(heading)*lateral, u.z+Math.sin(heading)*fore+Math.cos(heading)*lateral] : [u.x,u.z];
-        const shot = { id: ++state.shotSerial, kind: u.kind, seat: u.seat, team: u.team, from: u.id, x: sx, z: sz, tx: x, tz: z, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0, prev: null, ...(vsAir ? { w:1 } : {}), ...(split ? { salvo:pair, side, hits:1 } : {}) };
+        const shot = { id: ++state.shotSerial, kind: u.kind, seat: u.seat, team: u.team, from: u.id, x: sx, z: sz, tx: x, tz: z, target: p.core ? 0 : p.hit.id, core: p.core, ...mark, hop: 0, prev: null, ...(vsAir ? { w:1 } : {}), ...(split ? { salvo:pair, side, hits:1 } : {}) };
         state.shots.push(shot);
         emit('launch',u.seat,{from:u.id,shot:shot.id,kind:u.kind,...(split ? {salvo:pair,secondary:side===1} : {})},true);
       }
     } else {
-      instant.push({ from: u.id, kind: u.kind, seat: u.seat, team: u.team, target: p.core ? 0 : p.hit.id, core: p.core, hop: 0 });
+      instant.push({ from: u.id, kind: u.kind, seat: u.seat, team: u.team, target: p.core ? 0 : p.hit.id, core: p.core, ...mark, hop: 0 });
       if (spec.suicide) { u.hp = 0; u.boom = 1; } // 自殺蟲：出手即自爆，同步其他對它的攻擊落空；計入己席損失、不算對方擊殺
       const [ix,iz]=delivery?.mode==='atTarget'&&!p.core ? targetPoint(u,p.hit) : [x,z];
-      emit('shot', u.seat, { from: u.id, x:ix, z:iz, ...(p.core ? { core: p.core } : { to: p.hit.id }), ...(delivery?.mode === 'atTarget' ? {atTarget:true} : {}) }, true);
+      emit('shot', u.seat, { from: u.id, x:ix, z:iz, ...(p.core ? { core: p.core, ...mark } : { to: p.hit.id }), ...(delivery?.mode === 'atTarget' ? {atTarget:true} : {}) }, true);
     }
   });
   // 第四階段：依固定順序結算傷害
@@ -149,7 +158,9 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
   for (const h of [...arrived, ...instant.sort((a, b) => a.from - b.from)]) {
     const spec = weaponOf(h.kind, !!h.w), divisor = 3 ** h.hop;
     let dealt = null;
-    if (h.core) {
+    if (h.tower) {
+      dealt=hitTower(state,h.core,spec.damage,spec.attack,divisor,emit);
+    } else if (h.core) {
       if (state.seats[h.core].alive) { const body = { hp: 0, sh: 0, armor: CORE.armor }; dealt = applyDamage(body, spec.damage, spec.attack, divisor); coreDamage[h.core] = (coreDamage[h.core] || 0) + dealt.body; }
     } else if(h.effect==='effect'){
       // The impact point stays put during the 3-frame effect, and the damage test
@@ -174,7 +185,7 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
         if (spec.splash) splash(units, t, h, spec, killer, plateOf);
       }
     }
-    if (h.id) emit(dealt ? 'impact' : 'fizzle', h.seat, { shot: h.id, kind: h.kind, hop: h.hop, x: h.x, z: h.z, target: h.core || h.target, ...(dealt ?? {}) }, true);
+    if (h.id) emit(dealt ? 'impact' : 'fizzle', h.seat, { shot: h.id, kind: h.kind, hop: h.hop, x: h.x, z: h.z, target: h.core || h.target, ...(h.tower?{tower:true}:{}), ...(dealt ?? {}) }, true);
   }
   // 第五階段：彈跳。射手仍存活才續彈；排除本跳與上一跳目標，取最近者，同距取小編號
   for (const s of arrived) {
@@ -197,8 +208,9 @@ export function stepRoster(state, emit, dim, { RULES: R, waypoint, clampWalk }) 
       const [cx, cz] = L.corePos(c.id, dim), d = dist(s.x, s.z, cx, cz) - R.coreRadius;
       if (d <= BOUNCE_RADIUS && d < best) { best = d; next = { target: 0, core: c.id, tx: cx, tz: cz }; }
     }
-    if (next) state.shots.push({ ...s, ...next, id: s.seekingFlight ? s.id : ++state.shotSerial, hop: s.hop + 1, prev: here });
+    if (next) { const {tower, ...shot}=s; state.shots.push({ ...shot, ...next, id: s.seekingFlight ? s.id : ++state.shotSerial, hop: s.hop + 1, prev: here }); }
   }
+  if(state.version>=DEFENSE_VERSION)fireTowers(state,units,killer,emit);
   // 第六階段：移動一起套用，移除陣亡者
   const groundIntents = [];
   units.forEach((u, i) => {

@@ -7,6 +7,7 @@ import { ARENA_V8 as ARENA, corePos, fitArenaCamera, fitNearCamera } from './are
 import * as SF from './surfaces.js';
 import { createDossier } from './dossier.js';
 import { detailCommander, detailMaterials, triangles } from './detail-models.js';
+import { refreshedModels, refreshedMaterials } from './unit-art-refresh.js';
 import { unitModels, FLY_HEIGHT, WING_HINGE, HOVER_HEIGHT } from './unit-models.js';
 import { createAudio, LEVEL_NAMES } from './audio.js';
 import MUSIC_DATA from './music-data.generated.js';
@@ -15,19 +16,23 @@ import { KINDS, KIND_IDS, ATTACKS, CORE, FRAME_MS } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
 import { attackPose } from './combat-phases.mjs';
+import { DEFENSE_VERSION, TOWER } from './defense-tower.mjs';
+import { towerModels } from './defense-tower-view.js';
 import { buildSpecialZones } from './special-zone.js';
 import { fitSpecialZoneCamera, specialZoneFor } from './special-zone-layout.mjs';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
 // Preserve the old Pages and offline entry points as simulation 8.
-const MATCH_VERSION = document.documentElement.dataset.match === '8' ? 8 : S.VERSION;
+const requestedMatch = Number(document.documentElement.dataset.match);
+const MATCH_VERSION = [8, DEFENSE_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const DEFENSE_LAB = MATCH_VERSION === DEFENSE_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
 const MATCH_DIM = S.dimFor(MATCH_VERSION);
 const MATCH_PADS = S.padsFor(MATCH_VERSION).map(p => p.kind === 'wraith' ? { ...p,label: KINDS.wraith.name } : p);
 const SPEEDS = [1, 2, 4], DEFAULT_SPEED = 1;
 let inBattle = false, state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
-let renderer, camera, dossier, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
+let renderer, camera, dossier, towers, view = L.parseView('team:A'), angles = L.viewAngles(view), from = null, anim = 1, safe = { l: 0, t: 0, w: 16, h: 9 };
 
 // ---------- 場景物件 ----------
 const deploymentUnit = kind => kind === 'battlecruiser' ? '艘' : '名';
@@ -45,20 +50,21 @@ let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, glaive
 const inst = (geo, mat, n = MAX) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; m.count = 0; scene.add(m); return m; };
 let bodyTriangles;
 const looks = {};
+const artMaterials=(kind,id)=>DEFENSE_LAB && refreshedMaterials(kind,L.seatById(id).primary);
 function buildActors() {
   const commander = {
     hull: new THREE.CylinderGeometry(.5, .75, 1.7, 8).translate(0, .95, 0),
     dark: new THREE.CylinderGeometry(.4, .4, .6, 12).translate(0, 2.1, 0),
     lamp: new THREE.BoxGeometry(.6, .16, .3).translate(0, 2.15, .28),
   };
-  const build = q => Object.fromEntries(KIND_IDS.map(k => [k, unitModels[q][k]()]));
+  const build = q => Object.fromEntries(KIND_IDS.map(k => [k, ((DEFENSE_LAB && refreshedModels[q][k]) || unitModels[q][k])()]));
   looks.std = { ...build('std'), commander }; looks.high = { ...build('high'), commander: detailCommander() };
   squads = {}; commanders = {};
   for (const s of L.SEATS) {
     const M = W.seatMats[s.id];
     squads[s.id] = Object.fromEntries(KIND_IDS.map(k => [k, Object.keys(looks.std[k]).map(part => { // 第一個部件必須是本體（點選與高度以它為準）
-      const [material, tag] = part.split(':'), x = inst(looks.std[k][part], { hull: M.paint, dark: W.MAT.black, lamp: M.glow }[material]);
-      x.castShadow = true; Object.assign(x.userData, { part, material, side: tag === 'L' ? -1 : tag === 'R' ? 1 : 0 }); return x;
+      const [material, tag] = part.split(':'), x = inst(looks.std[k][part], (artMaterials(k,s.id) || { hull: M.paint, dark: W.MAT.black, lamp: M.glow })[material]);
+      x.castShadow = !(DEFENSE_LAB&&k==='archon'); Object.assign(x.userData, { part, material, side: tag === 'L' ? -1 : tag === 'R' ? 1 : 0 }); return x;
     })]));
     const c = new THREE.Group(), add = (g, m, y, z = 0) => { const x = new THREE.Mesh(g, m); x.position.set(0, y, z); x.castShadow = true; c.add(x); return x; };
     add(commander.hull, M.paint, 0); add(commander.dark, W.MAT.steel, 0); add(commander.lamp, M.glow, 0);
@@ -91,7 +97,7 @@ function buildPads() {
   for (const id of S.SEAT_IDS) MATCH_PADS.forEach((p, i) => { // 四席每座信標都立對應兵種的展示模型（觀戰與他席也看得到）；圈與標籤只畫自己的席位
     if (!p.kind) return;
     const M = W.seatMats[id], g = new THREE.Group(), [lx, lz] = MATCH_DIM.shopPadPositions[i], spec = KINDS[p.kind];
-    for (const [part, geo] of Object.entries(looks.std[p.kind])) { const m = new THREE.Mesh(geo, { hull: M.paint, dark: W.MAT.black, lamp: M.glow }[part.split(':')[0]]); m.castShadow = true; m.userData.pad = i; g.add(m); }
+    for (const [part, geo] of Object.entries(looks.std[p.kind])) { const m = new THREE.Mesh(geo, (artMaterials(p.kind,id) || { hull: M.paint, dark: W.MAT.black, lamp: M.glow })[part.split(':')[0]]); m.castShadow = !(DEFENSE_LAB&&p.kind==='archon'); m.userData.pad = i; g.add(m); }
     const [wx, wz] = S.toWorld(id, lx, lz, MATCH_DIM), home = L.seatById(id).dir;
     g.position.set(wx, .42 + (spec.air ? .5 : spec.hover ? .2 : 0), wz); g.scale.setScalar(compactPadLabels ? 1.4 : 1.15); // 橫式矮螢幕再放大，維持可辨
     g.userData.facing = Math.atan2(-home[0], -home[1]); g.userData.pad = i; g.userData.seat = id; padModels.add(g);
@@ -331,6 +337,9 @@ function write(e) {
     leave: () => mine && ['info', `離開${e.label}信標，停止購兵。`],
     wait: () => mine && ['warn', `金幣不足（需 ${e.cost} 金）；保持站立，存夠會自動購買。`],
     buy: () => ['info', `${who}花 ${e.cost} 金，部署 ${e.count} ${deploymentUnit(e.kind)}${KINDS[e.kind].name}。${mine ? `剩 ${e.gold} 金。` : ''}`],
+    'tower-build': () => ['info', `${who}花 ${e.cost} 金建成主城砲塔。`],
+    'tower-fall': () => ['warn', `${who}主城砲塔被摧毀。`],
+    'npc-defense': () => ['info', `${who}轉為守城，前往${KINDS[e.kind].name}信標。`],
     core: () => [e.level === 'critical' ? 'critical' : 'warn', `${who}核心${{ first: '開始受損', half: '剩一半', critical: '危急' }[e.level]}，${Math.ceil(e.hp)}／${CORE_MAX}。`],
     fall: () => ['critical', `${who}核心失守，停止購兵；存活部隊續戰。`],
     reroute: () => ['warn', `${who}的 ${e.count} 名部隊經中央改攻${seatName(e.to)}。`],
@@ -367,6 +376,11 @@ function tick() {
   prevShots = new Map(state.shots.map(s => [s.id, [s.x, s.z]]));
   const before = new Map(state.units.map(u => [u.id, u]));
   for (const e of S.step(state, now)) {
+    if(e.type==='tower-fire'){
+      shots.live.push({a:[e.x,1.25,e.z], b:[e.tx,heightOf(before.get(e.to)),e.tz],life:.18,color:'#aeeaff'});
+      puffs.live.push({x:e.tx,z:e.tz,y:heightOf(before.get(e.to)),size:.42,life:.18,color:'#aeeaff'});
+      continue;
+    }
     if(e.type==='launch'&&!e.secondary){
       audio.play(e.kind);
       if(e.effect==='effect')puffs.live.push({x:e.x,z:e.z,y:heightOf(before.get(e.target)),size:LOOK[e.kind].puff[1]*.48,life:.13,color:L.seatById(e.seat).secondary});
@@ -375,7 +389,7 @@ function tick() {
       const u = before.get(e.from);
       if (u) {
         audio.play(u.kind);
-        const y = e.core ? 2.5 : heightOf(before.get(e.to)), ink=L.seatById(e.seat).secondary;
+        const y = e.tower ? 1.15 : e.core ? 2.5 : heightOf(before.get(e.to)), ink=L.seatById(e.seat).secondary;
         if (e.atTarget) {
           // Needle Spines: a brief muzzle visual plus target effect, not a beam spanning the gap.
           const dx=e.x-u.x,dz=e.z-u.z,n=Math.hypot(dx,dz)||1;
@@ -389,7 +403,7 @@ function tick() {
       continue;
     }
     if (e.type === 'impact') {
-      const y=e.kind==='battlecruiser'||(e.kind==='wraith'&&MATCH_VERSION>=10) ? (typeof e.target==='string'?2.5:heightOf(before.get(e.target))) : LOOK[e.kind].puff[0];
+      const y=e.tower?1.15:e.kind==='battlecruiser'||(e.kind==='wraith'&&MATCH_VERSION>=10) ? (typeof e.target==='string'?2.5:heightOf(before.get(e.target))) : LOOK[e.kind].puff[0];
       puffs.live.push({x:e.x,z:e.z,y,size:LOOK[e.kind].puff[1],life:.25,color:L.seatById(e.seat).secondary});
       continue;
     }
@@ -422,6 +436,15 @@ function shopUi() {
 }
 function hud() {
   if (!state) return;
+  if(DEFENSE_LAB){
+    const button=$('tower-buy'), own=state.seats[seat];
+    button.hidden=!own;
+    if(own){const t=own.tower;
+      const label=t ? t.hp ? `砲塔 ${Math.ceil(t.hp)}／${TOWER.hp}` : '砲塔已毀' : `建砲塔 ${TOWER.cost} 金`;
+      if(button.textContent!==label)button.textContent=label;
+      button.disabled=!own.alive||!!t||own.gold<TOWER.cost||mode!=='play';
+    }
+  }
   audio.setPaused(mode === 'paused');
   $('clock').textContent = time(state.tick); $('gold').textContent = seat ? state.seats[seat].gold : '—';
   for (const s of L.SEATS) { const v = state.seats[s.id], e = $('core-' + s.id); e.classList.toggle('down', !v.alive); e.querySelector('i').style.width = `${v.hp / CORE_MAX * 100}%`; e.querySelector('span').textContent = `${relName(s.id)} ${Math.ceil(v.hp)}`; }
@@ -495,7 +518,7 @@ function applyQuality() {
     const M = W.seatMats[s.id];
     const pick = (paint, dark) => high ? (heroMats[s.id + dark.uuid] ??= detailMaterials(paint, dark)) : [paint, dark];
     const [dh, dd] = pick(M.paint, W.MAT.black), [ch, cd] = pick(M.paint, W.MAT.steel);
-    for (const k of KIND_IDS) for (const mesh of squads[s.id][k]) { mesh.geometry = look[k][mesh.userData.part]; mesh.material = { hull: dh, dark: dd, lamp: M.glow }[mesh.userData.material]; }
+    for (const k of KIND_IDS) for (const mesh of squads[s.id][k]) { mesh.geometry = look[k][mesh.userData.part]; mesh.material = (artMaterials(k,s.id) || { hull: dh, dark: dd, lamp: M.glow })[mesh.userData.material]; }
     for (const [i, part, mat] of [[0, 'hull', ch], [1, 'dark', cd], [2, 'lamp', M.glow]]) { const m = commanders[s.id].children[i]; m.geometry = look.commander[part]; m.material = mat; }
   }
   HS.setHighScene(high); dossier?.refresh();
@@ -544,6 +567,7 @@ function draw(dt, k) {
   for (const s of L.SEATS) {
     for (const kind of KIND_IDS) squads[s.id][kind].forEach(m => { m.count = counts[s.id][kind]; m.instanceMatrix.needsUpdate = true; });
     const v = state?.seats[s.id]; if (!v) { commanders[s.id].visible = false; continue; }
+    if(towers){const t=v.tower,g=towers.by[s.id];g.visible=!!(v.alive&&t?.hp>0);if(g.visible)bar(t.x,1.86,t.z,1,.14,t.hp/TOWER.hp,relColor(s.id));}
     const c = commanders[s.id]; c.visible = v.alive; c.position.set(v.commander.x, .1, v.commander.z); if (v.commander.dx || v.commander.dz) c.rotation.y = Math.atan2(v.commander.dx, v.commander.dz);
     bar(...coreStatus.barAt(s.id), 6, .55, v.hp / CORE_MAX, relColor(s.id));
   }
@@ -554,7 +578,7 @@ function draw(dt, k) {
     const [mesh, y] = PROJ[s.kind], i = flying[s.kind]; if (i >= 128) continue; flying[s.kind]++;
     const p = prevShots.get(s.id) ?? [s.x, s.z], x = p[0] + (s.x - p[0]) * k, z = p[1] + (s.z - p[1]) * k;
     const pct=s.fixedFlight && s.length>0 ? 1-s.remaining/s.length : 0;
-    const targetY=s.airTarget ? FLY_HEIGHT+.6 : s.core ? 2.5 : .8;
+    const targetY=s.tower?1.15:s.airTarget ? FLY_HEIGHT+.6 : s.core ? 2.5 : .8;
     const height=s.fixedFlight ? THREE.MathUtils.lerp(y,targetY,pct) : y;
     dummy.position.set(x,height,z);
     const followsDirection=mesh===darts||mesh===missiles||mesh===bolts||mesh===cruiserPulse;
@@ -611,9 +635,14 @@ $('rules').innerHTML = [`起始 ${liveEconomy.startGold} 金、每 ${liveEconomy
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: MATCH_DIM }));
   if (SPECIAL_LAB) scene.add(buildSpecialZones(MATCH_DIM));
+  if (DEFENSE_LAB) {
+    towers=towerModels(MATCH_DIM);scene.add(towers.root);
+    const b=$('tower-buy');b.title=`單席一座，拆毀後不能重買。試驗價 ${TOWER.cost} 金。`;
+    b.onclick=()=>{command({type:'tower'});canvas.focus();};
+  }
   buildActors(); coreStatus = createCoreStatus(CORE_MAX);
   if (innerHeight < 560 || innerWidth < 1100) $('panel').open = false;
-  dossier = createDossier(renderer, $('dossier'), $('panel'), () => display.quality, MATCH_VERSION>=10);
+  dossier = createDossier(renderer, $('dossier'), $('panel'), () => display.quality, MATCH_VERSION>=10, DEFENSE_LAB);
   applyDisplay(false); applyQuality();
   applySurface();
   const watch = new ResizeObserver(resize); [canvas, $('panel'), $('bar')].forEach(o => watch.observe(o)); $('panel').addEventListener('toggle', resize);

@@ -60,3 +60,10 @@ lab.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 特殊信標�
                .replace('data-match="8"', 'data-match="10" data-special-lab="true"')
                .replace('<script>/* BUNDLE */</script>', scripts))
 print(f'{lab} ({lab.stat().st_size:,} bytes)')
+
+defense = ROOT / 'battle_craft-defense-lab.html'
+defense.write_text(template.replace('BaattleCraft v6-0', 'BaattleCraft 守城試驗')
+                   .replace('data-match="8"', 'data-match="11" data-special-lab="true"')
+                   .replace('<div id="now-playing"', '<button id="tower-buy" hidden></button><div id="now-playing"')
+                   .replace('<script>/* BUNDLE */</script>', scripts))
+print(f'{defense} ({defense.stat().st_size:,} bytes)')
