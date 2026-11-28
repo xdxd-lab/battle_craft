@@ -75,3 +75,11 @@ print(f'{defense} ({defense.stat().st_size:,} bytes)')
 release = ROOT / 'battle_craft-v6-2.html'
 release.write_text(re.sub(r'BaattleCraft 守城試驗 8', 'BaattleCraft v6-2', defense.read_text()))
 print(f'{release} ({release.stat().st_size:,} bytes)')
+
+# New rules are available only at this explicit preview entry until approved.
+field = ROOT / 'battle_craft-v6-3-lab.html'
+field.write_text(release.read_text()
+                 .replace('BaattleCraft v6-2', 'BaattleCraft v6-3 戰地試玩')
+                 .replace('data-match="17" data-special-lab="true" data-special-controls="direct"',
+                          'data-match="18" data-special-lab="true" data-special-controls="dock"'))
+print(f'{field} ({field.stat().st_size:,} bytes)')

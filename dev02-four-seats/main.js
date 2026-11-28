@@ -17,7 +17,7 @@ import { KINDS, KIND_IDS, ATTACKS, CORE, FRAME_MS } from './roster.mjs';
 import * as HS from './high-scene.js';
 import { createCoreStatus } from './core-status.js';
 import { attackPose } from './combat-phases.mjs';
-import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER, towerCost } from './defense-tower.mjs';
+import { DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, TOWER, towerCost, towerSpec } from './defense-tower.mjs';
 import { towerModels } from './defense-tower-view.js';
 import { buildSpecialZones } from './special-zone.js';
 import { fitSpecialZoneCamera, specialZoneFor, SPECIAL_BEACONS, SPECIAL_ZONE } from './special-zone-layout.mjs';
@@ -25,27 +25,32 @@ import { SPECIAL_POWER_VERSION, SPECIAL_POWER_COSTS, specialPowerZone, specialPo
 import { createSpecialPowerUi, formatMinerals, powerResult, SPECIAL_POWER_LABELS } from './special-power-ui.js';
 import { COMPACT_SPECIAL_UI_FROM, createCompactSpecialPowerUi, installCompactSpecialHud } from './compact-special-power-ui.js';
 import { createDirectSpecialBeacons } from './direct-special-beacons.js';
+import { createResponsiveFieldUi, FIELD_TOWER_LABELS } from './responsive-field-ui.js';
 import { PORTRAIT_OVERVIEW_VERSION, isNarrowPortrait, overviewAngles, syncPortraitOverview, setPortraitOverviewActionInset, setPortraitOverviewFog, ensureDrawingBuffer, overviewPixelRatio, portraitOverviewScale } from './portrait-overview.js';
 
 const $ = id => document.getElementById(id), canvas = $('stage'), { scene } = W, R = S.RULES;
 const hash = new URLSearchParams(location.hash.slice(1));
 // Select the requested trial while preserving the official and offline entry points.
 const requestedMatch = Number(document.documentElement.dataset.match);
-const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION, S.UNIFIED_ATTACK_RANGE_FROM].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const MATCH_VERSION = [8, DEFENSE_VERSION, VISIBILITY_VERSION, DEFENSE_TUNING_VERSION, S.DRAGOON_TRACK_RANGE_FROM, S.DRAGOON_RANGE_TRIAL_FROM, SPECIAL_POWER_VERSION, S.UNIFIED_ATTACK_RANGE_FROM, S.FIELD_CONTROLS_VERSION].includes(requestedMatch) ? requestedMatch : S.VERSION;
+const FIELD_CONTROLS = MATCH_VERSION >= S.FIELD_CONTROLS_VERSION;
 const DEFENSE_LAB = MATCH_VERSION >= DEFENSE_VERSION;
 const DRAGOON_FX = MATCH_VERSION >= DEFENSE_TUNING_VERSION;
 const SPECIAL_LAB = document.documentElement.dataset.specialLab === 'true';
+const SCENE_SPECIAL_DECK = SPECIAL_LAB && !FIELD_CONTROLS;
 const MATCH_DIM = S.dimFor(MATCH_VERSION);
 const TOWER_MUZZLE = MATCH_DIM.visibleTower ? 1.54 : 1.25;
 const MATCH_PADS = S.padsFor(MATCH_VERSION).map(p => p.kind === 'wraith' ? { ...p,label: KINDS.wraith.name } : p);
 const MINERALS = MATCH_VERSION >= SPECIAL_POWER_VERSION;
-const ACTIVE_SPECIAL = MINERALS && SPECIAL_LAB;
-const DIRECT_SPECIAL = ACTIVE_SPECIAL && MATCH_VERSION >= COMPACT_SPECIAL_UI_FROM && document.documentElement.dataset.specialControls==='direct';
-const COMPACT_SPECIAL = !DIRECT_SPECIAL && ACTIVE_SPECIAL && MATCH_VERSION >= COMPACT_SPECIAL_UI_FROM;
-const liveEconomy=S.economyFor(MATCH_VERSION), matchTowerCost=towerCost(MATCH_VERSION);
+const ACTIVE_SPECIAL = MINERALS && (SPECIAL_LAB||FIELD_CONTROLS);
+const DIRECT_SPECIAL = !FIELD_CONTROLS && ACTIVE_SPECIAL && MATCH_VERSION >= COMPACT_SPECIAL_UI_FROM && document.documentElement.dataset.specialControls==='direct';
+const COMPACT_SPECIAL = !FIELD_CONTROLS && !DIRECT_SPECIAL && ACTIVE_SPECIAL && MATCH_VERSION >= COMPACT_SPECIAL_UI_FROM;
+const liveEconomy=S.economyFor(MATCH_VERSION), matchTowerCost=towerCost(MATCH_VERSION,FIELD_CONTROLS?'photon':undefined);
 const currency=MINERALS?'礦':'金', amount=MINERALS?formatMinerals:String;
 const price = value => `${amount(value)} ${currency}`;
-const specialDeckPowers=ACTIVE_SPECIAL?Object.fromEntries(Object.entries(SPECIAL_POWER_COSTS)
+const towerNames=FIELD_TOWER_LABELS;
+const towerColours={photon:'#aeeaff',spore:'#bbf480',sunken:'#f4a090'};
+const specialDeckPowers=SCENE_SPECIAL_DECK&&ACTIVE_SPECIAL?Object.fromEntries(Object.entries(SPECIAL_POWER_COSTS)
   .map(([key,cost])=>[key,{label:SPECIAL_POWER_LABELS[key],price:price(cost)}])):null;
 const SPEEDS = [1, 2, 4], DEFAULT_SPEED = 1;
 let inBattle = false, state = null, record = null, seat = null, queue = [], mode = 'menu', speed = DEFAULT_SPEED, accumulator = 0, previous = 0, logRows = [];
@@ -63,7 +68,7 @@ const LOOK = {
   battlecruiser: { pick: [.4, 2.1], top: 1.55, puff: [FLY_HEIGHT + .4, .5] }, scout: { pick: [.4, 1.5], top: 1.1, puff: [FLY_HEIGHT + .4, .45] }, scourge: { pick: [.45, 1.0], top: 1.0, puff: [FLY_HEIGHT + .4, .3] },
 };
 const liftOf = (spec, t = 0, id = 0) => spec.air ? FLY_HEIGHT : spec.hover ? HOVER_HEIGHT + Math.sin(t * .12 + id) * .06 : 0;
-let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, orbGlow, glaives, darts, missiles, bolts, cruiserPulse, shadows;
+let coreStatus, squads, commanders, barBack, barFill, shots, puffs, orbs, orbGlow, glaives, darts, missiles, bolts, cruiserPulse, shadows, turretOrbs;
 const inst = (geo, mat, n = MAX) => { const m = new THREE.InstancedMesh(geo, mat, n); m.frustumCulled = false; m.count = 0; scene.add(m); return m; };
 let bodyTriangles;
 const looks = {};
@@ -104,6 +109,7 @@ function buildActors() {
   darts = inst(new THREE.ConeGeometry(.07, .5, 5).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 刺蛇骨刺
   missiles = inst(new THREE.BoxGeometry(.1, .1, .55), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 死靈式戰機對空飛彈
   cruiserPulse = inst(new THREE.BoxGeometry(.16,.16,.72), new THREE.MeshBasicMaterial({ toneMapped:false }), 128);
+  if(FIELD_CONTROLS)turretOrbs=inst(new THREE.SphereGeometry(.18,10,8),new THREE.MeshBasicMaterial({toneMapped:false}),64);
   bolts = inst(new THREE.CapsuleGeometry(.09, .3, 3, 8).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ toneMapped: false }), 128); // 斥候對空反物質飛彈（一次兩發，畫成一枚）
   shadows = inst(new THREE.CircleGeometry(.55, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x02060a, transparent: true, opacity: .42, depthWrite: false }), 256);
 }
@@ -198,10 +204,10 @@ function pose() {
   fittedView = anim === 1 ? view : null; fittedSafe = safe; poseRevision++;
   const to = L.viewAngles(view), k = anim * anim * (3 - 2 * anim);
   if (from && anim < 1) { const turn = Math.atan2(Math.sin(to.az - from.az), Math.cos(to.az - from.az)); angles = { az: from.az + turn * k, el: from.el + (to.el - from.el) * k }; } else angles = to;
-  const base=overview?fitArenaCamera:(a,aspect)=>fitNearCamera(a,aspect,seat);
+  const base=overview?fitArenaCamera:(a,aspect)=>fitNearCamera(a,aspect,seat,{includeCore:FIELD_CONTROLS});
   W.poseCamera(camera,portraitAtlas?overviewAngles(angles):angles,safe,(a,aspect)=>{
     const fit=base(a,aspect);
-    return SPECIAL_LAB ? fitSpecialZoneCamera(fit,a,aspect,MATCH_DIM,{seat,overview}) : fit;
+    return SCENE_SPECIAL_DECK ? fitSpecialZoneCamera(fit,a,aspect,MATCH_DIM,{seat,overview}) : fit;
   }); camera.updateMatrixWorld();
   $('needle').style.transform = `rotate(${W.northAngle(camera)}rad)`; camera.updateMatrixWorld();
   keepMarkersReadable();
@@ -214,7 +220,11 @@ function setFraming(full) {
 }
 // 訊息列一律貼在購兵列上緣之上（九鈕兩列、三列高度隨畫面變），不壓到按鈕文字
 function placeMsg(scale = 1) {
-  const top = $('shop').childElementCount ? $('shop').getBoundingClientRect().top : innerHeight - 10, panel = $('panel');
+  const dock=FIELD_CONTROLS?specialPowerUi?.root:null;
+  const top = dock ? (dock.hidden ? innerHeight-10 : dock.getBoundingClientRect().top)
+    : $('shop').childElementCount ? $('shop').getBoundingClientRect().top : innerHeight - 10;
+  const panel=$('panel');
+  if(dock)document.documentElement.style.setProperty('--v18-dock-inset',`${Math.ceil(innerHeight-top+6*scale)}px`);
   $('msg').style.bottom = `${Math.ceil(innerHeight - top + 6 * scale)}px`;
   panel.style.maxHeight = innerWidth > innerHeight ? `${Math.max(120, Math.floor(top - 52 - panel.getBoundingClientRect().top))}px` : ''; // 橫式：介紹面板止於購兵列與兩行訊息之上
   return innerHeight - top;
@@ -229,7 +239,7 @@ function resize() {
   if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) setPortraitOverviewActionInset(portraitAtlas,shopH);
   const compact = h <= 560 || portraitAtlas;
   if (compact !== compactPadLabels) { compactPadLabels = compact; buildPads(); }
-  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portraitAtlas ? shopH + 42 * portraitAtlas : Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + (SPECIAL_LAB && portrait ? 72 : 34)); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
+  const portrait = h > w, bar = $('bar').getBoundingClientRect(), panel = $('panel').getBoundingClientRect(), open = $('panel').open && w >= 1100 && !compact, bottom = portraitAtlas ? shopH + 42 * portraitAtlas : Math.max(portrait ? 170 : h > 560 ? 116 : 90, shopH + (SCENE_SPECIAL_DECK && portrait ? 72 : 34)); // 保留購兵列與其上方一行訊息，最下列信標不被遮（九鈕：直式三列、橫式兩列）
   let l = portraitAtlas ? 7 * portraitAtlas : portrait ? 0 : bar.right + 8, r = portraitAtlas ? 7 * portraitAtlas : portrait || !open ? 0 : w - panel.left + 8; const t = portrait ? bar.bottom + 8 * (portraitAtlas || 1) : 0;
   if (!portrait && w - 2 * Math.max(l, r) > h * 1.25) l = r = Math.max(l, r);
   safe = { l, t, w: Math.max(80, w - l - r), h: Math.max(80, h - t - bottom) };
@@ -246,6 +256,13 @@ function resize() {
 function command(c) {
   if(mode!=='play' || !seat || !state.seats[seat].alive)return;
   const input={seat,...c};
+  if(FIELD_CONTROLS){
+    // Keep two shop taps even in the same simulation step: the second is
+    // cancellation. Separate one-shot purchases from commander input.
+    if(c.type==='special'||c.type==='tower')queue=queue.filter(q=>q.type!==c.type);
+    queue.push(input);
+    return;
+  }
   // A special ability must not erase an unrelated movement input
   // (or be erased by the next input) before the deterministic step records it.
   queue=(COMPACT_SPECIAL||DIRECT_SPECIAL)?[...queue.filter(q=>(q.type==='special')!==(c.type==='special')),input]:[input];
@@ -274,29 +291,27 @@ function specialAt(e) {
   return idx<0?null:SPECIAL_BEACONS[idx].id;
 }
 const beaconPoint=new THREE.Vector3();
-function specialProjection(id){
-  const deck=specialZoneFor(id,MATCH_DIM), [cx,cz]=corePos(id,MATCH_DIM);
-  const [dx,dz]=deck.radial, [tx,tz]=deck.clockwise, edge=MATCH_DIM.corePlatformRadius+.65;
-  const w=canvas.clientWidth,h=canvas.clientHeight;
-  function screen(x,y,z){
-    const p=beaconPoint.set(x,y,z).project(camera);
-    return Math.abs(p.z)<1?[(p.x+1)*w/2,(1-p.y)*h/2]:null;
-  }
-  const shell=[];
-  for(const h of [1,7.6])for(let i=0;i<8;i++){
-    const a=i*Math.PI/4, p=screen(cx+Math.cos(a)*3.1,h,cz+Math.sin(a)*3.1);
+function screenMapPoint(x,y,z,w=canvas.clientWidth,h=canvas.clientHeight){
+  const p=beaconPoint.set(x,y,z).project(camera);
+  return Math.abs(p.z)<1?[(p.x+1)*w/2,(1-p.y)*h/2]:null;
+}
+function coreBalanceProjection(id){
+  const [cx,cz]=corePos(id,MATCH_DIM), radial=L.seatById(id).dir;
+  const [dx,dz]=radial, [tx,tz]=L.ccw(radial).map(v=>-v), edge=MATCH_DIM.corePlatformRadius+.65;
+  const w=canvas.clientWidth,h=canvas.clientHeight, shell=[];
+  for(const y of [1,7.6])for(let i=0;i<8;i++){
+    const a=i*Math.PI/4, p=screenMapPoint(cx+Math.cos(a)*3.1,y,cz+Math.sin(a)*3.1,w,h);
     if(p)shell.push(p);
   }
   const keepClear=shell.length ? {left:Math.min(...shell.map(p=>p[0])),right:Math.max(...shell.map(p=>p[0])),
     top:Math.min(...shell.map(p=>p[1])),bottom:Math.max(...shell.map(p=>p[1]))}:null;
-  return {
-    pads:deck.ringPositions.map(([x,z])=>screen(x,SPECIAL_ZONE.deck+.28,z)),
-    bank:screen(cx+dx*edge+tx*1.5,1.7,cz+dz*edge+tz*1.5),
-    keepClear,
-  };
+  return {bank:screenMapPoint(cx+dx*edge+tx*1.5,1.7,cz+dz*edge+tz*1.5,w,h),keepClear};
+}
+function specialProjection(id){
+  return {...coreBalanceProjection(id),pads:specialZoneFor(id,MATCH_DIM).ringPositions.map(([x,z])=>screenMapPoint(x,SPECIAL_ZONE.deck+.28,z))};
 }
 function openSpecialAt(e) {
-  if(!specialPowerUi || DIRECT_SPECIAL)return false; // direct activation is a completed tap only
+  if(!specialPowerUi || DIRECT_SPECIAL || FIELD_CONTROLS)return false; // direct activation is a completed tap only
   const power=specialAt(e);
   return power ? (COMPACT_SPECIAL?specialPowerUi.showHint(power):specialPowerUi.open(power)):false;
 }
@@ -396,6 +411,11 @@ document.addEventListener('visibilitychange', () => {
   }, 250);
 });
 function gotoPad(i) { if (!seat) return; const [x, z] = S.padWorld(seat, i, MATCH_DIM); command({ type: 'goal', x, z }); }
+function toggleShopPad(index) {
+  if (!FIELD_CONTROLS) return gotoPad(index);
+  keys.clear();
+  command({type:'shop',index});
+}
 
 // ---------- 事件文字 ----------
 const time = tick => { const s = Math.floor(tick / S.HZ); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
@@ -410,7 +430,7 @@ function write(e) {
     leave: () => mine && ['info', `離開${e.label}信標，停止購兵。`],
     wait: () => mine && ['warn', `${MINERALS?'礦量':'金幣'}不足（需 ${price(e.cost)}）；保持站立，存夠會自動購買。`],
     buy: () => ['info', `${who}花 ${price(e.cost)}，部署 ${e.count} ${deploymentUnit(e.kind)}${KINDS[e.kind].name}。${mine ? `剩 ${price(e.gold)}。` : ''}`],
-    'tower-build': () => ['info', `${who}花 ${price(e.cost)}建成主城砲塔。`],
+    'tower-build': () => ['info', `${who}花 ${price(e.cost)}${e.replaced?'替換為':'建成'}${towerNames[e.kind]??'主城砲塔'}。`],
     special: () => {
       const message=powerResult(e);
       return message&&(mine||e.status==='applied')?[e.status==='applied'?'info':'warn',mine?message:`${who}使用${message}`]:null;
@@ -433,30 +453,39 @@ function write(e) {
 
 // ---------- 對局 ----------
 function start(id, seed = (Date.now() ^ (Math.random() * 2 ** 32)) >>> 0) {
-  if(COMPACT_SPECIAL||DIRECT_SPECIAL)specialPowerUi?.close();
+  if(COMPACT_SPECIAL||DIRECT_SPECIAL||FIELD_CONTROLS)specialPowerUi?.close();
   seat = L.seatById(id) ? id : null;
   record = { version: MATCH_VERSION, seed, bots: S.SEAT_IDS.filter(x => x !== seat), commands: [] };
   state = S.createSim(record); queue = []; keys.clear(); accumulator = 0; mode = 'play'; speed = DEFAULT_SPEED; logRows = [];
   inBattle = false; audio.setPhase('opening', true); // 每局重新隨機選開場曲
   mouse = null; dossier.reset();
-  $('log').replaceChildren(); W.clear(fallGroup); shots.live = []; puffs.live = []; prevPos = new Map(); prevShots = new Map();
+  $('log').replaceChildren(); W.clear(fallGroup); shots.live = []; puffs.live = []; prevPos = new Map(); prevShots = new Map(); prevTurretShots = new Map();
   buildPads(); setFraming(false); setView(L.parseView(seat ? `seat:${seat}` : 'team:A'), true); shopUi(); $('cover').hidden = true; canvas.focus(); hud();
 }
 function pause() { if(COMPACT_SPECIAL)specialPowerUi?.close(); if (mode === 'play') {
   mode = 'paused'; releaseInput(false);
   say('已暫停。', 'info'); } else if (mode === 'paused') { mode = 'play'; say('繼續。', 'info'); } accumulator = 0; hud(); }
-let prevPos = new Map(), prevShots = new Map();
+let prevPos = new Map(), prevShots = new Map(), prevTurretShots=new Map();
 const heightOf = u => u && KINDS[u.kind].air ? FLY_HEIGHT + .6 : u && KINDS[u.kind].hover ? HOVER_HEIGHT + 1.05 : .8;
 function tick() {
   const now = queue; queue = [];
   for (const c of now) record.commands.push({ tick: state.tick + 1, ...c });
   prevPos = new Map(state.units.map(u => [u.id, [u.x, u.z]]));
   prevShots = new Map(state.shots.map(s => [s.id, [s.x, s.z]]));
+  if(FIELD_CONTROLS)prevTurretShots=new Map((state.towerShots??[]).map(s=>[s.id,[s.x,s.z]]));
   const before = new Map(state.units.map(u => [u.id, u]));
   for (const e of S.step(state, now)) {
     if(e.type==='tower-fire'){
-      shots.live.push({a:[e.x,TOWER_MUZZLE,e.z], b:[e.tx,heightOf(before.get(e.to)),e.tz],life:.18,color:'#aeeaff'});
-      puffs.live.push({x:e.tx,z:e.tz,y:heightOf(before.get(e.to)),size:.42,life:.18,color:'#aeeaff'});
+      if(!e.delivery){
+        shots.live.push({a:[e.x,TOWER_MUZZLE,e.z], b:[e.tx,heightOf(before.get(e.to)),e.tz],life:.18,color:'#aeeaff'});
+        puffs.live.push({x:e.tx,z:e.tz,y:heightOf(before.get(e.to)),size:.42,life:.18,color:'#aeeaff'});
+      }
+      continue;
+    }
+    if(e.type==='tower-impact'||e.type==='tower-fizzle'){
+      const y=e.targetAir?FLY_HEIGHT+.55:.8, shade=towerColours[e.kind]??'#aeeaff';
+      if(e.delivery==='atTarget'&&e.type==='tower-impact')shots.live.push({a:[e.tx,.04,e.tz],b:[e.tx,1.55,e.tz],life:.26,color:shade});
+      puffs.live.push({x:e.tx,z:e.tz,y,size:e.type==='tower-impact'?.52:.32,life:.18,color:shade});
       continue;
     }
     if(e.type==='launch'&&!e.secondary){
@@ -499,7 +528,7 @@ function tick() {
   if (state.mode === 'end') finish();
 }
 function finish() {
-  if(COMPACT_SPECIAL||DIRECT_SPECIAL)specialPowerUi?.close();
+  if(COMPACT_SPECIAL||DIRECT_SPECIAL||FIELD_CONTROLS)specialPowerUi?.close();
   mode = 'end'; keys.clear(); audio.stopEffects(); record.ticks = state.tick; record.digest = S.digest(state); // 終局立即停掉殘留戰鬥音效；模擬已停，不再觸發新音效，音樂照設定續播
   const won = state.winner === 'draw' ? '平手' : !seat ? `${L.TEAMS[state.winner].name}獲勝` : L.seatById(seat).team === state.winner ? '勝利' : '敗北';
   $('card').innerHTML = `<h3 id="result">${won}</h3><p>${time(state.tick)}　種子 ${state.seed}</p><table><tr><th>席位</th><th>核心</th><th>購買</th><th>花費</th><th>部署</th><th>損失</th><th>擊破</th></tr>${L.SEATS.map(s => { const v = state.seats[s.id]; return `<tr><td>${s.name}席（${relName(s.id)}）</td><td>${v.alive ? Math.ceil(v.hp) : '失守'}</td><td>${v.buys}</td><td>${v.spent}</td><td>${v.deployed}</td><td>${v.lost}</td><td>${v.kills}</td></tr>`; }).join('')}</table><div class="row"><button class="go" id="restart">再來一局</button><button id="look">查看戰場</button></div>`;
@@ -508,12 +537,15 @@ function finish() {
 function menu() {
   specialPowerUi?.close();
   mode = 'menu'; audio.stopEffects(); audio.setPaused(false); $('cover').hidden = false;
-  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${DIRECT_SPECIAL?'本席礦量在主城旁。點自己的清除／控制信標，礦量足夠就直接發動。':COMPACT_SPECIAL?'礦夠才能啟用特殊信標；可按確認、再按同一招，或等 3 秒。':ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
+  $('card').innerHTML = `<h3>選一席開始</h3><p>甲隊（北＋西）對乙隊（南＋東），其餘席位由電腦控制。走到自己購買區的信標上會自動購兵，${MINERALS?'礦不夠':'錢不夠'}就站著等，存夠自動買，繼續站著會再買。攻下對方兩座核心即獲勝。九座信標分別購買陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲。</p><div id="pick">${L.SEATS.map(s => `<button data-seat="${s.id}"><i style="background:${s.primary};border-color:${s.secondary}"></i><b>${s.name}席</b><small>${L.TEAMS[s.team].name}</small></button>`).join('')}</div><button data-seat="none">觀戰（四席皆電腦）</button><p>點購買區地面、按數字鍵 1–9 或用 WASD／方向鍵移動指揮官；V 切換視角，空白鍵暫停。${FIELD_CONTROLS?'特殊能力與砲塔都使用畫面下方的按鈕，礦量顯示在自己主城旁。':DIRECT_SPECIAL?'本席礦量在主城旁。點自己的清除／控制信標，礦量足夠就直接發動。':COMPACT_SPECIAL?'礦夠才能啟用特殊信標；可按確認、再按同一招，或等 3 秒。':ACTIVE_SPECIAL?'特殊信標需手動選擇，再確認使用。':''}</p><p><small>場景配件含 3D Garden 模型改造，適用 <a href="https://www.3dgarden.app/licence" target="_blank" rel="noopener" style="color:#99d9f4">3D Garden 授權</a>；地表貼圖來自 Poly Haven（CC0）。</small></p><p id="music-credits"><small>背景音樂：${MUSIC_CREDITS.join('；')}。</small></p><p class="credit-links">${CREDIT_LINKS.map(l => `<a href="${l.href}" target="_blank" rel="noopener">${l.label}</a>`).join('')}</p>`;
   for (const b of $('card').querySelectorAll('[data-seat]')) b.onclick = () => start(b.dataset.seat, hash.has('seed') ? +hash.get('seed') >>> 0 : undefined);
 }
 function shopUi() {
   $('shop').innerHTML = seat ? MATCH_PADS.map((p, i) => p.locked ? '' : `<button data-pad="${i}"><b>${i + 1}　${p.label}</b><small>${price(p.cost)}<i> → ${p.count} ${deploymentUnit(p.kind)}</i></small></button>`).join('') : '';
-  for (const b of $('shop').querySelectorAll('button')) b.onclick = () => { gotoPad(+b.dataset.pad); canvas.focus(); };
+  for (const b of $('shop').querySelectorAll('button')) {
+    if(FIELD_CONTROLS)b.setAttribute('aria-pressed','false');
+    b.onclick = () => { toggleShopPad(+b.dataset.pad); canvas.focus(); };
+  }
   placeMsg();
   const label=MINERALS?'礦量':'金幣';
   $('gold-label').textContent=seat?`${seatName(seat)}${label}`:label;
@@ -523,7 +555,7 @@ function shopUi() {
 function hud() {
   if (!state) return;
   specialPowerUi?.update();
-  if(DEFENSE_LAB){
+  if(DEFENSE_LAB&&!FIELD_CONTROLS&&$('tower-buy')){
     const button=$('tower-buy'), own=state.seats[seat];
     button.hidden=!own;
     if(own){const t=own.tower;
@@ -535,7 +567,12 @@ function hud() {
   audio.setPaused(mode === 'paused');
   $('clock').textContent = time(state.tick); $('gold').textContent = seat ? amount(state.seats[seat].gold) : '—';
   for (const s of L.SEATS) { const v = state.seats[s.id], e = $('core-' + s.id); e.classList.toggle('down', !v.alive); e.querySelector('i').style.width = `${v.hp / CORE_MAX * 100}%`; e.querySelector('span').textContent = `${relName(s.id)} ${Math.ceil(v.hp)}`; }
-  for (const b of $('shop').querySelectorAll('button')) { b.classList.toggle('on', state.seats[seat].pad === +b.dataset.pad); b.disabled = !state.seats[seat].alive || mode === 'end'; }
+  for (const b of $('shop').querySelectorAll('button')) {
+    const own=state.seats[seat], selected=(FIELD_CONTROLS?(own.shopChoice??own.pad):own.pad)===+b.dataset.pad;
+    b.classList.toggle('on',selected);
+    if(FIELD_CONTROLS&&b.getAttribute('aria-pressed')!==String(selected))b.setAttribute('aria-pressed',String(selected));
+    b.disabled=!own.alive||(FIELD_CONTROLS?mode!=='play':mode==='end');
+  }
   $('pause').textContent = mode === 'paused' ? '繼續' : '暫停'; $('pause').disabled = mode === 'end' || mode === 'menu';
   const label = `${SPEEDS[speed] / SPEEDS[DEFAULT_SPEED]}×`;
   $('speed').textContent = label;
@@ -654,7 +691,15 @@ function draw(dt, k) {
   for (const s of L.SEATS) {
     for (const kind of KIND_IDS) squads[s.id][kind].forEach(m => { m.count = counts[s.id][kind]; m.instanceMatrix.needsUpdate = true; });
     const v = state?.seats[s.id]; if (!v) { commanders[s.id].visible = false; continue; }
-    if(towers){const t=v.tower,g=towers.by[s.id];g.visible=!!(v.alive&&t?.hp>0);if(g.visible)bar(t.x,MATCH_DIM.visibleTower?2.24:1.86,t.z,1,.14,t.hp/TOWER.hp,relColor(s.id));}
+    if(towers){
+      const t=v.tower,g=towers.by[s.id];g.visible=!!(v.alive&&t?.hp>0);
+      if(g.visible){
+        towers.show(s.id,t.kind);
+        const spec=t.kind?towerSpec(MATCH_VERSION,t.kind):TOWER, y=MATCH_DIM.visibleTower?2.24:1.86;
+        bar(t.x,y,t.z,1,.14,t.hp/spec.hp,relColor(s.id));
+        if(spec.shield)bar(t.x,y+.23,t.z,1,.11,t.sh/spec.shield,'#6fe8ff');
+      }
+    }
     const c = commanders[s.id]; c.visible = v.alive; c.position.set(v.commander.x, .1, v.commander.z); if (v.commander.dx || v.commander.dz) c.rotation.y = Math.atan2(v.commander.dx, v.commander.dz);
     bar(...coreStatus.barAt(s.id), 6, .55, v.hp / CORE_MAX, relColor(s.id));
   }
@@ -683,6 +728,18 @@ function draw(dt, k) {
   }
   if(orbGlow){orbGlow.count=flying.dragoon;orbGlow.instanceMatrix.needsUpdate=true;}
   for (const [kind, [mesh]] of Object.entries(PROJ)) { const n = flying[kind]; mesh.count = n; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; }
+  if(turretOrbs){
+    let n=0;
+    for(const s of (mode==='end'?[]:state?.towerShots??[])){
+      if(s.delivery!=='home'||n===64)continue;
+      const [px,pz]=prevTurretShots.get(s.id)??[s.x,s.z];
+      dummy.position.set(px+(s.x-px)*k,s.air?FLY_HEIGHT*.78:TOWER_MUZZLE,pz+(s.z-pz)*k);
+      dummy.quaternion.identity();dummy.scale.setScalar(s.kind==='spore'?1.32:1);dummy.updateMatrix();
+      turretOrbs.setMatrixAt(n,dummy.matrix);turretOrbs.setColorAt(n++,color.set(towerColours[s.kind]));
+    }
+    turretOrbs.count=n;turretOrbs.instanceMatrix.needsUpdate=true;
+    if(turretOrbs.instanceColor)turretOrbs.instanceColor.needsUpdate=true;
+  }
   for (const m of [barBack, barFill]) { m.count = bars; m.instanceMatrix.needsUpdate = true; } if (barFill.instanceColor) barFill.instanceColor.needsUpdate = true;
   const fx = (mesh, place) => { mesh.live = mesh.live.filter(e => (e.life -= dt) > 0); mesh.live.forEach((e, i) => { place(e); dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix); mesh.setColorAt(i, color.set(e.color)); }); mesh.count = mesh.live.length; mesh.instanceMatrix.needsUpdate = true; if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true; };
   fx(shots, e => { const d = new THREE.Vector3(...e.b).sub(new THREE.Vector3(...e.a)), n = d.length() || 1; dummy.position.set(...e.a).addScaledVector(d, .5); dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), d.divideScalar(n)); dummy.scale.set(.1, .1, n); });
@@ -695,9 +752,15 @@ function draw(dt, k) {
     // Fixed CSS pixels keep our tower label legible from a phone's far camera.
     const show=state?.seats[seat]?.alive&&point&&Math.abs(point.x)<1&&Math.abs(point.y)<1&&Math.abs(point.z)<1;
     marker.hidden=!show;
-    if(show){marker.style.left=`${(point.x+1)*canvas.clientWidth/2}px`;marker.style.top=`${(1-point.y)*canvas.clientHeight/2}px`;}
+    if(show){
+      marker.style.left=`${(point.x+1)*canvas.clientWidth/2}px`;marker.style.top=`${(1-point.y)*canvas.clientHeight/2}px`;
+      if(FIELD_CONTROLS){
+        const label=towerNames[t.kind]??'砲塔';
+        if(marker.textContent!==label)marker.textContent=label;
+      }
+    }
   }
-  if(DIRECT_SPECIAL)specialPowerUi?.draw({left:safe.l+2,right:safe.l+safe.w-2,top:safe.t+2,bottom:safe.t+safe.h-2},poseRevision);
+  if(DIRECT_SPECIAL||FIELD_CONTROLS)specialPowerUi?.draw({left:safe.l+2,right:safe.l+safe.w-2,top:safe.t+2,bottom:safe.t+safe.h-2},poseRevision);
   renderer.render(scene, camera);
 }
 function advance(dt) {
@@ -735,15 +798,30 @@ $('framing').onclick = e => { setFraming(!overview); if (e.detail) canvas.focus(
 $('again').onclick = () => { if (mode === 'play') pause(); menu(); };
 $('save').onclick = () => { if (!record) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ ...record, ticks: state.tick, digest: S.digest(state) })], { type: 'application/json' })); a.download = `battle_craft-dev02-${record.seed}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
 const battlecruiserPad = MATCH_PADS.find(p => p.kind === 'battlecruiser');
-$('rules').innerHTML = [`起始 ${price(liveEconomy.startGold)}、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${MINERALS?'+':''}${price(liveEconomy.income)}、陸戰隊 ${price(MATCH_PADS.find(p=>p.kind==='marine').cost)}；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈式戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈式戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `${MINERALS?'':'版本 8：'}戰鬥巡洋艦每次花 ${price(battlecruiserPad.cost)}部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。',...(ACTIVE_SPECIAL?[`${DIRECT_SPECIAL?'特殊信標（點本席主城旁的信標，礦量足夠就直接發動）':COMPACT_SPECIAL?'特殊信標（3 秒後自動確認，亦可按確認、連按同一招或取消）':'特殊信標需手動確認'}：敵對兵清除 ${price(SPECIAL_POWER_COSTS.clear)}，敵對兵控制 ${price(SPECIAL_POWER_COSTS.control)}。只選中央與道路上的敵方部隊，控制為主路長度的 70%。`]:SPECIAL_LAB?['特殊信標（未開放）：各席主城順時鐘側有「全場清除」與「控制單位」。兩招都未定價，不能購買或發動。']:[])].map(t => `<li>${t}</li>`).join('');
+$('rules').innerHTML = [`起始 ${price(liveEconomy.startGold)}、每 ${liveEconomy.incomeEvery / S.HZ} 秒 ${MINERALS?'+':''}${price(liveEconomy.income)}、陸戰隊 ${price(MATCH_PADS.find(p=>p.kind==='marine').cost)}；購買間隔 0.5 秒沿用 v5。價格、數量、核心、投射物速度、彈跳與濺射半徑為暫定。`, '版本 6：每席六座信標，加刺蛇、破壞能、死靈式戰機。破壞能濺射依距離 100／50／25%，不傷己席、可傷隊友（暫定）；死靈式戰機對地普通、對空指向性爆炸，隱形未實作。', '版本 7：每席九座信標，加戰鬥巡洋艦（基礎護甲 3，大和砲未實作）、斥候（對空兩發飛彈）、自殺蟲（只打空中，接觸自爆、不算對方擊殺）；基礎護甲先扣在盾之後、體型倍率之前，至少 0.5。', `${MINERALS?'':'版本 8：'}戰鬥巡洋艦每次花 ${price(battlecruiserPad.cost)}部署 ${battlecruiserPad.count} 艘，核心耐久為版本 7 的 3 倍；舊重播依原版規則計算。`, `核心 ${CORE_MAX}，視為重裝甲；損壞外觀依血量分 75／50／25% 三段（暫定，純視覺，不燃燒扣血）。兵種血量、護盾、傷害與冷卻沿用原版引擎預設。`, `攻擊標籤：${Object.values(ATTACKS).map(a => a.name).join('、')}。指向性爆炸對小／中／大（輕／中／重）本體 50／75／100%，盾先扣且不套體型倍率；範圍傷害另計，指向性爆炸本身不濺射；彈跳倍率暫同普通，跳兩次為 1/3、1/9。`, '護盾先吸收原始傷害且至少 1 點才吸收；回盾每原版 frame 7/256 點（以 42 毫秒換算，未驗證），受擊不中斷。', '部隊沿原軸攻向對側；平面距離 5 內主動接敵。', '對側核心失守後，存活部隊經中央改攻另一座敵方核心。', '失守席停止購兵，存活部隊續戰。', '兩隊最後核心同一步失守為平手。', `8 分鐘起所有核心每 2 秒過載扣 ${CORE.overtimeDamage}；過載不清護盾。`, '迷霧、房間連線未做；四席購買區皆可見。',...(ACTIVE_SPECIAL?[`${FIELD_CONTROLS?'特殊能力（直接按下方的按鈕，礦量足夠就發動）':DIRECT_SPECIAL?'特殊信標（點本席主城旁的信標，礦量足夠就直接發動）':COMPACT_SPECIAL?'特殊信標（3 秒後自動確認，亦可按確認、連按同一招或取消）':'特殊信標需手動確認'}：敵對兵清除 ${price(SPECIAL_POWER_COSTS.clear)}，敵對兵控制 ${price(SPECIAL_POWER_COSTS.control)}。只選中央與道路上的敵方部隊，控制為主路長度的 70%。`]:SPECIAL_LAB?['特殊信標（未開放）：各席主城順時鐘側有「全場清除」與「控制單位」。兩招都未定價，不能購買或發動。']:[])].map(t => `<li>${t}</li>`).join('');
 try {
   ({ renderer, camera } = W.createWorld(canvas, { commander: false, dim: MATCH_DIM }));
-  if (SPECIAL_LAB) scene.add(buildSpecialZones(MATCH_DIM,{powers:specialDeckPowers}));
+  if (SCENE_SPECIAL_DECK) scene.add(buildSpecialZones(MATCH_DIM,{powers:specialDeckPowers}));
   if (DEFENSE_LAB) {
-    towers=towerModels(MATCH_DIM);scene.add(towers.root);
-    const b=$('tower-buy');b.title=`單席一座，拆毀後不能重買。試驗價 ${price(matchTowerCost)}。`;
-    b.onclick=()=>{command({type:'tower'});canvas.focus();};
-    if(DIRECT_SPECIAL){
+    towers=towerModels(MATCH_DIM,{variants:FIELD_CONTROLS});scene.add(towers.root);
+    const b=$('tower-buy');
+    if(b&&!FIELD_CONTROLS){
+      b.title=`單席一座，拆毀後不能重買。試驗價 ${price(matchTowerCost)}。`;
+      b.onclick=()=>{command({type:'tower'});canvas.focus();};
+    }
+    if(FIELD_CONTROLS){
+      if(b)b.hidden=true;
+      installCompactSpecialHud($('bar'));
+      specialPowerUi=createResponsiveFieldUi({
+        shop:$('shop'),costs:SPECIAL_POWER_COSTS,
+        towerCosts:Object.fromEntries(Object.keys(FIELD_TOWER_LABELS).map(kind=>[kind,towerCost(MATCH_VERSION,kind)])),
+        projection:coreBalanceProjection,
+        context:()=>{const own=state?.seats[seat];return {seat,match:record,mode:document.hidden?'background':mode,
+          alive:!!own?.alive,gold:own?.gold??0,tower:own?.tower?.hp>0?own.tower.kind:null};},
+        cast:power=>command({type:'special',power}),purchaseTower:kind=>command({type:'tower',kind}),
+        notice:text=>say(text,'warn'),scale:()=>portraitOverviewScale(canvas.clientWidth,canvas.clientHeight),
+      });
+    }else if(DIRECT_SPECIAL){
       installCompactSpecialHud($('bar'));
       specialPowerUi=createDirectSpecialBeacons({
         canvas,costs:SPECIAL_POWER_COSTS,projection:specialProjection,canvasPower:specialAt,
@@ -778,10 +856,10 @@ try {
   dossier = createDossier(renderer, $('dossier'), $('panel'), () => display.quality, MATCH_VERSION>=10, DEFENSE_LAB, MATCH_VERSION>=VISIBILITY_VERSION);
   applyDisplay(false); applyQuality();
   applySurface();
-  const watch = new ResizeObserver(resize); [canvas, $('panel'), $('bar')].forEach(o => watch.observe(o)); $('panel').addEventListener('toggle', resize);
+  const watch = new ResizeObserver(resize); [canvas, $('panel'), $('bar'), ...(FIELD_CONTROLS&&specialPowerUi?.root?[specialPowerUi.root]:[])].forEach(o => watch.observe(o)); $('panel').addEventListener('toggle', resize);
   if (MATCH_VERSION >= PORTRAIT_OVERVIEW_VERSION) window.visualViewport?.addEventListener('resize',resize);
   shopUi(); setView(view, true); resize(); menu(); hud(); requestAnimationFrame(frame);
 } catch (err) { console.error(err); $('card').innerHTML = '<h3>無法啟動 3D</h3><p>此裝置或瀏覽器無法使用 WebGL，這一版沒有 2D 備援。</p>'; }
 // 供自動核對：唯讀快照
-window.__dev02 = { ...(SPECIAL_LAB?{specialZones:()=>S.SEAT_IDS.map(id=>{const z=specialZoneFor(id,MATCH_DIM);return {id,positions:z.ringPositions,sign:z.sign};})}:{}), audio: () => audio.info(), wings: wingTilts, cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count, hydralisk: darts.count, wraith: missiles.count, scout: bolts.count, ...(MATCH_VERSION>=10 ? {battlecruiser:cruiserPulse.count} : {}) }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
+window.__dev02 = { ...(SCENE_SPECIAL_DECK?{specialZones:()=>S.SEAT_IDS.map(id=>{const z=specialZoneFor(id,MATCH_DIM);return {id,positions:z.ringPositions,sign:z.sign};})}:{}), audio: () => audio.info(), wings: wingTilts, cores: () => coreStatus.info(), coreReach: () => coreStatus.reach(), snapshot: () => state && JSON.parse(JSON.stringify(state)), record: () => record && JSON.parse(JSON.stringify(record)), log: () => JSON.parse(JSON.stringify(logRows)), digest: () => state && S.digest(state), mode: () => mode, surface: () => ({ active: SF.surface(), busy: surfaceBusy, bytes: SF.bytes, textures: renderer.info.memory.textures }), display: () => ({ ...display, barsDrawn: !!barBack?.visible && barBack.count, logShown: !($('engineering-panel').hidden || !$('panel').open || !display.log), logRows: $('log').children.length }), view: () => L.viewKey(view), framing: () => overview ? 'overview' : 'near', quality: () => ({ active: display.quality, pixelRatio: renderer.getPixelRatio(), canvas: [renderer.domElement.width, renderer.domElement.height], props: { ...HS.props }, sceneVisible: HS.group.visible }), info: () => ({ heights: Object.fromEntries(KIND_IDS.map(k => [k, [...new Set(S.SEAT_IDS.flatMap(id => { const mesh = squads[id][k][0]; return Array.from({ length: mesh.count }, (_, i) => Math.round(mesh.instanceMatrix.array[i * 16 + 13] * 100) / 100); }))]])), shadows: shadows.count, projectiles: { dragoon: orbs.count, mutalisk: glaives.count, hydralisk: darts.count, wraith: missiles.count, scout: bolts.count, ...(MATCH_VERSION>=10 ? {battlecruiser:cruiserPulse.count} : {}) }, drawn: Object.fromEntries(KIND_IDS.map(k => [k, S.SEAT_IDS.reduce((n, id) => n + squads[id][k][0].count, 0)])), calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, bodyTriangles: { ...bodyTriangles } }),
   screen: (x, z, y = .1) => { const v = new THREE.Vector3(x, y, z).project(camera); return [(v.x + 1) / 2 * canvas.clientWidth, (1 - v.y) / 2 * canvas.clientHeight]; }, pad: i => S.padWorld(seat, i, MATCH_DIM), padModels: () => padModels.children.map(g => ({ seat: g.userData.seat, pad: g.userData.pad, kind: MATCH_PADS[g.userData.pad].kind, visible: g.visible })), padModel: i => { const m = padModels.children.find(o => o.userData.pad === i && o.userData.seat === seat); return m && [m.position.x, m.position.y + .8, m.position.z]; }, inside: () => { pose(); const b = [1e9, 1e9, -1e9, -1e9]; for (const p of L.framePoints(view, ARENA)) { const [x, y] = window.__dev02.screen(p[0], p[2], p[1]); b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], y); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], y); } return b[0] >= safe.l - 1 && b[1] >= safe.t - 1 && b[2] <= safe.l + safe.w + 1 && b[3] <= safe.t + safe.h + 1; } };

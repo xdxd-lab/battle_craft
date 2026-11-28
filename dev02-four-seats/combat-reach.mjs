@@ -22,8 +22,9 @@ export const DAT_EXTENTS = Object.freeze(Object.fromEntries(Object.entries({
 // fixed-point move in BW. The tiny tolerance only cancels conversion roundoff
 // when generating an exact source pixel from a JS float, including below zero.
 const pixel = world => Math.floor(world / WORLD_PER_PX + 1e-10);
-export function weaponBoxPx(kind, x, z) {
-  const [l,t,r,b] = DAT_EXTENTS[kind], px = pixel(x), pz = pixel(z);
+export function weaponBoxPx(kind, x, z) { return weaponBoxFromExtents(DAT_EXTENTS[kind],x,z); }
+export function weaponBoxFromExtents([l,t,r,b], x, z) {
+  const px = pixel(x), pz = pixel(z);
   // OpenBW unit_sprite_bounding_box uses the OUTER box: +1 at right/bottom.
   return {l:px-l, t:pz-t, r:px+r+1, b:pz+b+1};
 }
