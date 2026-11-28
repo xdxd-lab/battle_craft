@@ -20,7 +20,7 @@ Web 由 `padsFor(10)` 讀取，每筆是整批金價；歷史欄為 CHK Trigger 
 
 **射程／命中補記（2026-11-29，台灣時間）**：網頁值以世界單位計；表內一般部隊對部隊判斷用中心距，重騎兵在模擬 13 起用原作碰撞框的邊緣距（不拿放大的移動佔位代替靶框），自殺蟲則用接觸邊距（3 原作像素 × `1.62/128`），因此數值的量距方式並不全相同。「即時」是指開火後在目標位置結算，並不表示沒有起手。飛行雷射／飛彈和技能濺射都不限於畫面上的發光特效，見[命中調查](BC-V6-WEAPON-DELIVERY.md)。
 
-**重騎兵原作**：[暴雪普通重騎兵](https://classic.battle.net/scc/protoss/units/dragoon.shtml)是 4 格，研究射程升級後是 6 格；一格 32 原作像素，即 128／192 像素。[OpenBW](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L1703-L1726)對英雄 Fenix 固定加 64 像素，故基礎 128 加到 192（6 格）；不再疊加第二次。2009 SPEED 原附件與十份鏡像的通用升級資料 `PUPx` 把 Singularity Charge（33）起始等級設為 1，P1–P4 皆沿用通用值，所以原附件一般商店的普通重騎兵出場也是 6 格。網頁現有比例下，6 格對應 2.430，8 格對應 3.240；試玩 3.204 世界單位＝目前 1.068 的移動佔位寬 ×3；這是網頁版平衡試行，不是原作格數換算。正式版未變。
+**重騎兵原作**：[暴雪普通重騎兵](https://classic.battle.net/scc/protoss/units/dragoon.shtml)是 4 格，研究射程升級後是 6 格；一格 32 原作像素，即 128／192 像素。[OpenBW](https://github.com/OpenBW/openbw/blob/4b046d5f65302b10cb0a745f0fecd37ec85b20a8/bwgame.h#L1593-L1618)對英雄 Fenix 固定加 64 像素，故基礎 128 加到 192（6 格）；不再疊加第二次。2009 SPEED 原附件與十份鏡像的通用升級資料 `PUPx` 把 Singularity Charge（33）起始等級設為 1，P1–P4 皆沿用通用值，所以原附件一般商店的普通重騎兵出場也是 6 格。網頁現有比例下，6 格對應 2.430，8 格對應 3.240；試玩 3.204 世界單位＝目前 1.068 的移動佔位寬 ×3；這是網頁版平衡試行，不是原作格數換算。正式版未變。
 
 本輪直接解析 11 份 CHK：[2009 論壇附件](https://www.gamez.com.tw/t/topic/374947/11)與十份 SPEED 鏡像。上表九兵種的 16 筆購買 Trigger 逐位元一致，其他兵種的 24 筆也一致，因此鏡像併欄。十份鏡像為 2tzpVkp9、5ykDqVDV、8sGp67zf、96c594jR、GcqBVh2H、d37t25T3、fqzfY9cz、y5Dd5fbV、yrDYVGj7、zRDTRs23；各份 SCX 雜湊均可核對。經濟、技能範圍或 UNIx 覆寫仍可能不同。見[樣本雜湊與來源](battle_craft-scx-checksums.csv)、[基準 SPEED 40 筆兵種購買](battle_craft-speed-purchases.csv)、[九兵種 Trigger 對照](BC-V6-ATTACK-EVIDENCE.md)。
 
