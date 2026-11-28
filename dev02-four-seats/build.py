@@ -38,10 +38,6 @@ subprocess.run(
 inline = bundle.read_text().replace('</script', '<\\/script')
 template = (ROOT / 'template.html').read_text()
 assert template.count('<script>/* BUNDLE */</script>') == 1
-dest = ROOT / 'battle_craft-v6-0-offline.html'
-dest.write_text(template.replace('<script>/* BUNDLE */</script>', '<script>' + inline + '</script>'))
-print(f'{dest} ({dest.stat().st_size:,} bytes)')
-
 # Pages 載入同一份原始模組；依畫質與音樂階段分批抓圖檔，不改歷史 v5-9 離線檔。
 web_imports = {
     'three': '../vendor/three.module.js',
@@ -50,7 +46,10 @@ web_imports = {
     './prop-data.generated.js': './web-props.mjs',
     './DRACOLoader.local.js': '../vendor/addons/loaders/DRACOLoader.js',
 }
-web = ROOT / 'battle_craft-v6-0.html'
 scripts = '<script type="importmap">' + json.dumps({'imports': web_imports}, indent=2) + '</script>\n<script type="module" src="./main.js"></script>'
-web.write_text(template.replace('<script>/* BUNDLE */</script>', scripts))
-print(f'{web} ({web.stat().st_size:,} bytes)')
+for version in ('v6-0', 'v6-1'):
+    page = template if version == 'v6-0' else template.replace('v6-0', version).replace('data-match="8"', 'data-match="10"')
+    for suffix, body in (('', scripts), ('-offline', '<script>' + inline + '</script>')):
+        dest = ROOT / f'battle_craft-{version}{suffix}.html'
+        dest.write_text(page.replace('<script>/* BUNDLE */</script>', body))
+        print(f'{dest} ({dest.stat().st_size:,} bytes)')

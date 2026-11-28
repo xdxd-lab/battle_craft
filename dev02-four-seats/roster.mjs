@@ -30,8 +30,8 @@ export const KINDS = {
   // 以下三種自模擬版本 6 起開放。hp／shield／damage／cooldown／射程 px 取 BWAPI 原版預設；cost、projectile、濺射半徑換算為暫定。
   hydralisk: { name: '刺蛇', source: 'Hydralisk', armor: 'medium', attack: 'E', hp: 80, shield: 0, damage: 10, cooldown: 15, range: 1.62, air: false, targets: ['ground', 'air'], projectile: .2, bounces: 0, cost: 9, count: 1 },
   archon: { name: '破壞能', source: 'Archon', armor: 'heavy', attack: 'N', hp: 10, shield: 350, damage: 30, cooldown: 20, range: .81, air: false, hover: true, targets: ['ground', 'air'], projectile: 0, bounces: 0, cost: 28, count: 1, splash: SPLASH.archon },
-  // 死靈戰機對地 Burst Lasers（N，即時）、對空 Gemini Missiles（E，投射物）；隱形未實作
-  wraith: { name: '死靈戰機', source: 'Wraith', armor: 'heavy', attack: 'N', hp: 120, shield: 0, damage: 8, cooldown: 30, range: 2.025, air: true, targets: ['ground', 'air'], projectile: 0, bounces: 0, cost: 17, count: 1,
+  // 死靈式戰機對地 Burst Lasers（N，即時）、對空 Gemini Missiles（E，投射物）；隱形未實作
+  wraith: { name: '死靈式戰機', source: 'Wraith', armor: 'heavy', attack: 'N', hp: 120, shield: 0, damage: 8, cooldown: 30, range: 2.025, air: true, targets: ['ground', 'air'], projectile: 0, bounces: 0, cost: 17, count: 1,
     vsAir: { attack: 'E', damage: 20, cooldown: 22, range: 2.025, projectile: .25 } },
   // 以下三種自模擬版本 7 起開放。hp／shield／plate／damage／cooldown／射程 px 取 BWAPI 原版預設；cost、projectile、自殺蟲接觸距離為暫定。見 ../research/BC-NINE-UNITS.md
   // 戰鬥巡洋艦 ATS／ASS Laser Battery：對地對空同為 N 25、冷卻 30、192 px，即時；Yamato 未實作

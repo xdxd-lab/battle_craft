@@ -1,6 +1,6 @@
 ![BaattleCraft 原創科幻十字戰場概念橫幅](assets/branding/baattlecraft-banner.png)
 
-**最新版本：[v6-0 線上遊玩](https://xdxd-lab.github.io/battle_craft/dev02-four-seats/battle_craft-v6-0.html)** · [v6-0 改動與驗證](research/BC-V6-0-RELEASE.md) · [四席基準 v5-9（模擬 7）](dev02-four-seats/battle_craft-dev02.html)
+**最新版本：[v6-1 線上遊玩](https://xdxd-lab.github.io/battle_craft/dev02-four-seats/battle_craft-v6-1.html)** · [改動與驗證](research/BC-V6-1-RELEASE.md) · [v6-0](dev02-four-seats/battle_craft-v6-0.html) · [v5-9](dev02-four-seats/battle_craft-dev02.html)
 
 # BaattleCraft｜十字對衝
 
@@ -20,7 +20,7 @@ BaattleCraft 目前有六個單機試作。長期方向是四人 2v2、場外購
 | [v4](v4/battle_craft-v4.html) | [傾斜 3D 星際戰場](v4/README.md)，加入寫實燈具與畫質切換。每次停留只買一次。 |
 | [v5](v5/battle_craft-v5.html) | [提高俯角、持續自動購兵、血條與分色事件紀錄](v5/README.md)。建議從此版試玩。 |
 | [v5-2](v5-2/battle_craft-v5-2.html) | 保留歷史 HTML 快照。 |
-| [四席 2v2](dev02-four-seats/battle_craft-dev02.html) | [單人加三電腦，陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈戰機、戰鬥巡洋艦、斥候、自殺蟲](dev02-four-seats/README.md)；[九兵種與九信標](research/BC-NINE-UNITS.md)、[六兵種與六信標](research/BC-SIX-UNITS.md)、[傷害規則與暫定值](research/BC01-ROSTER-DAMAGE.md)、[受損外觀與道路依據](research/BC-SURFACE-HUD.md)、[經濟與聲音](research/BC-AUDIO-ROSTER.md)。 |
+| [四席 2v2](dev02-four-seats/battle_craft-dev02.html) | [單人加三電腦，陸戰隊、重騎兵、飛螳、刺蛇、破壞能、死靈式戰機、戰鬥巡洋艦、斥候、自殺蟲](dev02-four-seats/README.md)；[九兵種與九信標](research/BC-NINE-UNITS.md)、[六兵種與六信標](research/BC-SIX-UNITS.md)、[傷害規則與暫定值](research/BC01-ROSTER-DAMAGE.md)、[受損外觀與道路依據](research/BC-SURFACE-HUD.md)、[經濟與聲音](research/BC-AUDIO-ROSTER.md)。 |
 
 各版 HTML 可下載後雙擊離線遊玩。3D 版本需要支援 WebGL 的瀏覽器。
 
